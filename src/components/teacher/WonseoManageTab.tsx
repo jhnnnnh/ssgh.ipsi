@@ -310,7 +310,7 @@ export function WonseoManageTab() {
                     )}
                   >
                     {showRecentResults ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    <span>최근 입결 {showRecentResults ? "숨기기" : "보기"}</span>
+                    <span>지난 입결</span>
                   </button>
                   <button
                     onClick={handleToggleAutoAssign}
