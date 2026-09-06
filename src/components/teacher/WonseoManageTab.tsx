@@ -55,6 +55,7 @@ export function WonseoManageTab() {
   const [editingCard, setEditingCard] = useState<WonseoCard | null>(null);
   const [exporting, setExporting] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showRecentResults, setShowRecentResults] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
   const { setRef, maxHeight } = useEqualHeights(
@@ -300,6 +301,18 @@ export function WonseoManageTab() {
               {selectedStudentId && (
                 <div className="flex items-center gap-2 shrink-0">
                   <button
+                    onClick={() => setShowRecentResults((v) => !v)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+                      showRecentResults
+                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-600",
+                    )}
+                  >
+                    {showRecentResults ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    <span>최근 입결 {showRecentResults ? "숨기기" : "보기"}</span>
+                  </button>
+                  <button
                     onClick={handleToggleAutoAssign}
                     className={cn(
                       "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
@@ -345,6 +358,7 @@ export function WonseoManageTab() {
                           rankLabel={rankLabels[index]}
                           onRankChange={(text) => handleRankTextChange(card, text)}
                           showStatus={statusVisible}
+                          showRecentResults={showRecentResults}
                           onEdit={() => openEdit(card)}
                           onDelete={() => handleDelete(card)}
                         />
@@ -359,6 +373,7 @@ export function WonseoManageTab() {
                           autoAssign={autoAssign}
                           rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
                           showStatus={statusVisible}
+                          showRecentResults={showRecentResults}
                           onEdit={() => {}}
                           onDelete={() => {}}
                         />

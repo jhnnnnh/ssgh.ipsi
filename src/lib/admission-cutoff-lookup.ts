@@ -49,6 +49,39 @@ export async function fetchCutoffsForType(
     .slice(0, RECENT_YEARS);
 }
 
+export type CutoffLookupGroup = {
+  admissionType: string;
+  track: string | null;
+  /** 그 전형으로 찾은 모든 연도(있는 만큼, 최대 2023~2026학년도), 최신순. */
+  years: CutoffMatch[];
+};
+
+/**
+ * "입결 조회" 탭 전용 — 대학+학과로 admission_cutoffs 원본을 통째로 찾아 세부전형명별로
+ * 묶는다(연도 3개로 자르지 않고 있는 연도를 전부 보여준다). admissionType을 주면 그
+ * 전형 하나만 남긴다.
+ */
+export async function searchCutoffsForLookup(
+  university: string,
+  department: string,
+  admissionType?: string,
+): Promise<CutoffLookupGroup[]> {
+  const rows = await fetchCutoffRows(university, department);
+  const byType = new Map<string, CutoffRow[]>();
+  for (const row of rows) {
+    if (!row.admission_type) continue;
+    if (admissionType && row.admission_type !== admissionType) continue;
+    const list = byType.get(row.admission_type) ?? [];
+    list.push(row);
+    byType.set(row.admission_type, list);
+  }
+  return [...byType.entries()].map(([type, typeRows]) => ({
+    admissionType: type,
+    track: typeRows[0]?.track ?? null,
+    years: [...typeRows].sort((a, b) => b.year - a.year),
+  }));
+}
+
 /**
  * 이름을 비교하기 좋게 다듬는다. "교과"/"종합"/"전형"은 트랙을 나타내는 수식어일 뿐
  * 전형을 구분하는 진짜 이름이 아닌데, 두 원본이 이 수식어를 서로 다른 위치에 넣는다

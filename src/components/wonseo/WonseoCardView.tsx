@@ -24,6 +24,8 @@ export const WonseoCardView = forwardRef<
   {
     card: WonseoCard;
     showStatus: boolean;
+    /** 목록 상단의 전체 on/off 버튼으로 제어되는, 최근 입결 표시 여부. */
+    showRecentResults: boolean;
     onEdit: () => void;
     onDelete: () => void;
     minHeight?: number;
@@ -40,6 +42,7 @@ export const WonseoCardView = forwardRef<
   {
     card,
     showStatus,
+    showRecentResults,
     onEdit,
     onDelete,
     minHeight,
@@ -173,7 +176,7 @@ export const WonseoCardView = forwardRef<
         )}
       </div>
 
-      <RecentResultsSection years={card.recent_results ?? []} />
+      <RecentResultsSection years={card.recent_results ?? []} open={showRecentResults} />
 
       {card.memo && (
         <p className="text-xs text-amber-900 bg-amber-100 rounded-xl p-3 whitespace-pre-wrap shadow-md shadow-amber-900/5 -rotate-1">

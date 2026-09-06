@@ -10,6 +10,7 @@ export function SortableWonseoCard({
   id,
   card,
   showStatus,
+  showRecentResults,
   onEdit,
   onDelete,
   minHeight,
@@ -22,6 +23,7 @@ export function SortableWonseoCard({
   id: string;
   card: WonseoCard;
   showStatus: boolean;
+  showRecentResults: boolean;
   onEdit: () => void;
   onDelete: () => void;
   minHeight?: number;
@@ -41,6 +43,7 @@ export function SortableWonseoCard({
       }}
       card={card}
       showStatus={showStatus}
+      showRecentResults={showRecentResults}
       onEdit={onEdit}
       onDelete={onDelete}
       autoAssign={autoAssign}

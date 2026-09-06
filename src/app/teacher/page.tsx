@@ -11,6 +11,7 @@ import {
   KeyRound,
   ListChecks,
   LogOut,
+  Search,
   ShieldUser,
   UsersRound,
   UserCog,
@@ -25,6 +26,7 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { Tabs } from "@/components/ui/Tabs";
 import { StatusTab } from "@/components/teacher/StatusTab";
 import { WonseoManageTab } from "@/components/teacher/WonseoManageTab";
+import { CutoffLookupTab } from "@/components/wonseo/CutoffLookupTab";
 import { RosterTab } from "@/components/teacher/RosterTab";
 import { TeacherCalendarTab } from "@/components/teacher/TeacherCalendarTab";
 import { TeacherManageTab } from "@/components/teacher/TeacherManageTab";
@@ -34,7 +36,7 @@ import { ChangePasswordModal } from "@/components/teacher/ChangePasswordModal";
 import { ManualHelpModal } from "@/components/teacher/ManualHelpModal";
 import { formatClassLabel } from "@/lib/student-id";
 
-type TeacherTab = "status" | "wonseo" | "roster" | "calendar" | "teachers" | "cutoffs";
+type TeacherTab = "status" | "wonseo" | "cutoffLookup" | "roster" | "calendar" | "teachers" | "cutoffs";
 
 export default function TeacherPage() {
   const router = useRouter();
@@ -80,6 +82,7 @@ function TeacherDashboard() {
   const tabs = [
     { key: "status", label: "상담 신청 현황", icon: <ListChecks className="w-4 h-4" /> },
     { key: "wonseo", label: "수시 원서 관리", icon: <GraduationCap className="w-4 h-4" /> },
+    { key: "cutoffLookup", label: "입결 조회", icon: <Search className="w-4 h-4" /> },
     { key: "calendar", label: "입시 일정", icon: <CalendarDays className="w-4 h-4" /> },
     { key: "roster", label: "학생 명단 관리", icon: <UsersRound className="w-4 h-4" /> },
     ...(isAdmin
@@ -188,7 +191,12 @@ function TeacherDashboard() {
 
       <Tabs items={tabs} active={tab} onChange={(k) => setTab(k as TeacherTab)} />
 
-      {!loading && grade == null && classNo == null && tab !== "teachers" && tab !== "cutoffs" ? (
+      {!loading &&
+      grade == null &&
+      classNo == null &&
+      tab !== "teachers" &&
+      tab !== "cutoffs" &&
+      tab !== "cutoffLookup" ? (
         <Card padded={false} className="p-12 text-center space-y-2">
           <p className="text-sm font-bold text-slate-600">
             {isAdmin ? "아직 등록된 반이 없습니다." : "담당 반 정보를 확인할 수 없습니다."}
@@ -203,6 +211,7 @@ function TeacherDashboard() {
         <>
           {tab === "status" && <StatusTab />}
           {tab === "wonseo" && <WonseoManageTab />}
+          {tab === "cutoffLookup" && <CutoffLookupTab />}
           {tab === "roster" && <RosterTab />}
           {tab === "calendar" && <TeacherCalendarTab />}
         </>
