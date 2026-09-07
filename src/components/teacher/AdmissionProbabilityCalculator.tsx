@@ -558,16 +558,94 @@ export function AdmissionProbabilityCalculator({
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">
                   이 수치는 어떻게 계산되었나요?
                 </summary>
-                <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 space-y-2 border-t border-slate-100 pt-3">
-                  <p>
-                    최근 연도의 50%·70%컷을 기준값으로 삼아 예상 경쟁률 변화율을 반영한 선형회귀 보정을
-                    적용합니다. 이어서 두 컷 사이의 스프레드와 정원 대비 충원비율을 설명변수로 하는
-                    다중선형회귀로 등록 마지노선(모집정원이 최종적으로 채워지는 컷)을 추정합니다. 이
-                    마지노선에서 합격확률이 정확히 50%가 되도록 변곡점을 고정한 로지스틱 함수에 입력 등급을
-                    대입해 최종 확률을 산출하며, 표본의 평균 경쟁률 수준에 따라 곡선의 기울기(신뢰가중치)를
-                    조정해 이분산성이 큰 표본일수록 확률 구간을 신중하게 넓힙니다.
-                  </p>
-                  <ProbCurve result={ok} userScore={queriedScore} />
+                <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3">
+                  <ol className="space-y-3 list-decimal pl-4">
+                    <li>
+                      <strong className="text-slate-800">기준값(baseline) 산정.</strong> 최신 연도 관측치를 다음
+                      시점의 추정량으로 그대로 채택합니다.
+                      <div className="mt-1">
+                        <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">X̂(t+1) = X(t)</code>
+                      </div>
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">경쟁률 변화 선형회귀 보정.</strong> 예상 경쟁률과 최근
+                      경쟁률의 비(ρ)를 산출해 50%·70%컷 각각에 회귀식을 적용합니다.
+                      <div className="mt-1 space-y-0.5">
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">ρ = 예상경쟁률 ÷ 최근경쟁률</code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                            X̂₅₀ = X₅₀ + (0.1399 − 0.2303ρ)
+                          </code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                            X̂₇₀ = X₇₀ + (0.1424 − 0.2404ρ)
+                          </code>
+                        </div>
+                      </div>
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">표본크기 척도보정.</strong> 참조 정원(15명) 대비
+                      역제곱근 척도로 충원비율(φ)을 보정합니다(정원이 작을수록 추합 인원 1~2명의 등락이
+                      상대적으로 크게 반영되도록).
+                      <div className="mt-1 space-y-0.5">
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">λ = √(15 ÷ 정원), λ ∈ [0.6, 1.6]</code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">φ_보정 = (φ·λ) ÷ (1 + φ·λ)</code>
+                        </div>
+                      </div>
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">등록 마지노선(100%컷) 다중선형회귀 추정.</strong>{" "}
+                      50%·70%컷 스프레드(Δ)와 보정된 충원비율을 설명변수로 마지노선까지의 확장폭을
+                      추정합니다.
+                      <div className="mt-1 space-y-0.5">
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">Δ = X̂₇₀ − X̂₅₀</code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                            확장량 = −0.1550 + 0.4105·φ_보정 + 1.5181·Δ
+                          </code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">X̂₁₀₀ = X̂₇₀ + 확장량</code>
+                        </div>
+                      </div>
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">신뢰가중치(이분산성 보정) 산정.</strong> 과거 평균
+                      경쟁률을 기준 경쟁률(4.0)과 비교해 0.5~1.0 구간으로 절단한 가중치를 구합니다.
+                      <div className="mt-1">
+                        <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                          w = clip(평균경쟁률 ÷ 4.0, 0.5, 1.0)
+                        </code>
+                      </div>
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">로지스틱 함수를 통한 확률 산출.</strong> 변곡점(확률
+                      50%)을 마지노선 X̂₁₀₀에 고정한 로지스틱 함수에 입력 등급을 대입해 최종 확률을 계산합니다.
+                      <div className="mt-1 space-y-0.5">
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                            k = ln(9) ÷ (X̂₁₀₀ − X̂₅₀) × w
+                          </code>
+                        </div>
+                        <div>
+                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
+                            P(합격) = 1 ÷ (1 + e^(−k(X̂₁₀₀ − 입력등급)))
+                          </code>
+                        </div>
+                      </div>
+                    </li>
+                  </ol>
+                  <div className="mt-3">
+                    <ProbCurve result={ok} userScore={queriedScore} />
+                  </div>
                 </div>
               </details>
             </>

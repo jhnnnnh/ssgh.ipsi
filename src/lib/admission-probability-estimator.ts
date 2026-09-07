@@ -128,7 +128,11 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
   const prob = 1 / (1 + Math.exp(-zClamped));
   const finalProb = Math.max(1, Math.min(99, Math.round(prob * 100)));
 
-  const BASE_RADIUS = 0.045;
+  // 정식으로 검증된 신뢰구간은 아니고, 마지노선(100%컷) 추정치의 실증 오차(MAE 약
+  // 0.02~0.03등급, 원 도구 검증 당시 기준)를 정규분포로 가정해 역산한 반경이다.
+  // 0.03등급 ≈ 표준편차의 약 1배 수준으로, 실제 결과가 이 범위 안에 들어올 확률은
+  // 대략 67% 정도로 추정된다(더 넓혔던 0.045등급 기준으로는 약 85%).
+  const BASE_RADIUS = 0.03;
   const radius = BASE_RADIUS * (1 + (1 - competitionConfidence));
   const zLow = k * (cut100 - (userScore + radius));
   const zHigh = k * (cut100 - (userScore - radius));
