@@ -558,94 +558,91 @@ export function AdmissionProbabilityCalculator({
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">
                   이 수치는 어떻게 계산되었나요?
                 </summary>
-                <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3">
-                  <ol className="space-y-3 list-decimal pl-4">
-                    <li>
-                      <strong className="text-slate-800">기준값(baseline) 산정.</strong> 최신 연도 관측치를 다음
-                      시점의 추정량으로 그대로 채택합니다.
-                      <div className="mt-1">
-                        <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">X̂(t+1) = X(t)</code>
-                      </div>
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">경쟁률 변화 선형회귀 보정.</strong> 예상 경쟁률과 최근
-                      경쟁률의 비(ρ)를 산출해 50%·70%컷 각각에 회귀식을 적용합니다.
-                      <div className="mt-1 space-y-0.5">
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">ρ = 예상경쟁률 ÷ 최근경쟁률</code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            X̂₅₀ = X₅₀ + (0.1399 − 0.2303ρ)
-                          </code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            X̂₇₀ = X₇₀ + (0.1424 − 0.2404ρ)
-                          </code>
-                        </div>
-                      </div>
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">표본크기 척도보정.</strong> 참조 정원(15명) 대비
-                      역제곱근 척도로 충원비율(φ)을 보정합니다(정원이 작을수록 추합 인원 1~2명의 등락이
-                      상대적으로 크게 반영되도록).
-                      <div className="mt-1 space-y-0.5">
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">λ = √(15 ÷ 정원), λ ∈ [0.6, 1.6]</code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">φ_보정 = (φ·λ) ÷ (1 + φ·λ)</code>
-                        </div>
-                      </div>
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">등록 마지노선(100%컷) 다중선형회귀 추정.</strong>{" "}
-                      50%·70%컷 스프레드(Δ)와 보정된 충원비율을 설명변수로 마지노선까지의 확장폭을
-                      추정합니다.
-                      <div className="mt-1 space-y-0.5">
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">Δ = X̂₇₀ − X̂₅₀</code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            확장량 = −0.1550 + 0.4105·φ_보정 + 1.5181·Δ
-                          </code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">X̂₁₀₀ = X̂₇₀ + 확장량</code>
-                        </div>
-                      </div>
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">신뢰가중치(이분산성 보정) 산정.</strong> 과거 평균
-                      경쟁률을 기준 경쟁률(4.0)과 비교해 0.5~1.0 구간으로 절단한 가중치를 구합니다.
-                      <div className="mt-1">
-                        <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                          w = clip(평균경쟁률 ÷ 4.0, 0.5, 1.0)
-                        </code>
-                      </div>
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">로지스틱 함수를 통한 확률 산출.</strong> 변곡점(확률
-                      50%)을 마지노선 X̂₁₀₀에 고정한 로지스틱 함수에 입력 등급을 대입해 최종 확률을 계산합니다.
-                      <div className="mt-1 space-y-0.5">
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            k = ln(9) ÷ (X̂₁₀₀ − X̂₅₀) × w
-                          </code>
-                        </div>
-                        <div>
-                          <code className="font-mono bg-slate-100 rounded px-1.5 py-0.5">
-                            P(합격) = 1 ÷ (1 + e^(−k(X̂₁₀₀ − 입력등급)))
-                          </code>
-                        </div>
-                      </div>
-                    </li>
-                  </ol>
-                  <div className="mt-3">
-                    <ProbCurve result={ok} userScore={queriedScore} />
-                  </div>
+                <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3 space-y-4">
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">1. 기준 시계열값 산정</h4>
+                    <p>
+                      입결 컷은 확률보행(random walk)적 성격이 강해, 다년도 가중평균은 최신 국면을 과거
+                      국면으로 희석시켜 추정량에 체계적 편의(bias)를 유발합니다. 이를 피하기 위해 최신
+                      관측치(t년)를 기준 추정량으로 채택하는 마르코프적 접근을 취합니다.
+                    </p>
+                    <Formula>X̂(t+1) = X(t)</Formula>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">2. 경쟁률 공변량 보정 (선택 입력)</h4>
+                    <p>
+                      전년 대비 경쟁률 변화율(ρ)은 컷 이동량에 대해 유의한 설명력을 가지는 공변량입니다(R²
+                      ≈ 0.44). 단순선형회귀로 절편과 기울기를 추정해 조건부 기댓값을 보정합니다.
+                    </p>
+                    <Formula>
+                      {"ρ = C(t+1)_예상 / C(t)"}
+                      {"\nX̂₅₀ = X₅₀(t) + (β₀ + β₁ρ),  β₀=0.1399, β₁=−0.2303"}
+                      {"\nX̂₇₀ = X₇₀(t) + (β₀′ + β₁′ρ),  β₀′=0.1424, β₁′=−0.2404"}
+                    </Formula>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">3. 마지노선(등록 상한 경계) 추정 — 다중선형회귀</h4>
+                    <p>
+                      50%컷·70%컷은 등록자 분포상의 두 분위수일 뿐, 그 자체로는 정원이 최종 충족되는
+                      경계(마지노선)를 특정하지 못합니다. 두 분위수 사이의 국소 기울기를 외삽하는 단순
+                      선형모형은 분포의 왜도(skewness)를 반영하지 못해 잔차가 커지므로, 충원비율(φ)을 추가
+                      설명변수로 도입한 다중회귀모형을 사용합니다.
+                    </p>
+                    <Formula>
+                      {"Δ = 70%컷 − 50%컷  (국소 분산의 대리지표)"}
+                      {"\n확장량 = α + γ₁·φ + γ₂·Δ,  α=−0.1550, γ₁=0.4105, γ₂=1.5181"}
+                      {"\n마지노선 = X̂₇₀ + 확장량"}
+                    </Formula>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">4. 표본크기 척도보정 (scale correction)</h4>
+                    <p>
+                      충원비율(φ)이 동일하더라도 모집단 크기(정원)가 작을수록 추합 인원 1~2명의 등락이
+                      φ에 미치는 상대적 영향은 커집니다(이산 변량의 상대분산이 표본크기에 반비례). 이를
+                      반영해 정원 규모에 따라 φ를 역제곱근 척도로 보정합니다.
+                    </p>
+                    <Formula>
+                      {"λ = √(15 / 정원),  λ ∈ [0.6, 1.6]  (15는 참조표본의 평균 정원)"}
+                      {"\nφ_보정 = (φ·λ) / (1 + φ·λ)"}
+                    </Formula>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">5. 합격확률의 확률론적 정의</h4>
+                    <p>
+                      분위수상의 순위와 사건 확률은 서로 다른 층위의 개념입니다. 등록자 중앙값(50%컷)은
+                      이미 사건이 실현된 값이므로 그 지점의 사후확률은 0.5에 수렴하지 않고 상당히 높은
+                      값(경험적으로 0.9 부근)을 가집니다. 반면 마지노선은 정의상 채택/기각이 정확히
+                      양분되는 임계점(threshold)이므로, 로지스틱 함수의 변곡점(확률 0.5)을 이 지점에
+                      고정합니다.
+                    </p>
+                    <Formula>
+                      {"P(합격) = 1 / (1 + e^(−k(Xₜ − x)))"}
+                      {"\nk = ln(9) / (Xₜ − X̂₅₀) × w  — ln(9)=logit(0.9), Xₜ=마지노선, x=입력 등급, w=신뢰가중치"}
+                    </Formula>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">6. 신뢰가중치(w) — 표본 안정성 보정</h4>
+                    <p>
+                      경쟁률은 표본크기의 대리지표로 기능합니다. 과거 평균 경쟁률이 낮을수록 연도 간
+                      분산이 커지는 이분산성(heteroscedasticity)이 나타나므로, 로지스틱 곡선의 기울기 k에
+                      가중치를 곱해 과도한 확신(overconfidence)을 방지합니다.
+                    </p>
+                    <Formula>{"w = clip(경쟁률평균 / 4.0, 0.5, 1.0)"}</Formula>
+                  </section>
+
+                  <ProbCurve result={ok} userScore={queriedScore} />
+
+                  <p className="text-slate-400 border-t border-slate-100 pt-3">
+                    본 모형의 계수는 복수 연도·복수 학과 표본에 대한 회귀분석으로 추정된 값이며, 표본 외
+                    예측(out-of-sample prediction)의 성격상 실제값과 편차가 발생할 수 있습니다. 특히
+                    정성평가 요소가 결합된 전형은 잔차의 분산이 커집니다. 본 추정치는 통계적 근사이며
+                    합격을 보증하지 않습니다.
+                  </p>
                 </div>
               </details>
             </>
@@ -660,6 +657,14 @@ export function AdmissionProbabilityCalculator({
         onPick={pickMyCard}
       />
     </div>
+  );
+}
+
+function Formula({ children }: { children: React.ReactNode }) {
+  return (
+    <pre className="mt-1.5 whitespace-pre-wrap font-mono text-[11px] text-slate-700 bg-slate-100 rounded-lg p-2.5">
+      {children}
+    </pre>
   );
 }
 
