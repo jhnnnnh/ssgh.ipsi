@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { normalize, nameSimilarity } from "@/lib/admission-cutoff-lookup";
+import { nameSimilarity } from "@/lib/admission-cutoff-lookup";
 
 export type CompetitionPoint = {
   /** 그 대학 작년 원서접수 시작 시각으로부터 경과한 분. "최종" 집계 지점은 null. */
@@ -37,11 +37,23 @@ async function fetchRows(university: string, department: string | null): Promise
   return (data as Row[] | null) ?? [];
 }
 
+/**
+ * admission-cutoff-lookup.ts의 normalize()는 "교과"/"종합"/"전형"까지 지워버리는데,
+ * 거기서는 대학어디가 쪽과 이투스 쪽이 그 수식어를 서로 다른 위치에 붙이는 문제를 풀기
+ * 위해서였다. 여기서는 hint 자체가 "학생부교과전형"처럼 트랙 이름 하나뿐인 경우가 흔한데,
+ * "교과"/"종합"을 지워버리면 "학생부"만 남아 사실상 아무 전형이나 다 걸려버린다(대부분의
+ * 전형명이 "학생부"로 시작한다). 공백/괄호만 지우고 트랙 단어는 남겨서, 학생부교과와
+ * 학생부종합처럼 실제로 다른 전형끼리 서로 매치되지 않게 한다.
+ */
+function normalizeLoose(s: string): string {
+  return s.replace(/\s+/g, "").replace(/[()]/g, "").trim();
+}
+
 function pickBest(rows: Row[], hint: string): Row | null {
-  const normalizedHint = normalize(hint);
+  const normalizedHint = normalizeLoose(hint);
   let best: { row: Row; score: number } | null = null;
   for (const row of rows) {
-    const score = nameSimilarity(normalize(row.admission_type), normalizedHint);
+    const score = nameSimilarity(normalizeLoose(row.admission_type), normalizedHint);
     if (score === 0) continue;
     if (!best || score > best.score) best = { row, score };
   }
