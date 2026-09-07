@@ -128,7 +128,7 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
   const prob = 1 / (1 + Math.exp(-zClamped));
   const finalProb = Math.max(1, Math.min(99, Math.round(prob * 100)));
 
-  const BASE_RADIUS = 0.06;
+  const BASE_RADIUS = 0.045;
   const radius = BASE_RADIUS * (1 + (1 - competitionConfidence));
   const zLow = k * (cut100 - (userScore + radius));
   const zHigh = k * (cut100 - (userScore - radius));
