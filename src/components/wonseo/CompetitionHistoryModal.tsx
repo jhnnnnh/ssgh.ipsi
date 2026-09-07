@@ -167,9 +167,6 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
           </g>
         )}
       </svg>
-      <p className="text-[11px] text-slate-400 -mt-1">
-        그래프 위에서 마우스를 움직이거나 손가락으로 짚으면 그 시점의 정확한 경쟁률을 볼 수 있어요.
-      </p>
 
       {finalPoint && (
         <p className="text-xs text-slate-500">
