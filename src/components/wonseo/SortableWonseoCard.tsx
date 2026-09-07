@@ -33,7 +33,7 @@ export function SortableWonseoCard({
   rankLabel: string;
   onRankChange: (text: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isSorting } = useSortable({ id });
 
   return (
     <WonseoCardView
@@ -52,7 +52,7 @@ export function SortableWonseoCard({
       minHeight={minHeight}
       style={{
         transform: CSS.Transform.toString(transform),
-        transition,
+        transition: isSorting ? transition : undefined,
       }}
       className={isDragging ? "opacity-30" : undefined}
       dragHandle={
