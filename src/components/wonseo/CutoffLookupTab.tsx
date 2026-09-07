@@ -136,11 +136,14 @@ export function CutoffLookupTab({
 
   function pickMyCard(card: MyCard) {
     if (!card.university || !card.department) return;
+    // 카드의 세부전형명 표기는 입결/모집정보 원본과 글자가 정확히 안 맞을 수 있어(예:
+    // "학생부종합전형" vs 원본의 "학생부종합(학생부종합전형)"), 검색 필터로 넘기지 않고
+    // 입력칸에만 참고용으로 채운다 — 그래야 그 학과의 전형이 전부 보여서 놓치지 않는다.
     const type = card.sub_category ?? card.category ?? "";
     setUniversity(card.university);
     setDepartment(card.department);
     setAdmissionType(type);
-    void runSearch(card.university, card.department, type);
+    void runSearch(card.university, card.department, "");
   }
 
   function applyCandidate(c: CutoffCandidatePreview) {
