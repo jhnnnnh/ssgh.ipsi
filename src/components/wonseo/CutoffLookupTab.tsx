@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp } from "lucide-react";
+import { Search, TrendingUp, FileBarChart } from "lucide-react";
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -16,6 +16,8 @@ import {
   searchCutoffsForLookup,
   searchCutoffCandidatesWithPreview,
   trackFromCategory,
+  normalize,
+  nameSimilarity,
   type CutoffLookupGroup,
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
@@ -33,6 +35,15 @@ const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grad
 
 type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category">;
 
+/** 세부 전형명이 비어 있으면 전부 통과, 있으면 느슨한(비슷한 이름 포함) 매칭만 통과시킨다.
+ * 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
+ * (예: "학생부종합전형" vs "학생부종합(학생부종합전형)"), 정확히 같은 문자열만 찾으면
+ * 실제로는 있는 데이터도 없는 것처럼 사라져 버린다. */
+function matchesHint(admissionType: string, hint: string): boolean {
+  if (!hint) return true;
+  return nameSimilarity(normalize(admissionType), normalize(hint)) > 0;
+}
+
 function OfferingMethod({ o }: { o: MergedOffering }) {
   if (o.selectionMode === "single") return <>{o.methodSingle || "-"}</>;
   return (
@@ -42,11 +53,48 @@ function OfferingMethod({ o }: { o: MergedOffering }) {
   );
 }
 
+/** 학생 원서 카드에서 대학+학과+전형을 그대로 불러와 채워 넣는 공용 선택 상자. */
+function MyCardSelect({
+  cards,
+  onPick,
+  placeholder,
+  className,
+}: {
+  cards: MyCard[];
+  onPick: (card: MyCard) => void;
+  placeholder: string;
+  className?: string;
+}) {
+  if (cards.length === 0) return null;
+  return (
+    <select
+      value=""
+      onChange={(e) => {
+        const card = cards.find((c) => c.id === e.target.value);
+        if (card) onPick(card);
+      }}
+      className={
+        className ??
+        "bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      }
+    >
+      <option value="">{placeholder}</option>
+      {cards.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.university} · {c.department} · {c.sub_category ?? c.category ?? ""}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /**
- * 대입 정보 조회 탭: 대학+학과(+세부전형)로 (1) 이번 학년도 모집정보(이투스 전형데이터)와
- * (2) 최근 3개년 입결(대학어디가)을 함께 보여주고, 각 전형에서 바로 "작년 경쟁률 보기"로
- * 이어진다. 정확히 일치하는 데이터가 하나도 없으면 이름이 비슷한 다른 학과를 추천한다.
- * 학생 화면에서는 studentId, 교사 화면에서는 roster를 받아 "내 원서 카드 불러오기"에 쓴다.
+ * 대입 정보 조회 탭: (1) "모집 정보 및 입결 조회"에서 대학+학과(+세부전형)로 이번 학년도
+ * 모집정보(이투스 전형데이터)와 최근 3개년 입결(대학어디가)을 함께 보여주고, 정확히
+ * 일치하는 데이터가 하나도 없으면 이름이 비슷한 다른 학과를 추천한다. (2) "작년 경쟁률
+ * 조회"는 완전히 독립된 검색 상자로, 위 결과를 거치지 않고 바로 작년 경쟁률 그래프를 연다.
+ * 둘 다 학생 화면에서는 studentId, 교사 화면에서는 roster를 받아 "내 원서 카드 불러오기"에
+ * 쓴다(같은 카드 목록을 두 상자가 함께 쓴다).
  */
 export function CutoffLookupTab({
   studentId,
@@ -65,9 +113,11 @@ export function CutoffLookupTab({
   const [offerings, setOfferings] = useState<MergedOffering[]>([]);
   const [candidates, setCandidates] = useState<CutoffCandidatePreview[] | null>(null);
   const [findingCandidates, setFindingCandidates] = useState(false);
-  const [competitionTarget, setCompetitionTarget] = useState<{ department: string; admissionType: string } | null>(
-    null,
-  );
+
+  const [caUniversity, setCaUniversity] = useState("");
+  const [caDepartment, setCaDepartment] = useState("");
+  const [caAdmissionType, setCaAdmissionType] = useState("");
+  const [competitionOpen, setCompetitionOpen] = useState(false);
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
@@ -107,14 +157,15 @@ export function CutoffLookupTab({
     setCandidates(null);
     try {
       const [groups, offeringList] = await Promise.all([
-        searchCutoffsForLookup(uni, dept, type || undefined),
+        searchCutoffsForLookup(uni, dept),
         listOfferingCandidates(uni, dept),
       ]);
-      const filteredOfferings = type ? offeringList.filter((o) => o.admissionType.includes(type)) : offeringList;
-      setCutoffGroups(groups);
+      const filteredGroups = groups.filter((g) => matchesHint(g.admissionType, type));
+      const filteredOfferings = offeringList.filter((o) => matchesHint(o.admissionType, type));
+      setCutoffGroups(filteredGroups);
       setOfferings(filteredOfferings);
       setSearched(true);
-      if (groups.length === 0 && filteredOfferings.length === 0) {
+      if (filteredGroups.length === 0 && filteredOfferings.length === 0) {
         setFindingCandidates(true);
         try {
           const found = await searchCutoffCandidatesWithPreview(uni, dept, trackFromCategory(type), type);
@@ -136,20 +187,33 @@ export function CutoffLookupTab({
 
   function pickMyCard(card: MyCard) {
     if (!card.university || !card.department) return;
-    // 카드의 세부전형명 표기는 입결/모집정보 원본과 글자가 정확히 안 맞을 수 있어(예:
-    // "학생부종합전형" vs 원본의 "학생부종합(학생부종합전형)"), 검색 필터로 넘기지 않고
-    // 입력칸에만 참고용으로 채운다 — 그래야 그 학과의 전형이 전부 보여서 놓치지 않는다.
     const type = card.sub_category ?? card.category ?? "";
     setUniversity(card.university);
     setDepartment(card.department);
     setAdmissionType(type);
-    void runSearch(card.university, card.department, "");
+    void runSearch(card.university, card.department, type);
   }
 
   function applyCandidate(c: CutoffCandidatePreview) {
     setUniversity(c.university);
     setDepartment(c.department);
     void runSearch(c.university, c.department, admissionType.trim());
+  }
+
+  function pickMyCardForCompetition(card: MyCard) {
+    if (!card.university || !card.department) return;
+    setCaUniversity(card.university);
+    setCaDepartment(card.department);
+    setCaAdmissionType(card.sub_category ?? card.category ?? "");
+    setCompetitionOpen(true);
+  }
+
+  function handleCompetitionSearch() {
+    if (!caUniversity.trim() || !caDepartment.trim()) {
+      showToast("대학명과 학과명을 입력해 주세요.", "error");
+      return;
+    }
+    setCompetitionOpen(true);
   }
 
   const showEmpty = searched && !loading && cutoffGroups.length === 0 && offerings.length === 0;
@@ -182,21 +246,7 @@ export function CutoffLookupTab({
               </select>
             )}
             {effectiveStudentId && myCards && myCards.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => {
-                  const card = myCards.find((c) => c.id === e.target.value);
-                  if (card) pickMyCard(card);
-                }}
-                className="flex-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">내 원서 카드에서 불러오기</option>
-                {myCards.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.university} · {c.department} · {c.sub_category ?? c.category ?? ""}
-                  </option>
-                ))}
-              </select>
+              <MyCardSelect cards={myCards} onPick={pickMyCard} placeholder="내 원서 카드에서 불러오기" className="flex-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             )}
             {effectiveStudentId && myCards && myCards.length === 0 && (
               <p className="text-[11px] text-slate-400 self-center">등록된 원서 카드가 없어요.</p>
@@ -265,20 +315,19 @@ export function CutoffLookupTab({
           <div className="space-y-2">
             {offerings.map((o) => (
               <div key={o.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-1">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-slate-800 text-sm">{o.admissionType}</span>
-                  <button
-                    onClick={() => setCompetitionTarget({ department, admissionType: o.admissionType })}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition"
-                  >
-                    <TrendingUp className="w-3 h-3" />
-                    작년 경쟁률 보기
-                  </button>
+                  {o.track && (
+                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                      {o.track}
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-slate-500">모집인원 {o.enrollment ?? "-"}명</p>
                 <p className="text-xs text-slate-500">
-                  모집인원 {o.enrollment ?? "-"}명 · 전형방법{" "}
-                  <OfferingMethod o={o} /> · 수능최저 {o.minStandard || "없음"}
+                  전형방법 <OfferingMethod o={o} />
                 </p>
+                <p className="text-xs text-slate-500">수능최저 {o.minStandard || "없음"}</p>
               </div>
             ))}
           </div>
@@ -286,10 +335,11 @@ export function CutoffLookupTab({
       )}
 
       {searched && !loading && cutoffGroups.length > 0 && (
-        <div className="space-y-4">
-          {cutoffGroups.map((g) => (
-            <Card key={g.admissionType} className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap justify-between">
+        <Card className="space-y-3">
+          <h4 className="text-sm font-bold text-slate-800">최근 3개년 입결</h4>
+          <div className="space-y-4">
+            {cutoffGroups.map((g) => (
+              <div key={g.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-slate-800 text-sm">{g.admissionType}</span>
                   {g.track && (
@@ -298,45 +348,38 @@ export function CutoffLookupTab({
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => setCompetitionTarget({ department, admissionType: g.admissionType })}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition"
-                >
-                  <TrendingUp className="w-3 h-3" />
-                  작년 경쟁률 보기
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="text-xs border-collapse w-full">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-1.5 sticky left-0 bg-white" />
-                      {g.years.map((y) => (
-                        <th key={y.year} className="p-1.5 text-center font-bold text-slate-700">
-                          {y.year}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ROWS.map((row) => (
-                      <tr key={row.key} className="border-t border-slate-100">
-                        <td className="text-slate-500 font-bold p-1.5 whitespace-nowrap sticky left-0 bg-white">
-                          {row.label}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="text-xs border-collapse w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-left p-1.5 sticky left-0 bg-white" />
                         {g.years.map((y) => (
-                          <td key={y.year} className="p-1.5 text-center text-slate-700">
-                            {y[row.key] || "-"}
-                          </td>
+                          <th key={y.year} className="p-1.5 text-center font-bold text-slate-700">
+                            {y.year}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {ROWS.map((row) => (
+                        <tr key={row.key} className="border-t border-slate-100">
+                          <td className="text-slate-500 font-bold p-1.5 whitespace-nowrap sticky left-0 bg-white">
+                            {row.label}
+                          </td>
+                          {g.years.map((y) => (
+                            <td key={y.year} className="p-1.5 text-center text-slate-700">
+                              {y[row.key] || "-"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {showEmpty &&
@@ -377,12 +420,82 @@ export function CutoffLookupTab({
           </Card>
         ))}
 
+      <Card className="space-y-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <FileBarChart className="w-4 h-4 text-indigo-600" />
+            작년 경쟁률 조회
+          </h3>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            위 모집정보·입결 조회와 별개로, 대학+학과만 알면 바로 작년 원서접수 기간의 시간대별 경쟁률
+            그래프를 볼 수 있어요.
+          </p>
+        </div>
+
+        {myCards && myCards.length > 0 && (
+          <MyCardSelect cards={myCards} onPick={pickMyCardForCompetition} placeholder="내 원서 카드에서 불러오기" />
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1 text-xs">대학교명</label>
+            <AutocompleteInput
+              value={caUniversity}
+              onChange={(v) => {
+                setCaUniversity(v);
+                setCaDepartment("");
+                setCaAdmissionType("");
+              }}
+              onSearch={searchCutoffUniversities}
+              placeholder="OO대학교"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1 text-xs">모집단위 / 학과</label>
+            <AutocompleteInput
+              value={caDepartment}
+              onChange={(v) => {
+                setCaDepartment(v);
+                setCaAdmissionType("");
+              }}
+              onSearch={(q) => searchCutoffDepartments(q, caUniversity)}
+              placeholder="OO학과 또는 OO학부"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1 text-xs">세부 전형명 (선택)</label>
+            <AutocompleteInput
+              value={caAdmissionType}
+              onChange={setCaAdmissionType}
+              onSearch={
+                caUniversity.trim() && caDepartment.trim()
+                  ? (q) => searchCutoffAdmissionTypes(q, caUniversity, caDepartment)
+                  : undefined
+              }
+              revealOnFocus
+              placeholder="예: 일반전형"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleCompetitionSearch}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+        >
+          <TrendingUp className="w-3.5 h-3.5" />
+          <span>작년 경쟁률 보기</span>
+        </button>
+      </Card>
+
       <CompetitionHistoryModal
-        open={competitionTarget != null}
-        onClose={() => setCompetitionTarget(null)}
-        university={university}
-        department={competitionTarget?.department ?? department}
-        hintAdmissionType={competitionTarget?.admissionType ?? admissionType}
+        open={competitionOpen}
+        onClose={() => setCompetitionOpen(false)}
+        university={caUniversity.trim()}
+        department={caDepartment.trim()}
+        hintAdmissionType={caAdmissionType.trim()}
       />
     </div>
   );
