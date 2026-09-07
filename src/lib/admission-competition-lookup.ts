@@ -49,58 +49,66 @@ function normalizeLoose(s: string): string {
   return s.replace(/\s+/g, "").replace(/[()]/g, "").trim();
 }
 
-function pickBest(rows: Row[], hint: string): Row | null {
+/** 힌트와 이름이 비슷한 행을 점수 높은 순으로 모두 돌려준다(0점 제외). 힌트가 없으면
+ * 걸러내지 않고 전부(원본 순서 그대로) 돌려준다 — 그래야 세부전형명 없이 검색했을 때도
+ * 그 학과/대학의 전형을 전부 골라볼 수 있다. */
+function matchRows(rows: Row[], hint: string): Row[] {
   const normalizedHint = normalizeLoose(hint);
-  let best: { row: Row; score: number } | null = null;
-  for (const row of rows) {
-    const score = nameSimilarity(normalizeLoose(row.admission_type), normalizedHint);
-    if (score === 0) continue;
-    if (!best || score > best.score) best = { row, score };
-  }
-  return best?.row ?? null;
+  if (!normalizedHint) return rows;
+  return rows
+    .map((row) => ({ row, score: nameSimilarity(normalizeLoose(row.admission_type), normalizedHint) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.row);
 }
 
 function toPoints(series: Row["series"]): CompetitionPoint[] {
   return series.map(([elapsedMin, applicants, ratio]) => ({ elapsedMin, applicants, ratio }));
 }
 
+function toSeries(row: Row, matchLevel: CompetitionSeries["matchLevel"]): CompetitionSeries {
+  return {
+    university: row.university,
+    admissionType: row.admission_type,
+    department: row.department,
+    matchLevel,
+    startAt: row.start_at,
+    points: toPoints(row.series),
+  };
+}
+
+export type CompetitionLookupResult =
+  | { kind: "matched"; series: CompetitionSeries }
+  /** 이름만으로는 어느 전형인지 하나로 못 좁혔다 — 자동으로 아무거나 고르면 틀린 그래프를
+   * 보여줄 수 있으니, 후보를 전부 넘겨서 사람이 직접 고르게 한다. */
+  | { kind: "ambiguous"; options: CompetitionSeries[] }
+  | { kind: "none" };
+
 /**
- * 학생 원서 카드의 대학+학과+세부전형명과 가장 비슷한 작년 경쟁률 시계열을 찾는다.
- * 1) 학과까지 정확히 일치하는 데이터에서 전형명이 비슷한 것을 우선 찾고,
- * 2) 없으면 학과 구분 없는 "전형 전체" 요약 시계열로 대체한다(그것도 없으면 null).
+ * 대학+학과(+세부전형명 힌트)로 작년 경쟁률 시계열을 찾는다.
+ * 1) 학과까지 정확히 일치하는 데이터 중 이름이 비슷한 전형을 찾고,
+ * 2) 없으면 학과 구분 없는 "전형 전체" 요약 시계열로 대체한다.
+ * 후보가 정확히 하나면 바로 그래프를 그릴 수 있게 matched를, 둘 이상이면 ambiguous를
+ * 돌려준다(호출부에서 사람이 직접 고르게 한다).
  */
 export async function fetchCompetitionSeries(
   university: string,
   department: string,
   hintAdmissionType: string,
-): Promise<CompetitionSeries | null> {
+): Promise<CompetitionLookupResult> {
   const deptRows = await fetchRows(university, department);
-  const deptBest = pickBest(deptRows, hintAdmissionType);
-  if (deptBest) {
-    return {
-      university,
-      admissionType: deptBest.admission_type,
-      department: deptBest.department,
-      matchLevel: "department",
-      startAt: deptBest.start_at,
-      points: toPoints(deptBest.series),
-    };
-  }
+  const deptMatches = matchRows(deptRows, hintAdmissionType);
+  if (deptMatches.length === 1) return { kind: "matched", series: toSeries(deptMatches[0], "department") };
+  if (deptMatches.length > 1) return { kind: "ambiguous", options: deptMatches.map((r) => toSeries(r, "department")) };
 
   const summaryRows = await fetchRows(university, null);
-  const summaryBest = pickBest(summaryRows, hintAdmissionType);
-  if (summaryBest) {
-    return {
-      university,
-      admissionType: summaryBest.admission_type,
-      department: null,
-      matchLevel: "summary",
-      startAt: summaryBest.start_at,
-      points: toPoints(summaryBest.series),
-    };
+  const summaryMatches = matchRows(summaryRows, hintAdmissionType);
+  if (summaryMatches.length === 1) return { kind: "matched", series: toSeries(summaryMatches[0], "summary") };
+  if (summaryMatches.length > 1) {
+    return { kind: "ambiguous", options: summaryMatches.map((r) => toSeries(r, "summary")) };
   }
 
-  return null;
+  return { kind: "none" };
 }
 
 /**
