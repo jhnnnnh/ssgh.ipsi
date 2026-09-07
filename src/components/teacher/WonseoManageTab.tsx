@@ -23,7 +23,6 @@ import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
-import { useRoster } from "@/lib/hooks/useRoster";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
 import { useEqualHeights } from "@/lib/hooks/useEqualHeights";
 import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
@@ -35,14 +34,13 @@ import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
 import { WonseoTableView } from "@/components/teacher/WonseoTableView";
 import { exportWonseoExcel } from "@/lib/wonseo-excel";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
-import type { WonseoCard } from "@/lib/database.types";
+import type { Roster, WonseoCard } from "@/lib/database.types";
 
 type ViewMode = "cards" | "table";
 
-export function WonseoManageTab() {
+export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const showToast = useToast();
   const confirm = useConfirm();
-  const { roster } = useRoster();
   const { enabled: statusVisible, toggle } = useStatusReveal();
   const { isAdmin } = useActiveClass();
   const [selectedStudentId, setSelectedStudentId] = useState("");

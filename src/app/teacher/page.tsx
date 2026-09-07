@@ -224,7 +224,7 @@ function TeacherDashboard() {
       ) : (
         <>
           {tab === "status" && <StatusTab />}
-          {tab === "wonseo" && <WonseoManageTab />}
+          {tab === "wonseo" && <WonseoManageTab roster={roster} />}
           {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
           {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
           {tab === "roster" && <RosterTab />}
