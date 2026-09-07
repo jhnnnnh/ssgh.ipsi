@@ -48,20 +48,22 @@ export function useEqualHeights(resetKey: string, count: number, multiColumnBrea
     setMaxHeight(undefined);
     if (count === 0) return;
 
-    const observers: ResizeObserver[] = [];
+    const elToIndex = new Map<Element, number>();
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const i = elToIndex.get(entry.target);
+        if (i !== undefined) heights.current[i] = entry.contentRect.height;
+      }
+      setMaxHeight(Math.max(...heights.current));
+    });
 
     refs.current.slice(0, count).forEach((el, i) => {
       if (!el) return;
-      const ro = new ResizeObserver((entries) => {
-        const h = entries[0].contentRect.height;
-        heights.current[i] = h;
-        setMaxHeight(Math.max(...heights.current));
-      });
+      elToIndex.set(el, i);
       ro.observe(el);
-      observers.push(ro);
     });
 
-    return () => observers.forEach((ro) => ro.disconnect());
+    return () => ro.disconnect();
   }, [resetKey, count]);
 
   return { setRef, maxHeight: multiColumn ? maxHeight : undefined };
