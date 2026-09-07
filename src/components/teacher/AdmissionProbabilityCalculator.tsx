@@ -26,7 +26,15 @@ import type { Roster, WonseoCard } from "@/lib/database.types";
 
 type MyCard = Pick<
   WonseoCard,
-  "id" | "university" | "department" | "category" | "sub_category" | "enrollment" | "recent_results" | "level"
+  | "id"
+  | "university"
+  | "department"
+  | "category"
+  | "sub_category"
+  | "enrollment"
+  | "recent_results"
+  | "level"
+  | "calculated_grade"
 >;
 type Triple = [number, number, number];
 
@@ -130,7 +138,7 @@ export function AdmissionProbabilityCalculator({
     const supabase = createClient();
     supabase
       .from("wonseo_cards")
-      .select("id, university, department, category, sub_category, enrollment, recent_results, level")
+      .select("id, university, department, category, sub_category, enrollment, recent_results, level, calculated_grade")
       .eq("student_id", id)
       .order("sort_order", { ascending: true })
       .then(({ data }) => setMyCards(data ?? []));
@@ -144,12 +152,17 @@ export function AdmissionProbabilityCalculator({
       turnover: y.fillCount ?? "",
       applicants: y.competitionRate ?? "",
     }));
+    // calculated_grade는 자유 텍스트라("2.35" 같은 순수 숫자가 아닐 수도 있음) 실제로
+    // 숫자로 읽히는 경우에만 내신 등급 칸에 채운다.
+    const cardGrade = card.calculated_grade?.trim() ?? "";
+    const userScore = cardGrade && Number.isFinite(parseFloat(cardGrade)) ? cardGrade : "";
     setForm((f) => ({
       ...f,
       university: card.university ?? "",
       department: card.department ?? "",
       admissionType: card.sub_category?.trim() || card.category?.trim() || "",
       targetQuota: card.enrollment != null ? String(card.enrollment) : "",
+      userScore: userScore || f.userScore,
       ...filled,
     }));
     setTypeCandidates(null);
@@ -234,8 +247,18 @@ export function AdmissionProbabilityCalculator({
   }
 
   function handleQuery() {
+    // 내신 등급이 비어 있으면 parseNum이 조용히 0을 돌려주는데, 등급 스케일에서는 0이
+    // "가장 좋은 등급"보다도 더 좋은 값으로 계산돼 버려서 등급을 입력 안 했는데도
+    // 확률이 나오는(그것도 아주 높게 나오는) 심각한 오류가 있었다. 반드시 실제 값을
+    // 입력해야만 조회되게 막는다.
+    const rawScore = form.userScore.trim();
+    const parsedScore = parseFloat(rawScore);
+    if (!rawScore || !Number.isFinite(parsedScore) || parsedScore <= 0) {
+      showToast("내신 등급을 입력해 주세요.", "error");
+      return;
+    }
     const input: EstimatorInput = {
-      userScore: parseNum(form.userScore),
+      userScore: parsedScore,
       targetQuota: parseIntNum(form.targetQuota),
       expectedCompetition: parseNum(form.expectedCompetition),
       c50: form.c50.map(parseNum) as Triple,

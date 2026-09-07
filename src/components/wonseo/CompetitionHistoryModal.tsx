@@ -55,11 +55,11 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
   const nowElapsed = currentElapsedMinutes(series.startAt);
   const showNowMarker = nowElapsed >= 0 && nowElapsed <= maxElapsed;
 
-  function handleMove(e: React.MouseEvent<SVGSVGElement>) {
+  function handleMoveAt(clientX: number) {
     if (!svgRef.current || realPoints.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
     const scale = CHART_W / rect.width;
-    const svgX = (e.clientX - rect.left) * scale;
+    const svgX = (clientX - rect.left) * scale;
     const chartRatio = (svgX - PAD_L) / (CHART_W - PAD_L - PAD_R);
     const targetMin = chartRatio * maxElapsed;
     let nearest = 0;
@@ -73,6 +73,16 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
     });
     setHoverIdx(nearest);
   }
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    handleMoveAt(e.clientX);
+  }
+  // 모바일·태블릿에서는 마우스 이벤트가 안 와서 손가락으로 그래프를 짚거나 끌 때
+  // 같은 방식으로 값을 보여준다. touch-action:none으로 브라우저가 이 동작을
+  // 스크롤/줌으로 가로채지 않게 한다(그래야 preventDefault 없이도 끌기가 된다).
+  function handleTouchMove(e: React.TouchEvent<SVGSVGElement>) {
+    const touch = e.touches[0];
+    if (touch) handleMoveAt(touch.clientX);
+  }
 
   const hoverPoint = hoverIdx != null ? realPoints[hoverIdx] : null;
 
@@ -81,9 +91,12 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full h-auto cursor-crosshair"
-        onMouseMove={handleMove}
+        className="w-full h-auto cursor-crosshair touch-none"
+        onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIdx(null)}
+        onTouchStart={handleTouchMove}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={() => setHoverIdx(null)}
       >
         {/* y축 그리드 + 라벨 */}
         {[0, 0.5, 1].map((t) => {
@@ -154,7 +167,9 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
           </g>
         )}
       </svg>
-      <p className="text-[11px] text-slate-400 -mt-1">그래프 위를 움직이면 그 시점의 정확한 경쟁률을 볼 수 있어요.</p>
+      <p className="text-[11px] text-slate-400 -mt-1">
+        그래프 위에서 마우스를 움직이거나 손가락으로 짚으면 그 시점의 정확한 경쟁률을 볼 수 있어요.
+      </p>
 
       {finalPoint && (
         <p className="text-xs text-slate-500">

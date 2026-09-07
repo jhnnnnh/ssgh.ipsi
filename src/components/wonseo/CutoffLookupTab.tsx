@@ -172,7 +172,6 @@ export function CutoffLookupTab({
     setCaUniversity(card.university);
     setCaDepartment(card.department);
     setCaAdmissionType(card.sub_category ?? card.category ?? "");
-    setCompetitionOpen(true);
   }
 
   function handleCompetitionSearch() {
