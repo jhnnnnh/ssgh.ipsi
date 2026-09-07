@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { Search, Download, LayoutGrid } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { createClient } from "@/lib/supabase/client";
@@ -21,9 +21,13 @@ import {
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
+import { MyCardPickerModal } from "@/components/wonseo/MyCardPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
-type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category" | "enrollment" | "recent_results">;
+type MyCard = Pick<
+  WonseoCard,
+  "id" | "university" | "department" | "category" | "sub_category" | "enrollment" | "recent_results" | "level"
+>;
 type Triple = [number, number, number];
 
 const YEAR_COLS = ["2026", "2025", "2024"] as const;
@@ -105,6 +109,7 @@ export function AdmissionProbabilityCalculator({
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
+  const [cardPickerOpen, setCardPickerOpen] = useState(false);
   const effectiveStudentId = studentId ?? teacherStudentId;
 
   // 세부전형명 하나로 못 좁혔을 때 보여줄 후보들 — 같은 학과 안의 다른 전형(typeCandidates)
@@ -125,7 +130,7 @@ export function AdmissionProbabilityCalculator({
     const supabase = createClient();
     supabase
       .from("wonseo_cards")
-      .select("id, university, department, category, sub_category, enrollment, recent_results")
+      .select("id, university, department, category, sub_category, enrollment, recent_results, level")
       .eq("student_id", id)
       .order("sort_order", { ascending: true })
       .then(({ data }) => setMyCards(data ?? []));
@@ -274,21 +279,14 @@ export function AdmissionProbabilityCalculator({
             </select>
           )}
           {effectiveStudentId && myCards && myCards.length > 0 && (
-            <select
-              value=""
-              onChange={(e) => {
-                const card = myCards.find((c) => c.id === e.target.value);
-                if (card) pickMyCard(card);
-              }}
-              className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            <button
+              type="button"
+              onClick={() => setCardPickerOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold transition"
             >
-              <option value="">내 원서 카드에서 불러오기(대학·학과·입결 자동 입력)</option>
-              {myCards.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.university} · {c.department}
-                </option>
-              ))}
-            </select>
+              <LayoutGrid className="w-3.5 h-3.5" />
+              내 원서 카드에서 불러오기(대학·학과·입결 자동 입력)
+            </button>
           )}
 
           <div className="grid grid-cols-1 gap-3">
@@ -556,6 +554,13 @@ export function AdmissionProbabilityCalculator({
           )}
         </div>
       </div>
+
+      <MyCardPickerModal
+        open={cardPickerOpen}
+        onClose={() => setCardPickerOpen(false)}
+        cards={myCards ?? []}
+        onPick={pickMyCard}
+      />
     </div>
   );
 }

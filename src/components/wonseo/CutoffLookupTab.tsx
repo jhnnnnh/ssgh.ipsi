@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp, FileBarChart } from "lucide-react";
+import { Search, TrendingUp, FileBarChart, LayoutGrid } from "lucide-react";
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -23,6 +23,7 @@ import {
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
 import { CompetitionHistoryModal } from "@/components/wonseo/CompetitionHistoryModal";
+import { MyCardPickerModal } from "@/components/wonseo/MyCardPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
 const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grade_50" | "grade_70"; label: string }[] = [
@@ -33,7 +34,7 @@ const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grad
   { key: "grade_70", label: "70% 컷" },
 ];
 
-type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category">;
+type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category" | "level">;
 
 /** 세부 전형명이 비어 있으면 전부 통과, 있으면 느슨한(비슷한 이름 포함) 매칭만 통과시킨다.
  * 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
@@ -50,41 +51,6 @@ function OfferingMethod({ o }: { o: MergedOffering }) {
     <>
       1단계 {o.methodStage1 || "-"} · 2단계 {o.methodStage2 || "-"}
     </>
-  );
-}
-
-/** 학생 원서 카드에서 대학+학과+전형을 그대로 불러와 채워 넣는 공용 선택 상자. */
-function MyCardSelect({
-  cards,
-  onPick,
-  placeholder,
-  className,
-}: {
-  cards: MyCard[];
-  onPick: (card: MyCard) => void;
-  placeholder: string;
-  className?: string;
-}) {
-  if (cards.length === 0) return null;
-  return (
-    <select
-      value=""
-      onChange={(e) => {
-        const card = cards.find((c) => c.id === e.target.value);
-        if (card) onPick(card);
-      }}
-      className={
-        className ??
-        "bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      }
-    >
-      <option value="">{placeholder}</option>
-      {cards.map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.university} · {c.department} · {c.sub_category ?? c.category ?? ""}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -121,6 +87,7 @@ export function CutoffLookupTab({
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
+  const [cardPickerTarget, setCardPickerTarget] = useState<"lookup" | "competition" | null>(null);
   const effectiveStudentId = studentId ?? teacherStudentId;
 
   useEffect(() => {
@@ -137,7 +104,7 @@ export function CutoffLookupTab({
     const supabase = createClient();
     supabase
       .from("wonseo_cards")
-      .select("id, university, department, category, sub_category")
+      .select("id, university, department, category, sub_category, level")
       .eq("student_id", effectiveStudentId)
       .order("sort_order", { ascending: true })
       .then(({ data }) => {
@@ -246,7 +213,14 @@ export function CutoffLookupTab({
               </select>
             )}
             {effectiveStudentId && myCards && myCards.length > 0 && (
-              <MyCardSelect cards={myCards} onPick={pickMyCard} placeholder="내 원서 카드에서 불러오기" className="flex-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <button
+                type="button"
+                onClick={() => setCardPickerTarget("lookup")}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                내 원서 카드에서 불러오기
+              </button>
             )}
             {effectiveStudentId && myCards && myCards.length === 0 && (
               <p className="text-[11px] text-slate-400 self-center">등록된 원서 카드가 없어요.</p>
@@ -433,7 +407,14 @@ export function CutoffLookupTab({
         </div>
 
         {myCards && myCards.length > 0 && (
-          <MyCardSelect cards={myCards} onPick={pickMyCardForCompetition} placeholder="내 원서 카드에서 불러오기" />
+          <button
+            type="button"
+            onClick={() => setCardPickerTarget("competition")}
+            className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            내 원서 카드에서 불러오기
+          </button>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -496,6 +477,13 @@ export function CutoffLookupTab({
         university={caUniversity.trim()}
         department={caDepartment.trim()}
         hintAdmissionType={caAdmissionType.trim()}
+      />
+
+      <MyCardPickerModal
+        open={cardPickerTarget != null}
+        onClose={() => setCardPickerTarget(null)}
+        cards={myCards ?? []}
+        onPick={(card) => (cardPickerTarget === "competition" ? pickMyCardForCompetition(card) : pickMyCard(card))}
       />
     </div>
   );
