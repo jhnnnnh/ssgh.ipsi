@@ -1,12 +1,11 @@
 "use client";
 
 import { forwardRef, useEffect, useState } from "react";
-import { Pencil, Trash2, TrendingUp } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPreview";
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
 import { RecentResultsSection } from "@/components/wonseo/RecentResultsSection";
-import { CompetitionHistoryModal } from "@/components/wonseo/CompetitionHistoryModal";
 import { LEVEL_EMPHASIS_STYLE, STATUS_BADGE_STYLE, STATUS_OPTIONS } from "@/lib/wonseo-constants";
 import { formatDateLabel } from "@/lib/time";
 import type { WonseoCard, WonseoImage } from "@/lib/database.types";
@@ -41,8 +40,6 @@ export const WonseoCardView = forwardRef<
     rankLabel?: string;
     /** 자동 배정이 꺼져 있을 때 학생/교사가 직접 입력한 텍스트가 바뀌면(blur 시) 저장한다. */
     onRankChange?: (text: string) => void;
-    /** "작년 경쟁률 보기" 버튼 노출 여부. 검증 전이라 교사 화면에서만 우선 켠다. */
-    showCompetitionHistory?: boolean;
   }
 >(function WonseoCardView(
   {
@@ -59,13 +56,11 @@ export const WonseoCardView = forwardRef<
     autoAssign = true,
     rankLabel,
     onRankChange,
-    showCompetitionHistory = false,
   },
   ref,
 ) {
   const [images, setImages] = useState<WonseoImage[]>([]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [competitionOpen, setCompetitionOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -161,15 +156,6 @@ export const WonseoCardView = forwardRef<
                 {card.sub_category}
               </span>
             )}
-            {showCompetitionHistory && card.university && card.department && (
-              <button
-                onClick={() => setCompetitionOpen(true)}
-                className="flex items-center gap-1 border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg"
-              >
-                <TrendingUp className="w-3 h-3" />
-                작년 경쟁률 보기
-              </button>
-            )}
           </div>
         </div>
         <WonseoAttachmentPreview images={images} onClick={() => setLightboxOpen(true)} />
@@ -208,15 +194,6 @@ export const WonseoCardView = forwardRef<
         onClose={() => setLightboxOpen(false)}
         images={images}
       />
-      {showCompetitionHistory && card.university && card.department && (
-        <CompetitionHistoryModal
-          open={competitionOpen}
-          onClose={() => setCompetitionOpen(false)}
-          university={card.university}
-          department={card.department}
-          hintAdmissionType={[card.category, card.sub_category].filter(Boolean).join(" ")}
-        />
-      )}
     </div>
   );
 });

@@ -1,9 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { Search, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Download } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/providers/ToastProvider";
+import {
+  prefetchCutoffUniversities,
+  searchCutoffAdmissionTypes,
+  searchCutoffDepartments,
+  searchCutoffUniversities,
+} from "@/lib/admission-cutoff-autocomplete";
+import { fetchCutoffsForType, type CutoffMatch } from "@/lib/admission-cutoff-lookup";
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
@@ -30,7 +39,9 @@ function fmt2(n: number): string {
 
 function emptyForm() {
   return {
-    deptName: "",
+    university: "",
+    department: "",
+    admissionType: "",
     userScore: "",
     targetQuota: "",
     expectedCompetition: "",
@@ -41,26 +52,32 @@ function emptyForm() {
     applicants: ["", "", ""] as [string, string, string],
   };
 }
+type FormState = ReturnType<typeof emptyForm>;
 
-/** 카드의 최근 입결(연도별 자유 텍스트)을 "2026/2025/2024" 3칸에 최대한 맞춰 채운다.
- * year 텍스트가 그 세 값 중 하나와 일치하면 그 칸에, 아니면 최신순으로 앞에서부터 채운다. */
-function recentResultsToForm(card: MyCard) {
-  const sorted = [...(card.recent_results ?? [])].sort((a, b) => Number(b.year) - Number(a.year));
+/** 연도별 3개년 데이터(입결 원본이든 카드의 최근입결이든)를 "2026/2025/2024" 3칸에
+ * 최대한 맞춰 채운다. year가 그 세 값 중 하나와 일치하면 그 칸에, 아니면 최신순으로
+ * 앞에서부터 채운다. */
+function yearsToTriples<T extends { year: string | number }>(
+  rows: T[],
+  pick: (row: T) => { c50: string; c70: string; quota: string; turnover: string; applicants: string },
+) {
+  const sorted = [...rows].sort((a, b) => Number(b.year) - Number(a.year));
   const c50: [string, string, string] = ["", "", ""];
   const c70: [string, string, string] = ["", "", ""];
   const quota: [string, string, string] = ["", "", ""];
   const turnover: [string, string, string] = ["", "", ""];
   const applicants: [string, string, string] = ["", "", ""];
 
-  sorted.forEach((y, idx) => {
-    const col = YEAR_COLS.indexOf(y.year as (typeof YEAR_COLS)[number]);
+  sorted.forEach((row, idx) => {
+    const col = YEAR_COLS.indexOf(String(row.year) as (typeof YEAR_COLS)[number]);
     const slot = col >= 0 ? col : idx;
     if (slot > 2) return;
-    c50[slot] = y.cut50 ?? "";
-    c70[slot] = y.cut70 ?? "";
-    quota[slot] = y.enrollment ?? "";
-    turnover[slot] = y.fillCount ?? "";
-    applicants[slot] = y.competitionRate ?? "";
+    const v = pick(row);
+    c50[slot] = v.c50;
+    c70[slot] = v.c70;
+    quota[slot] = v.quota;
+    turnover[slot] = v.turnover;
+    applicants[slot] = v.applicants;
   });
 
   return { c50, c70, quota, turnover, applicants };
@@ -73,13 +90,19 @@ export function AdmissionProbabilityCalculator({
   studentId?: string;
   roster?: Pick<Roster, "student_id" | "name">[];
 }) {
-  const [form, setForm] = useState(emptyForm());
+  const showToast = useToast();
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [result, setResult] = useState<EstimatorResult | { insufficient: true } | null>(null);
   const [queriedScore, setQueriedScore] = useState(0);
+  const [loadingCutoffs, setLoadingCutoffs] = useState(false);
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
   const effectiveStudentId = studentId ?? teacherStudentId;
+
+  useEffect(() => {
+    prefetchCutoffUniversities();
+  }, []);
 
   function loadCards(id: string) {
     setTeacherStudentId(id);
@@ -97,17 +120,54 @@ export function AdmissionProbabilityCalculator({
   }
 
   function pickMyCard(card: MyCard) {
-    const filled = recentResultsToForm(card);
-    setForm({
-      deptName: [card.university, card.department].filter(Boolean).join(" · "),
-      userScore: "",
+    const filled = yearsToTriples(card.recent_results ?? [], (y) => ({
+      c50: y.cut50 ?? "",
+      c70: y.cut70 ?? "",
+      quota: y.enrollment ?? "",
+      turnover: y.fillCount ?? "",
+      applicants: y.competitionRate ?? "",
+    }));
+    setForm((f) => ({
+      ...f,
+      university: card.university ?? "",
+      department: card.department ?? "",
       targetQuota: card.enrollment != null ? String(card.enrollment) : "",
-      expectedCompetition: "",
       ...filled,
-    });
+    }));
   }
 
-  function updateField<K extends keyof ReturnType<typeof emptyForm>>(key: K, value: ReturnType<typeof emptyForm>[K]) {
+  /** 대학+학과+세부전형명으로 대학어디가 입결 원본을 찾아 3개년 표를 자동으로 채운다.
+   * "내 카드 불러오기"와 달리 카드 없이도, 직접 검색한 아무 학과나 넣어볼 수 있다. */
+  async function loadCutoffData() {
+    const uni = form.university.trim();
+    const dept = form.department.trim();
+    const type = form.admissionType.trim();
+    if (!uni || !dept || !type) {
+      showToast("대학·학과·세부전형명을 모두 입력해 주세요.", "error");
+      return;
+    }
+    setLoadingCutoffs(true);
+    try {
+      const matches: CutoffMatch[] = await fetchCutoffsForType(uni, dept, type);
+      if (matches.length === 0) {
+        showToast("일치하는 입결 데이터를 찾을 수 없습니다.", "error");
+        return;
+      }
+      const filled = yearsToTriples(matches, (m) => ({
+        c50: m.grade_50 ?? "",
+        c70: m.grade_70 ?? "",
+        quota: m.enrollment ?? "",
+        turnover: m.additional_pass ?? "",
+        applicants: m.competition_rate ?? "",
+      }));
+      setForm((f) => ({ ...f, ...filled }));
+      showToast("입결 데이터를 불러왔습니다.", "success");
+    } finally {
+      setLoadingCutoffs(false);
+    }
+  }
+
+  function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
   function updateTriple(key: "c50" | "c70" | "quota" | "turnover" | "applicants", idx: number, value: string) {
@@ -134,6 +194,7 @@ export function AdmissionProbabilityCalculator({
   }
 
   const ok = result && !("insufficient" in result) ? result : null;
+  const deptLabel = [form.university, form.department].filter(Boolean).join(" · ");
 
   return (
     <div className="space-y-6">
@@ -171,7 +232,7 @@ export function AdmissionProbabilityCalculator({
               }}
               className="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">내 원서 카드에서 불러오기(최근 입결 자동 채움)</option>
+              <option value="">내 원서 카드에서 불러오기(대학·학과·입결 자동 입력)</option>
               {myCards.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.university} · {c.department}
@@ -180,14 +241,53 @@ export function AdmissionProbabilityCalculator({
             </select>
           )}
 
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">지원 대학 · 학과</label>
-            <input
-              value={form.deptName}
-              onChange={(e) => updateField("deptName", e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">대학교명</label>
+              <AutocompleteInput
+                value={form.university}
+                onChange={(v) => setForm((f) => ({ ...f, university: v, department: "", admissionType: "" }))}
+                onSearch={searchCutoffUniversities}
+                placeholder="OO대학교"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">모집단위 / 학과</label>
+              <AutocompleteInput
+                value={form.department}
+                onChange={(v) => setForm((f) => ({ ...f, department: v, admissionType: "" }))}
+                onSearch={(q) => searchCutoffDepartments(q, form.university)}
+                placeholder="OO학과 또는 OO학부"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">세부 전형명</label>
+              <AutocompleteInput
+                value={form.admissionType}
+                onChange={(v) => updateField("admissionType", v)}
+                onSearch={
+                  form.university.trim() && form.department.trim()
+                    ? (q) => searchCutoffAdmissionTypes(q, form.university, form.department)
+                    : undefined
+                }
+                revealOnFocus
+                placeholder="예: 학생부교과(일반전형)"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={loadCutoffData}
+            disabled={loadingCutoffs}
+            className="w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-60"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {loadingCutoffs ? "불러오는 중..." : "입결 불러오기(대학·학과·전형으로 3개년 자동 입력)"}
+          </button>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -284,7 +384,7 @@ export function AdmissionProbabilityCalculator({
         <div className="space-y-4">
           <Card className="flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-[11px] text-slate-400">{form.deptName || "학과명을 입력하면 표시됩니다"}</p>
+              <p className="text-[11px] text-slate-400">{deptLabel || "대학·학과를 입력하면 표시됩니다"}</p>
               {!result && <p className="text-lg font-bold text-slate-400">분석 대기중</p>}
               {result && "insufficient" in result && <p className="text-lg font-bold text-slate-400">데이터 부족</p>}
               {ok && <p className={`text-lg font-bold ${TIER_COLOR[ok.tier.key].fg}`}>{ok.tier.name} 지원</p>}
@@ -338,12 +438,6 @@ export function AdmissionProbabilityCalculator({
                   </p>
                 </div>
               </div>
-
-              <p className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                이 수치는 과거 3개년 입결 패턴을 바탕으로 한 통계적 추정이며, 실제 합격을 보장하지 않습니다.
-                최종 지원 결정 전 입학처 공식 자료와 담임·진학 교사 상담을 함께 참고하세요.
-              </p>
 
               <details className="border border-slate-200 rounded-xl bg-white">
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">

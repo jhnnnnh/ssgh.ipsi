@@ -357,7 +357,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                           onRankChange={(text) => handleRankTextChange(card, text)}
                           showStatus={statusVisible}
                           showRecentResults={showRecentResults}
-                          showCompetitionHistory
                           onEdit={() => openEdit(card)}
                           onDelete={() => handleDelete(card)}
                         />
@@ -373,7 +372,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                           rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
                           showStatus={statusVisible}
                           showRecentResults={showRecentResults}
-                          showCompetitionHistory
                           onEdit={() => {}}
                           onDelete={() => {}}
                         />

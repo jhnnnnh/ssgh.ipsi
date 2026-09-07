@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 
@@ -18,6 +18,15 @@ export function AdmissionProbabilityConsentGate({
 }) {
   const [scrolledToEnd, setScrolledToEnd] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // 화면이 넓거나 글자 크기 설정에 따라 유의사항이 박스 안에 다 들어가서 애초에 스크롤할
+  // 게 없는 경우가 있다 — 그러면 "끝까지 스크롤"이 영영 발생하지 않아 동의 버튼이 계속
+  // 비활성 상태로 남는다. 그런 경우는 이미 전부 보이는 것이므로 바로 동의 가능 처리한다.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    if (el.scrollHeight <= el.clientHeight + 8) setScrolledToEnd(true);
+  }, []);
 
   function handleScroll() {
     const el = boxRef.current;
