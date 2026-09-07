@@ -285,7 +285,7 @@ export function AdmissionProbabilityCalculator({
               className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold transition"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              내 원서 카드에서 불러오기(대학·학과·입결 자동 입력)
+              내 원서 카드에서 불러오기
             </button>
           )}
 
