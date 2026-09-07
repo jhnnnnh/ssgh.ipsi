@@ -19,6 +19,7 @@ export function SortableWonseoCard({
   autoAssign,
   rankLabel,
   onRankChange,
+  showCompetitionHistory,
 }: {
   id: string;
   card: WonseoCard;
@@ -32,6 +33,7 @@ export function SortableWonseoCard({
   autoAssign: boolean;
   rankLabel: string;
   onRankChange: (text: string) => void;
+  showCompetitionHistory?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isSorting } = useSortable({ id });
 
@@ -47,6 +49,7 @@ export function SortableWonseoCard({
       autoAssign={autoAssign}
       rankLabel={rankLabel}
       onRankChange={onRankChange}
+      showCompetitionHistory={showCompetitionHistory}
       minHeight={minHeight}
       style={{
         transform: CSS.Transform.toString(transform),

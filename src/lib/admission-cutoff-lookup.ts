@@ -88,7 +88,7 @@ export async function searchCutoffsForLookup(
  * (입결 쪽 "교과(지역인재)" vs 전형데이터 쪽 "지역인재전형(교과)") — 그대로 비교하면
  * 같은 전형인데도 문자열이 안 겹쳐서 다르다고 오판할 수 있어 미리 걷어낸다.
  */
-function normalize(s: string): string {
+export function normalize(s: string): string {
   return s
     .replace(/\s+/g, "")
     .replace(/전형|교과|종합|\(|\)/g, "")
@@ -96,7 +96,7 @@ function normalize(s: string): string {
 }
 
 /** 이름이 완전히 같으면 2점, 한쪽이 다른 쪽을 포함하면 1점, 전혀 안 비슷하면 0점. */
-function nameSimilarity(a: string, b: string): number {
+export function nameSimilarity(a: string, b: string): number {
   if (!a || !b) return 0;
   if (a === b) return 2;
   // 너무 짧은 조각끼리의 포함 관계는 우연히 겹칠 수 있어 후보로 인정하지 않는다.
