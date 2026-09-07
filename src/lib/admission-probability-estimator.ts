@@ -134,7 +134,7 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
   const zHigh = k * (cut100 - (userScore - radius));
   const probLow = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, zLow))));
   const probHigh = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, zHigh))));
-  const probRangeLow = Math.max(1, Math.round(probLow * 100));
+  const probRangeLow = Math.max(1, Math.min(99, Math.round(probLow * 100)));
   let probRangeHigh = Math.min(99, Math.round(probHigh * 100));
   if (probRangeHigh <= probRangeLow) probRangeHigh = Math.min(99, probRangeLow + 2);
 
