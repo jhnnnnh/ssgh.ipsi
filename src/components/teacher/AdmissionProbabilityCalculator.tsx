@@ -23,7 +23,7 @@ import {
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
-type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "enrollment" | "recent_results">;
+type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category" | "enrollment" | "recent_results">;
 type Triple = [number, number, number];
 
 const YEAR_COLS = ["2026", "2025", "2024"] as const;
@@ -125,7 +125,7 @@ export function AdmissionProbabilityCalculator({
     const supabase = createClient();
     supabase
       .from("wonseo_cards")
-      .select("id, university, department, enrollment, recent_results")
+      .select("id, university, department, category, sub_category, enrollment, recent_results")
       .eq("student_id", id)
       .order("sort_order", { ascending: true })
       .then(({ data }) => setMyCards(data ?? []));
@@ -143,6 +143,7 @@ export function AdmissionProbabilityCalculator({
       ...f,
       university: card.university ?? "",
       department: card.department ?? "",
+      admissionType: card.sub_category?.trim() || card.category?.trim() || "",
       targetQuota: card.enrollment != null ? String(card.enrollment) : "",
       ...filled,
     }));
