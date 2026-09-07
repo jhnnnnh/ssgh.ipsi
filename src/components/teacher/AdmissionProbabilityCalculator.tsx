@@ -566,7 +566,7 @@ export function AdmissionProbabilityCalculator({
                       국면으로 희석시켜 추정량에 체계적 편의(bias)를 유발합니다. 이를 피하기 위해 최신
                       관측치(t년)를 기준 추정량으로 채택하는 마르코프적 접근을 취합니다.
                     </p>
-                    <Formula>X̂(t+1) = X(t)</Formula>
+                    <Formula>X′(t+1) = X(t)</Formula>
                   </section>
 
                   <section>
@@ -577,8 +577,8 @@ export function AdmissionProbabilityCalculator({
                     </p>
                     <Formula>
                       {"ρ = C(t+1)_예상 / C(t)"}
-                      {"\nX̂₅₀ = X₅₀(t) + (β₀ + β₁ρ),  β₀=0.1399, β₁=−0.2303"}
-                      {"\nX̂₇₀ = X₇₀(t) + (β₀′ + β₁′ρ),  β₀′=0.1424, β₁′=−0.2404"}
+                      {"\nX′₅₀ = X₅₀(t) + (β₀ + β₁ρ)   (β₀, β₁: 경쟁률보정계수)"}
+                      {"\nX′₇₀ = X₇₀(t) + (β₀′ + β₁′ρ)  (β₀′, β₁′: 경쟁률보정계수)"}
                     </Formula>
                   </section>
 
@@ -592,8 +592,8 @@ export function AdmissionProbabilityCalculator({
                     </p>
                     <Formula>
                       {"Δ = 70%컷 − 50%컷  (국소 분산의 대리지표)"}
-                      {"\n확장량 = α + γ₁·φ + γ₂·Δ,  α=−0.1550, γ₁=0.4105, γ₂=1.5181"}
-                      {"\n마지노선 = X̂₇₀ + 확장량"}
+                      {"\n확장량 = α + γ₁·φ + γ₂·Δ   (α, γ₁, γ₂: 마지노선회귀계수)"}
+                      {"\n마지노선 = X′₇₀ + 확장량"}
                     </Formula>
                   </section>
 
@@ -605,7 +605,7 @@ export function AdmissionProbabilityCalculator({
                       반영해 정원 규모에 따라 φ를 역제곱근 척도로 보정합니다.
                     </p>
                     <Formula>
-                      {"λ = √(15 / 정원),  λ ∈ [0.6, 1.6]  (15는 참조표본의 평균 정원)"}
+                      {"λ = √(참조정원 / 정원),  λ ∈ [최소보정계수, 최대보정계수]"}
                       {"\nφ_보정 = (φ·λ) / (1 + φ·λ)"}
                     </Formula>
                   </section>
@@ -621,7 +621,7 @@ export function AdmissionProbabilityCalculator({
                     </p>
                     <Formula>
                       {"P(합격) = 1 / (1 + e^(−k(Xₜ − x)))"}
-                      {"\nk = ln(9) / (Xₜ − X̂₅₀) × w  — ln(9)=logit(0.9), Xₜ=마지노선, x=입력 등급, w=신뢰가중치"}
+                      {"\nk = ln(9) / (Xₜ − X′₅₀) × w  — ln(9)=logit(0.9), Xₜ=마지노선, x=입력 등급, w=신뢰가중치"}
                     </Formula>
                   </section>
 
@@ -632,7 +632,7 @@ export function AdmissionProbabilityCalculator({
                       분산이 커지는 이분산성(heteroscedasticity)이 나타나므로, 로지스틱 곡선의 기울기 k에
                       가중치를 곱해 과도한 확신(overconfidence)을 방지합니다.
                     </p>
-                    <Formula>{"w = clip(경쟁률평균 / 4.0, 0.5, 1.0)"}</Formula>
+                    <Formula>{"w = clip(경쟁률평균 / 참조경쟁률, 최소신뢰도, 1.0)"}</Formula>
                   </section>
 
                   <ProbCurve result={ok} userScore={queriedScore} />
@@ -662,7 +662,7 @@ export function AdmissionProbabilityCalculator({
 
 function Formula({ children }: { children: React.ReactNode }) {
   return (
-    <pre className="mt-1.5 whitespace-pre-wrap font-mono text-[11px] text-slate-700 bg-slate-100 rounded-lg p-2.5">
+    <pre className="mt-1.5 whitespace-pre-wrap break-words overflow-x-auto font-mono text-[11px] text-slate-700 bg-slate-100 rounded-lg p-2.5">
       {children}
     </pre>
   );
