@@ -35,6 +35,7 @@ import { AdmissionOfferingUploadTab } from "@/components/teacher/AdmissionOfferi
 import { ChangePasswordModal } from "@/components/teacher/ChangePasswordModal";
 import { ManualHelpModal } from "@/components/teacher/ManualHelpModal";
 import { formatClassLabel } from "@/lib/student-id";
+import { useRoster } from "@/lib/hooks/useRoster";
 
 type TeacherTab = "status" | "wonseo" | "cutoffLookup" | "roster" | "calendar" | "teachers" | "cutoffs";
 
@@ -73,6 +74,7 @@ function TeacherDashboard() {
   const { profile, refreshProfile, signOut } = useAuth();
   const { grade, classNo, isAdmin, canSwitchClass, classOptions, setActiveClass, loading } =
     useActiveClass();
+  const { roster } = useRoster();
   const [tab, setTab] = useState<TeacherTab>("status");
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -82,7 +84,7 @@ function TeacherDashboard() {
   const tabs = [
     { key: "status", label: "상담 신청 현황", icon: <ListChecks className="w-4 h-4" /> },
     { key: "wonseo", label: "수시 원서 관리", icon: <GraduationCap className="w-4 h-4" /> },
-    { key: "cutoffLookup", label: "입결 조회", icon: <Search className="w-4 h-4" /> },
+    { key: "cutoffLookup", label: "대입 정보 조회", icon: <Search className="w-4 h-4" /> },
     { key: "calendar", label: "입시 일정", icon: <CalendarDays className="w-4 h-4" /> },
     { key: "roster", label: "학생 명단 관리", icon: <UsersRound className="w-4 h-4" /> },
     ...(isAdmin
@@ -211,7 +213,7 @@ function TeacherDashboard() {
         <>
           {tab === "status" && <StatusTab />}
           {tab === "wonseo" && <WonseoManageTab />}
-          {tab === "cutoffLookup" && <CutoffLookupTab />}
+          {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
           {tab === "roster" && <RosterTab />}
           {tab === "calendar" && <TeacherCalendarTab />}
         </>

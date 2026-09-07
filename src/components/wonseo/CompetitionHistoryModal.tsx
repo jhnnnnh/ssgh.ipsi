@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, TrendingUp } from "lucide-react";
+import { WEEKDAY_KR } from "@/lib/time";
 import {
   fetchCompetitionSeries,
   currentElapsedMinutes,
@@ -16,9 +17,17 @@ const PAD_R = 16;
 const PAD_T = 16;
 const PAD_B = 32;
 
-function formatDay(minutes: number): string {
-  const days = Math.floor(minutes / (24 * 60));
-  return `${days}일`;
+type RealPoint = { elapsedMin: number; applicants: number | null; ratio: number };
+
+/** startAt 기준 경과분을 실제 달력 날짜+요일로 바꾼다(예: "9/9(화)"). */
+function formatElapsedAsDate(startAt: string, elapsedMin: number): string {
+  const d = new Date(new Date(startAt).getTime() + elapsedMin * 60000);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KR[d.getDay()]})`;
+}
+function formatElapsedAsDateTime(startAt: string, elapsedMin: number): string {
+  const d = new Date(new Date(startAt).getTime() + elapsedMin * 60000);
+  const hh = String(d.getHours()).padStart(2, "0");
+  return `${formatElapsedAsDate(startAt, elapsedMin)} ${hh}:00`;
 }
 
 export function CompetitionHistoryModal({
@@ -36,6 +45,8 @@ export function CompetitionHistoryModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<CompetitionSeries | null | undefined>(undefined);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +54,7 @@ export function CompetitionHistoryModal({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setData(undefined);
+    setHoverIdx(null);
     fetchCompetitionSeries(university, department, hintAdmissionType).then((res) => {
       if (active) {
         setData(res);
@@ -56,9 +68,8 @@ export function CompetitionHistoryModal({
 
   if (!open) return null;
 
-  const realPoints = (data?.points ?? []).filter(
-    (p): p is { elapsedMin: number; applicants: number | null; ratio: number } =>
-      p.elapsedMin != null && p.ratio != null,
+  const realPoints: RealPoint[] = (data?.points ?? []).filter(
+    (p): p is RealPoint => p.elapsedMin != null && p.ratio != null,
   );
   const finalPoint = data?.points.find(
     (p): p is { elapsedMin: null; applicants: number | null; ratio: number } => p.elapsedMin == null && p.ratio != null,
@@ -77,6 +88,27 @@ export function CompetitionHistoryModal({
 
   const nowElapsed = data ? currentElapsedMinutes(data.startAt) : null;
   const showNowMarker = nowElapsed != null && nowElapsed >= 0 && nowElapsed <= maxElapsed;
+
+  function handleMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!svgRef.current || realPoints.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scale = CHART_W / rect.width;
+    const svgX = (e.clientX - rect.left) * scale;
+    const chartRatio = (svgX - PAD_L) / (CHART_W - PAD_L - PAD_R);
+    const targetMin = chartRatio * maxElapsed;
+    let nearest = 0;
+    let best = Infinity;
+    realPoints.forEach((p, i) => {
+      const d = Math.abs(p.elapsedMin - targetMin);
+      if (d < best) {
+        best = d;
+        nearest = i;
+      }
+    });
+    setHoverIdx(nearest);
+  }
+
+  const hoverPoint = hoverIdx != null ? realPoints[hoverIdx] : null;
 
   return (
     <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
@@ -116,7 +148,13 @@ export function CompetitionHistoryModal({
                 <p className="text-[11px] text-slate-400">전형: {data.admissionType}</p>
               )}
 
-              <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full h-auto">
+              <svg
+                ref={svgRef}
+                viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+                className="w-full h-auto cursor-crosshair"
+                onMouseMove={handleMove}
+                onMouseLeave={() => setHoverIdx(null)}
+              >
                 {/* y축 그리드 + 라벨 */}
                 {[0, 0.5, 1].map((t) => {
                   const ratioVal = maxRatio * 1.05 * t;
@@ -130,10 +168,10 @@ export function CompetitionHistoryModal({
                     </g>
                   );
                 })}
-                {/* x축 라벨(일 단위) */}
+                {/* x축 라벨: 날짜(요일) — 작년과 비교할 때 요일이 맞아야 감이 온다 */}
                 {Array.from({ length: Math.floor(maxElapsed / (24 * 60)) + 1 }, (_, d) => d * 24 * 60).map((m) => (
                   <text key={m} x={x(m)} y={CHART_H - PAD_B + 16} textAnchor="middle" fontSize={10} fill="#94a3b8">
-                    {formatDay(m)}
+                    {data ? formatElapsedAsDate(data.startAt, m) : ""}
                   </text>
                 ))}
 
@@ -155,7 +193,38 @@ export function CompetitionHistoryModal({
                     </text>
                   </g>
                 )}
+
+                {/* 마우스로 짚은 지점의 정확한 값 */}
+                {hoverPoint && data && (
+                  <g>
+                    <line
+                      x1={x(hoverPoint.elapsedMin)}
+                      x2={x(hoverPoint.elapsedMin)}
+                      y1={PAD_T}
+                      y2={CHART_H - PAD_B}
+                      stroke="#cbd5e1"
+                      strokeWidth={1}
+                    />
+                    <circle cx={x(hoverPoint.elapsedMin)} cy={y(hoverPoint.ratio)} r={4} fill="#4f46e5" />
+                    {(() => {
+                      const label = `${formatElapsedAsDateTime(data.startAt, hoverPoint.elapsedMin)} 기준  ${hoverPoint.ratio.toFixed(2)} : 1`;
+                      const boxW = label.length * 6 + 16;
+                      let boxX = x(hoverPoint.elapsedMin) - boxW / 2;
+                      boxX = Math.max(PAD_L, Math.min(CHART_W - PAD_R - boxW, boxX));
+                      const boxY = Math.max(PAD_T, y(hoverPoint.ratio) - 34);
+                      return (
+                        <g>
+                          <rect x={boxX} y={boxY} width={boxW} height={22} rx={6} fill="#1e293b" />
+                          <text x={boxX + boxW / 2} y={boxY + 15} textAnchor="middle" fontSize={11} fontWeight={700} fill="white">
+                            {label}
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
               </svg>
+              <p className="text-[11px] text-slate-400 -mt-1">그래프 위를 움직이면 그 시점의 정확한 경쟁률을 볼 수 있어요.</p>
 
               {finalPoint && (
                 <p className="text-xs text-slate-500">
