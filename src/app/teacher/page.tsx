@@ -11,6 +11,7 @@ import {
   KeyRound,
   ListChecks,
   LogOut,
+  Percent,
   Search,
   ShieldUser,
   UsersRound,
@@ -32,12 +33,21 @@ import { TeacherCalendarTab } from "@/components/teacher/TeacherCalendarTab";
 import { TeacherManageTab } from "@/components/teacher/TeacherManageTab";
 import { AdmissionCutoffUploadTab } from "@/components/teacher/AdmissionCutoffUploadTab";
 import { AdmissionOfferingUploadTab } from "@/components/teacher/AdmissionOfferingUploadTab";
+import { AdmissionProbabilityTab } from "@/components/teacher/AdmissionProbabilityTab";
 import { ChangePasswordModal } from "@/components/teacher/ChangePasswordModal";
 import { ManualHelpModal } from "@/components/teacher/ManualHelpModal";
 import { formatClassLabel } from "@/lib/student-id";
 import { useRoster } from "@/lib/hooks/useRoster";
 
-type TeacherTab = "status" | "wonseo" | "cutoffLookup" | "roster" | "calendar" | "teachers" | "cutoffs";
+type TeacherTab =
+  | "status"
+  | "wonseo"
+  | "cutoffLookup"
+  | "admissionProbability"
+  | "roster"
+  | "calendar"
+  | "teachers"
+  | "cutoffs";
 
 export default function TeacherPage() {
   const router = useRouter();
@@ -85,6 +95,7 @@ function TeacherDashboard() {
     { key: "status", label: "상담 신청 현황", icon: <ListChecks className="w-4 h-4" /> },
     { key: "wonseo", label: "수시 원서 관리", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "cutoffLookup", label: "대입 정보 조회", icon: <Search className="w-4 h-4" /> },
+    { key: "admissionProbability", label: "합격 가능성 추정", icon: <Percent className="w-4 h-4" /> },
     { key: "calendar", label: "입시 일정", icon: <CalendarDays className="w-4 h-4" /> },
     { key: "roster", label: "학생 명단 관리", icon: <UsersRound className="w-4 h-4" /> },
     ...(isAdmin
@@ -198,7 +209,8 @@ function TeacherDashboard() {
       classNo == null &&
       tab !== "teachers" &&
       tab !== "cutoffs" &&
-      tab !== "cutoffLookup" ? (
+      tab !== "cutoffLookup" &&
+      tab !== "admissionProbability" ? (
         <Card padded={false} className="p-12 text-center space-y-2">
           <p className="text-sm font-bold text-slate-600">
             {isAdmin ? "아직 등록된 반이 없습니다." : "담당 반 정보를 확인할 수 없습니다."}
@@ -214,6 +226,7 @@ function TeacherDashboard() {
           {tab === "status" && <StatusTab />}
           {tab === "wonseo" && <WonseoManageTab />}
           {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
+          {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
           {tab === "roster" && <RosterTab />}
           {tab === "calendar" && <TeacherCalendarTab />}
         </>

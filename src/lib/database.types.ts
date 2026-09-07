@@ -46,6 +46,9 @@ export type Profile = {
   class_no: number | null;
   dual_admin: boolean;
   admin_mode_enabled: boolean;
+  /** "합격 확률 추정" 기능의 유의사항에 동의한 시각(null이면 아직 동의 전 — 기능 사용 전
+   * 반드시 유의사항을 끝까지 읽고 동의해야 한다). */
+  admission_probability_consent_at: string | null;
   created_at: string;
 };
 
