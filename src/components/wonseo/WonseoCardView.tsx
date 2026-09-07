@@ -29,6 +29,9 @@ export const WonseoCardView = forwardRef<
     onEdit: () => void;
     onDelete: () => void;
     minHeight?: number;
+    /** 카드 동일높이 계산용 실측 대상. min-height가 걸리는 루트 대신 이 안쪽 요소를
+     * 재야, 내용이 줄어들 때도 예전 min-height에 막히지 않고 실제 줄어든 높이를 감지한다. */
+    measureRef?: (el: HTMLDivElement | null) => void;
     style?: React.CSSProperties;
     className?: string;
     dragHandle?: React.ReactNode;
@@ -46,6 +49,7 @@ export const WonseoCardView = forwardRef<
     onEdit,
     onDelete,
     minHeight,
+    measureRef,
     style,
     className,
     dragHandle,
@@ -85,7 +89,7 @@ export const WonseoCardView = forwardRef<
       className={`bg-white rounded-3xl border-2 ${emphasis.border} shadow-sm overflow-hidden flex ${className ?? ""}`}
     >
       <div className={`w-2 shrink-0 ${emphasis.bar}`} />
-      <div className="flex-1 p-5 space-y-3 min-w-0">
+      <div ref={measureRef} className="flex-1 self-start p-5 space-y-3 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}

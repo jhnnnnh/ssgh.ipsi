@@ -37,10 +37,8 @@ export function SortableWonseoCard({
 
   return (
     <WonseoCardView
-      ref={(el) => {
-        setNodeRef(el);
-        setEqualHeightRef(el);
-      }}
+      ref={setNodeRef}
+      measureRef={setEqualHeightRef}
       card={card}
       showStatus={showStatus}
       showRecentResults={showRecentResults}

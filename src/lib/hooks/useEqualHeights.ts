@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /**
  * 그리드 안의 카드 높이를 목록 전체에서 가장 긴 카드에 맞춰 통일한다.
  * (같은 행뿐 아니라 다른 행에 있는 카드끼리도 전부 동일해진다.)
  *
- * 각 카드의 "실제 콘텐츠 높이"는 카드 자신(ref)으로 측정하고, 계산된
- * min-height도 그 같은 요소에 돌려준다. min-height는 바닥값일 뿐이라
- * 자기 자신을 측정하는 데 써도 순환 문제가 생기지 않는다: 내용이 더
- * 길어지면 자연스럽게 그만큼 커지고, 그 변화가 다시 감지된다.
+ * min-height는 카드 루트(ref)에 돌려주지만, 실제 콘텐츠 높이는 그 min-height의
+ * 영향을 받지 않는 안쪽 요소(measureRef)로 잰다. 카드 루트 자신을 재면 한번 커진
+ * min-height가 내려갈 상황에서도 "내용이 줄어든 걸" 영영 감지하지 못한다(루트가
+ * 이미 min-height로 떠받쳐져 있어 실제로 안 줄어드는 것처럼 보이기 때문).
  *
  * 화면이 1열(모바일)로 좁아지면 통일을 끄고 각 카드가 자기 내용 길이대로
  * 자연스러운 높이를 갖도록 한다.
@@ -46,6 +46,28 @@ export function useEqualHeights(resetKey: string, count: number, multiColumnBrea
     heights.current = new Array(count).fill(0);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMaxHeight(undefined);
+  }, [resetKey, count]);
+
+  // 화면에 그려지기 전에(useLayoutEffect) 실제 콘텐츠 높이를 다시 재서 필요하면 바로
+  // 보정한다. min-height가 걸린 카드 자신이 아니라, 그 영향을 받지 않는 내부 콘텐츠
+  // 요소(measureRef)를 재기 때문에 "내용이 줄어들어도 예전에 정해진 min-height 때문에
+  // 줄어든 걸 감지하지 못하는" 문제가 없다. ResizeObserver(아래)는 리액트 렌더와
+  // 무관한 변화(이미지 로드 등 외부 요인)까지 마저 잡아내는 보조 수단이다.
+  // 의도적으로 매 렌더마다 다시 잰다(카드 콘텐츠가 바뀌었는지 알려줄 별도의
+  // dependency 값이 없다). prev===next면 상태를 바꾸지 않으므로 무한 루프로
+  // 이어지지 않는다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    if (!multiColumn || count === 0) return;
+    const current = refs.current.slice(0, count);
+    if (current.some((el) => !el)) return;
+    const measured = current.map((el) => el!.getBoundingClientRect().height);
+    heights.current = measured;
+    const next = Math.max(...measured);
+    setMaxHeight((prev) => (prev === next ? prev : next));
+  });
+
+  useEffect(() => {
     if (count === 0) return;
 
     const elToIndex = new Map<Element, number>();
@@ -54,7 +76,10 @@ export function useEqualHeights(resetKey: string, count: number, multiColumnBrea
         const i = elToIndex.get(entry.target);
         if (i !== undefined) heights.current[i] = entry.contentRect.height;
       }
-      setMaxHeight(Math.max(...heights.current));
+      setMaxHeight((prev) => {
+        const next = Math.max(...heights.current);
+        return prev === next ? prev : next;
+      });
     });
 
     refs.current.slice(0, count).forEach((el, i) => {
