@@ -26,7 +26,7 @@ type Row = {
   series: [number | null, number | null, number | null][];
 };
 
-async function fetchRows(university: string, department: string | null): Promise<Row[]> {
+async function fetchRowsExact(university: string, department: string | null): Promise<Row[]> {
   const supabase = createClient();
   let query = supabase
     .from("admission_competition_history")
@@ -35,6 +35,17 @@ async function fetchRows(university: string, department: string | null): Promise
   query = department != null ? query.eq("department", department) : query.is("department", null);
   const { data } = await query;
   return (data as Row[] | null) ?? [];
+}
+
+/** 일부 국립대(부경대·순천대·창원대·목포대·한국해양대 등)는 대학명 자동완성이 가져오는
+ * "대학어디가" 쪽 표기에는 "국립"이 붙어 있는데(예: "국립부경대"), 이 아카이브는 엑셀 시트
+ * 이름 그대로("부경대") 저장돼 있어 정확히 일치하는 이름이 아예 없다. "국립" 접두어를
+ * 붙이거나 뗀 이름으로도 한 번 더 시도한다. */
+async function fetchRows(university: string, department: string | null): Promise<Row[]> {
+  const exact = await fetchRowsExact(university, department);
+  if (exact.length > 0) return exact;
+  const altUniversity = university.startsWith("국립") ? university.slice(2) : `국립${university}`;
+  return fetchRowsExact(altUniversity, department);
 }
 
 /**
