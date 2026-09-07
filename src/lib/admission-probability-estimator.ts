@@ -115,7 +115,18 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
   const competitionConfidence =
     avgCompetitionRatio > 0 ? Math.max(0.5, Math.min(1.0, avgCompetitionRatio / REFERENCE_COMPETITION)) : 1.0;
 
-  const expansion = estimateExpansion(cut50, cut70, turnoverRatioProxy);
+  // 충원비율이 연도별로 들쭉날쭉할수록(변동계수가 클수록) 그 값의 표본 신뢰도가
+  // 낮다고 보고, 확장량 산정에 반영되는 충원비율을 그 변동성만큼 완만하게
+  // 낮춘다. 고정된 상한값 대신 실제 관측된 연도 간 분산에 따라 자동으로
+  // 조정되므로, 정원이 작아 충원비율이 극단적으로 튀는 학과에서 마지노선이
+  // 과도하게 외삽되는 것을 데이터 기반으로 억제한다.
+  const validRMean = validR.length ? validR.reduce((a, b) => a + b, 0) / validR.length : 0;
+  const turnoverVariance =
+    validR.length >= 2 ? validR.reduce((sum, v) => sum + (v - validRMean) ** 2, 0) / validR.length : 0;
+  const turnoverCV = validRMean > 0 ? Math.sqrt(turnoverVariance) / validRMean : 0;
+  const turnoverConsistency = validR.length >= 2 ? Math.max(0.5, Math.min(1.0, 1 / (1 + turnoverCV))) : 1.0;
+
+  const expansion = estimateExpansion(cut50, cut70, turnoverRatioProxy * turnoverConsistency);
   let cut100 = cut70 + expansion;
   if (cut100 < cut70 + 0.01) cut100 = cut70 + 0.01;
 
