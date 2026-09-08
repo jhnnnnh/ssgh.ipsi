@@ -465,6 +465,7 @@ export function CutoffLookupTab({
         university={caUniversity.trim()}
         department={caDepartment.trim()}
         hintAdmissionType={caAdmissionType.trim()}
+        onPickManually={() => setCompetitionPickerOpen(true)}
       />
 
       <MyCardPickerModal

@@ -184,12 +184,17 @@ export function CompetitionHistoryModal({
   university,
   department,
   hintAdmissionType,
+  onPickManually,
 }: {
   open: boolean;
   onClose: () => void;
   university: string;
   department: string;
   hintAdmissionType: string;
+  /** "내 원서 카드에서 불러오기"는 수기 입력값을 그대로 쓰기 때문에 실제 아카이브와 이름이
+   * 달라 엉뚱한(혹은 못 찾는) 결과가 나올 수 있다. 있으면 언제든 대학·학과·전형을 직접
+   * 골라 다시 검색할 수 있는 버튼을 보여준다. */
+  onPickManually?: () => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompetitionLookupResult | undefined>(undefined);
@@ -266,6 +271,12 @@ export function CompetitionHistoryModal({
 
           {!loading && chosen && (
             <div className="space-y-3">
+              {chosen.matchLevel === "department" && chosen.department && chosen.department !== department && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  입력하신 학과명과 정확히 일치하는 데이터가 없어, 이름이 가장 비슷한{" "}
+                  <strong>{chosen.department}</strong>의 경쟁률로 대신 보여드려요.
+                </p>
+              )}
               {chosen.matchLevel === "summary" && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   정확히 일치하는 학과 데이터가 없어, <strong>{chosen.admissionType}</strong> 전형 전체
@@ -279,9 +290,23 @@ export function CompetitionHistoryModal({
             </div>
           )}
 
-          <p className="mt-4 text-[11px] text-slate-400 border-t border-slate-100 pt-3">
-            2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.
-          </p>
+          <div className="mt-4 border-t border-slate-100 pt-3 space-y-2">
+            {onPickManually && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onPickManually();
+                }}
+                className="w-full text-center text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+              >
+                찾는 학교·학과·전형이 아닌가요? 직접 선택하기
+              </button>
+            )}
+            <p className="text-[11px] text-slate-400">
+              2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.
+            </p>
+          </div>
         </div>
       </div>
     </div>

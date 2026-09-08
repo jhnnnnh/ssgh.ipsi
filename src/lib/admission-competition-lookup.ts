@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { nameSimilarity } from "@/lib/admission-cutoff-lookup";
+import { normalize, nameSimilarity } from "@/lib/admission-cutoff-lookup";
 
 export type CompetitionPoint = {
   /** 그 대학 작년 원서접수 시작 시각으로부터 경과한 분. "최종" 집계 지점은 null. */
@@ -46,6 +46,39 @@ async function fetchRows(university: string, department: string | null): Promise
   if (exact.length > 0) return exact;
   const altUniversity = university.startsWith("국립") ? university.slice(2) : `국립${university}`;
   return fetchRowsExact(altUniversity, department);
+}
+
+async function fetchAllDepartmentRowsExact(university: string): Promise<Row[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("admission_competition_history")
+    .select("university, admission_type, department, start_at, series")
+    .eq("university", university)
+    .not("department", "is", null);
+  return (data as Row[] | null) ?? [];
+}
+
+async function fetchAllDepartmentRows(university: string): Promise<Row[]> {
+  const exact = await fetchAllDepartmentRowsExact(university);
+  if (exact.length > 0) return exact;
+  const altUniversity = university.startsWith("국립") ? university.slice(2) : `국립${university}`;
+  return fetchAllDepartmentRowsExact(altUniversity);
+}
+
+/** "내 원서 카드에서 불러오기"는 학생·교사가 수기로 입력한 학과명을 그대로 쓰기 때문에
+ * 아카이브에 저장된 학과명과 정확히 같지 않을 수 있다(예: "경제학과" vs
+ * "경제학부(경제학전공)"). 정확히 일치하는 학과가 없을 때, 그 대학의 학과들 중 이름이
+ * 가장 비슷한 학과로 한 번 더 시도한다. */
+function pickBestFuzzyDepartment(rows: Row[], hintDepartment: string): string | null {
+  const normalizedHint = normalize(hintDepartment);
+  if (!normalizedHint) return null;
+  const uniqueDepts = Array.from(new Set(rows.map((r) => r.department).filter((d): d is string => d != null)));
+  let best: { dept: string; score: number } | null = null;
+  for (const d of uniqueDepts) {
+    const score = nameSimilarity(normalize(d), normalizedHint);
+    if (score > 0 && (!best || score > best.score)) best = { dept: d, score };
+  }
+  return best?.dept ?? null;
 }
 
 /**
@@ -135,7 +168,9 @@ export type CompetitionLookupResult =
 /**
  * 대학+학과(+세부전형명 힌트)로 작년 경쟁률 시계열을 찾는다.
  * 1) 학과까지 정확히 일치하는 데이터 중 이름이 비슷한 전형을 찾고,
- * 2) 없으면 학과 구분 없는 "전형 전체" 요약 시계열로 대체한다.
+ * 2) 없으면(원서 카드처럼 수기 입력이라 학과명 표기가 다를 수 있으니) 그 대학의 학과 중
+ *    이름이 가장 비슷한 학과로 한 번 더 시도하고,
+ * 3) 그래도 없으면 학과 구분 없는 "전형 전체" 요약 시계열로 대체한다.
  * 후보가 정확히 하나면 바로 그래프를 그릴 수 있게 matched를, 둘 이상이면 ambiguous를
  * 돌려준다(호출부에서 사람이 직접 고르게 한다).
  */
@@ -145,7 +180,20 @@ export async function fetchCompetitionSeries(
   hintAdmissionType: string,
 ): Promise<CompetitionLookupResult> {
   const deptRows = await fetchRows(university, department);
-  const deptMatches = matchRows(deptRows, hintAdmissionType);
+  let deptMatches = matchRows(deptRows, hintAdmissionType);
+
+  if (deptMatches.length === 0 && department.trim()) {
+    const allDeptRows = await fetchAllDepartmentRows(university);
+    const bestDept = pickBestFuzzyDepartment(allDeptRows, department);
+    if (bestDept && bestDept !== department) {
+      const fuzzyMatches = matchRows(
+        allDeptRows.filter((r) => r.department === bestDept),
+        hintAdmissionType,
+      );
+      if (fuzzyMatches.length > 0) deptMatches = fuzzyMatches;
+    }
+  }
+
   if (deptMatches.length === 1) return { kind: "matched", series: toSeries(deptMatches[0], "department") };
   if (deptMatches.length > 1) return { kind: "ambiguous", options: deptMatches.map((r) => toSeries(r, "department")) };
 
