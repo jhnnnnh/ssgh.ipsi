@@ -371,7 +371,17 @@ export function CutoffLookupTab({
         onComplete={handleLookupPicked}
         fetchUniversities={listCutoffUniversities}
         fetchDepartments={async (u) => ({ list: await listCutoffDepartments(u), hasSummary: false })}
-        fetchAdmissionTypes={(u, d) => listCutoffAdmissionTypes(u, d ?? "")}
+        fetchAdmissionTypes={async (u, d) => {
+          // 올해 새로 생긴 전형(예: 작년까지 교과만 모집하다 올해 종합을 신설)은
+          // admission_cutoffs(과거 입결)에는 아직 없고 admission_offerings(이번 학년도
+          // 모집정보)에만 있을 수 있다. 입결이 없을 뿐 실제로 모집하는 전형이니 선택
+          // 목록에서는 보여야 한다 — 그래서 두 출처를 합친다(입결은 당연히 못 뜬다).
+          const [cutoffTypes, offerings] = await Promise.all([
+            listCutoffAdmissionTypes(u, d ?? ""),
+            listOfferingCandidates(u, d ?? ""),
+          ]);
+          return Array.from(new Set([...cutoffTypes, ...offerings.map((o) => o.admissionType)]));
+        }}
         admissionTypeAllLabel="전체 전형 보기"
         cards={myCards ?? []}
       />
