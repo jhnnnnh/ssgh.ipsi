@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { nameSimilarity, pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
+import { nameSimilarity, pickBestFuzzyOption, pickBestFuzzyAdmissionType } from "@/lib/admission-cutoff-lookup";
 export { pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
 
 export type CompetitionPoint = {
@@ -150,6 +150,27 @@ export async function fetchCompetitionAdmissionTypeOptions(
     p_department: department,
   });
   return (data ?? []).map((r) => r.admission_type);
+}
+
+/**
+ * 입결/모집정보의 전형명이 실제 원서접수 사이트 표기(경쟁률 아카이브가 그 사이트에서
+ * 그대로 캡처한 것)와 다를 때, 화면에 참고로 보여줄 "공식 명칭"을 찾는다.
+ * pickBestFuzzyAdmissionType과 같은 기준을 쓴다 — 트랙(교과/종합)이 다르면 무조건 후보에서
+ * 빠지므로(안전장치), 트랙이 같은 후보 중 핵심 이름이 가장 비슷한 것만 돌려준다. 그래도
+ * 하나도 안 겹치면(아카이브에 없는, 즉 올해 전형이 새로 생겼거나 이름이 완전히 바뀐
+ * 경우일 수 있음) null을 돌려준다 — 원본 표기는 화면에서 그대로 두고(데이터 조회에도
+ * 전혀 영향 없음), 이 값은 순수 참고용으로만 쓴다.
+ */
+export async function findOfficialAdmissionTypeName(
+  university: string,
+  department: string,
+  rawAdmissionType: string,
+): Promise<string | null> {
+  let rows = await fetchRows(university, department);
+  if (rows.length === 0) rows = await fetchRows(university, null);
+  const candidates = Array.from(new Set(rows.map((r) => r.admission_type)));
+  const best = pickBestFuzzyAdmissionType(candidates, rawAdmissionType);
+  return best && best !== rawAdmissionType ? best : null;
 }
 
 export type CompetitionLookupResult =
