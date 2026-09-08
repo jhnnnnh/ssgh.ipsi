@@ -89,7 +89,7 @@ export function CutoffLookupTab({
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
-  const [cardPickerTarget, setCardPickerTarget] = useState<"lookup" | "competition" | null>(null);
+  const [cardPickerTarget, setCardPickerTarget] = useState<"lookup" | null>(null);
   const effectiveStudentId = studentId ?? teacherStudentId;
 
   useEffect(() => {
@@ -167,13 +167,6 @@ export function CutoffLookupTab({
     setUniversity(c.university);
     setDepartment(c.department);
     void runSearch(c.university, c.department, admissionType.trim());
-  }
-
-  function pickMyCardForCompetition(card: MyCard) {
-    if (!card.university || !card.department) return;
-    setCaUniversity(card.university);
-    setCaDepartment(card.department);
-    setCaAdmissionType(card.sub_category ?? card.category ?? "");
   }
 
   function handleCompetitionSearch() {
@@ -414,26 +407,14 @@ export function CutoffLookupTab({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          {myCards && myCards.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setCardPickerTarget("competition")}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              내 원서 카드에서 불러오기
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setCompetitionPickerOpen(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
-          >
-            <Search className="w-3.5 h-3.5" />
-            대학·학과·전형 선택
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCompetitionPickerOpen(true)}
+          className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+        >
+          <Search className="w-3.5 h-3.5" />
+          대학·학과·전형 선택
+        </button>
 
         {caUniversity && (
           <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
@@ -457,6 +438,7 @@ export function CutoffLookupTab({
         open={competitionPickerOpen}
         onClose={() => setCompetitionPickerOpen(false)}
         onComplete={handleCompetitionPicked}
+        cards={myCards ?? []}
       />
 
       <CompetitionHistoryModal
@@ -472,7 +454,7 @@ export function CutoffLookupTab({
         open={cardPickerTarget != null}
         onClose={() => setCardPickerTarget(null)}
         cards={myCards ?? []}
-        onPick={(card) => (cardPickerTarget === "competition" ? pickMyCardForCompetition(card) : pickMyCard(card))}
+        onPick={pickMyCard}
       />
     </div>
   );

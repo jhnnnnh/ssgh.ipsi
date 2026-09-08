@@ -65,20 +65,24 @@ async function fetchAllDepartmentRows(university: string): Promise<Row[]> {
   return fetchAllDepartmentRowsExact(altUniversity);
 }
 
-/** "내 원서 카드에서 불러오기"는 학생·교사가 수기로 입력한 학과명을 그대로 쓰기 때문에
- * 아카이브에 저장된 학과명과 정확히 같지 않을 수 있다(예: "경제학과" vs
- * "경제학부(경제학전공)"). 정확히 일치하는 학과가 없을 때, 그 대학의 학과들 중 이름이
- * 가장 비슷한 학과로 한 번 더 시도한다. */
-function pickBestFuzzyDepartment(rows: Row[], hintDepartment: string): string | null {
-  const normalizedHint = normalize(hintDepartment);
+/** 이름이 정확히 같은 후보가 없을 때, 문자열 목록 중 힌트와 이름이 가장 비슷한 하나를
+ * 고른다. "내 원서 카드에서 불러오기"처럼 수기로 입력한 학교/학과/전형명이 아카이브 표기와
+ * 정확히 같지 않을 때(예: "경제학과" vs "경제학부(경제학전공)") 대학·학과·전형 선택
+ * 팝업의 각 칸을 미리 채워 넣는 데 쓴다. */
+export function pickBestFuzzyOption(options: string[], hint: string): string | null {
+  const normalizedHint = normalize(hint);
   if (!normalizedHint) return null;
-  const uniqueDepts = Array.from(new Set(rows.map((r) => r.department).filter((d): d is string => d != null)));
-  let best: { dept: string; score: number } | null = null;
-  for (const d of uniqueDepts) {
-    const score = nameSimilarity(normalize(d), normalizedHint);
-    if (score > 0 && (!best || score > best.score)) best = { dept: d, score };
+  let best: { value: string; score: number } | null = null;
+  for (const o of options) {
+    const score = nameSimilarity(normalize(o), normalizedHint);
+    if (score > 0 && (!best || score > best.score)) best = { value: o, score };
   }
-  return best?.dept ?? null;
+  return best?.value ?? null;
+}
+
+function pickBestFuzzyDepartment(rows: Row[], hintDepartment: string): string | null {
+  const uniqueDepts = Array.from(new Set(rows.map((r) => r.department).filter((d): d is string => d != null)));
+  return pickBestFuzzyOption(uniqueDepts, hintDepartment);
 }
 
 /**
