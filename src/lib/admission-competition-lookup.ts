@@ -204,15 +204,18 @@ export async function fetchCompetitionSeries(
 /**
  * 작년 원서접수 시작 시각을 대략 1년 뒤로 옮겨 "올해 시작 시각"으로 가정한다(대학마다
  * 실제 올해 접수 일정을 따로 입력받지 않는 대신 쓰는 단순 추정치). 그래프는 날짜가 아니라
- * 요일로 작년과 올해를 맞춰 보는 용도라("월화수목금" 라벨), 단순히 캘린더 날짜를 +1년
- * 하면 1년이 365일(윤년이면 366일)이라 요일이 하루이틀 밀려버린다 — 그러면 실제로는
- * 화요일인데 그래프의 "지금" 표시가 수요일 자리에 찍히는 식으로 어긋난다. 그래서 +1년한
- * 날짜에서 요일이 작년 시작 요일과 같아지도록 며칠(0~6일) 더 보정해 맞춘다.
+ * 요일·시각으로 작년과 올해를 맞춰 보는 용도라("월화수목금" 라벨), 실제 날짜는 비교
+ * 대상이 아니다 — 단순히 캘린더 날짜를 +1년 하면 1년이 365일(윤년이면 366일)이라 요일이
+ * 하루이틀 밀려버려서 그래프의 "지금" 표시가 어긋난 요일 자리에 찍힌다. 그래서 +1년한
+ * 날짜에서 요일이 작년 시작 요일과 같아지도록, 가장 가까운 방향(최대 ±3일)으로 보정한다
+ * (항상 미래 쪽으로만 보정하면 실제 "지금"이 그 보정된 날짜보다 앞서서, 시작 전으로
+ * 계산돼 "지금" 표시 자체가 아예 안 뜨는 경우가 있었다).
  */
 export function assumeThisYearStart(lastYearStartIso: string): Date {
   const d = new Date(lastYearStartIso);
   const naive = new Date(d.getFullYear() + 1, d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
-  const weekdayCorrection = (d.getDay() - naive.getDay() + 7) % 7;
+  let weekdayCorrection = (d.getDay() - naive.getDay() + 7) % 7;
+  if (weekdayCorrection > 3) weekdayCorrection -= 7;
   naive.setDate(naive.getDate() + weekdayCorrection);
   return naive;
 }
