@@ -154,10 +154,6 @@ export function CutoffLookupTab({
     }
   }
 
-  function handleSearch() {
-    void runSearch(university.trim(), department.trim(), admissionType.trim());
-  }
-
   function handleLookupPicked(uni: string, dept: string | null, type: string) {
     setUniversity(uni);
     setDepartment(dept ?? "");
@@ -169,14 +165,6 @@ export function CutoffLookupTab({
     setUniversity(c.university);
     setDepartment(c.department);
     void runSearch(c.university, c.department, admissionType.trim());
-  }
-
-  function handleCompetitionSearch() {
-    if (!caUniversity.trim()) {
-      showToast("대학명을 입력해 주세요.", "error");
-      return;
-    }
-    setCompetitionOpen(true);
   }
 
   function handleCompetitionPicked(uni: string, dept: string | null, type: string) {
@@ -218,10 +206,11 @@ export function CutoffLookupTab({
         <button
           type="button"
           onClick={() => setLookupPickerOpen(true)}
-          className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+          disabled={loading}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-60"
         >
           <Search className="w-3.5 h-3.5" />
-          대학·학과·전형 선택
+          <span>{loading ? "조회 중..." : "조회하기"}</span>
         </button>
 
         {university && (
@@ -231,21 +220,11 @@ export function CutoffLookupTab({
             {admissionType && <> · <span className="font-bold text-slate-700">{admissionType}</span></>}
           </p>
         )}
-
-        <button
-          type="button"
-          onClick={handleSearch}
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5 disabled:opacity-60"
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span>{loading ? "조회 중..." : "조회하기"}</span>
-        </button>
       </Card>
 
       {searched && !loading && offerings.length > 0 && (
         <Card className="space-y-3">
-          <h4 className="text-sm font-bold text-slate-800">이번 학년도 모집정보</h4>
+          <h4 className="text-sm font-bold text-slate-800">모집정보</h4>
           <div className="space-y-2">
             {offerings.map((o) => (
               <div key={o.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-1">
@@ -270,7 +249,7 @@ export function CutoffLookupTab({
 
       {searched && !loading && cutoffGroups.length > 0 && (
         <Card className="space-y-3">
-          <h4 className="text-sm font-bold text-slate-800">최근 3개년 입결</h4>
+          <h4 className="text-sm font-bold text-slate-800">최근입결</h4>
           <div className="space-y-4">
             {cutoffGroups.map((g) => (
               <div key={g.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-2">
@@ -369,10 +348,10 @@ export function CutoffLookupTab({
         <button
           type="button"
           onClick={() => setCompetitionPickerOpen(true)}
-          className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
         >
-          <Search className="w-3.5 h-3.5" />
-          대학·학과·전형 선택
+          <TrendingUp className="w-3.5 h-3.5" />
+          <span>작년 경쟁률 보기</span>
         </button>
 
         {caUniversity && (
@@ -382,15 +361,6 @@ export function CutoffLookupTab({
             {caAdmissionType && <> · <span className="font-bold text-slate-700">{caAdmissionType}</span></>}
           </p>
         )}
-
-        <button
-          type="button"
-          onClick={handleCompetitionSearch}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
-        >
-          <TrendingUp className="w-3.5 h-3.5" />
-          <span>작년 경쟁률 보기</span>
-        </button>
       </Card>
 
       <CascadingPickerModal
