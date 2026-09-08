@@ -181,11 +181,6 @@ export function CutoffLookupTab({
       <Card className="space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-800">모집 정보 및 입결 조회</h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            대학→학과→전형을 순서대로 골라서 이번 학년도 모집정보와 2023~2026학년도 수시
-            입결을 함께 조회할 수 있어요. 전형은 &quot;전체 전형 보기&quot;를 고르면 그
-            학과에 등록된 전형을 전부 보여줘요.
-          </p>
         </div>
 
         {!studentId && roster && (
@@ -348,10 +343,6 @@ export function CutoffLookupTab({
             <FileBarChart className="w-4 h-4 text-indigo-600" />
             작년 경쟁률 조회
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            위 모집정보·입결 조회와 별개로, 대학→학과→전형을 순서대로 골라서 바로 작년
-            원서접수 기간의 시간대별 경쟁률 그래프를 볼 수 있어요.
-          </p>
         </div>
 
         <button
