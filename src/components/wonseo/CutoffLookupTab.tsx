@@ -375,7 +375,10 @@ export function CutoffLookupTab({
           // 목록에서는 보여야 한다 — 그래서 두 출처를 합친다(입결은 당연히 못 뜬다). 다만
           // 두 출처가 같은 전형을 다르게 적어 둔 경우가 흔해서(예: "교과(지역인재)" vs
           // "지역인재전형(교과)") 그대로 합치면 같은 전형이 두 번 보인다 — 입결 쪽 표기를
-          // 우선해 하나로 합친다.
+          // 우선해 하나로 합친다. 이때 반드시 핵심 이름이 "완전히 같을 때"(2점)만 합친다 —
+          // ">0"(부분 겹침)까지 합치면, 같은 대학이 "지역전형" 같은 짧은 이름과 지역별로
+          // 나뉜 여러 실제 전형(예: "지역의사진료전형(경주)"/"(구미)"/...)을 동시에 갖고
+          // 있을 때 서로 다른 여러 전형이 하나로 뭉개져 선택 목록에서 사라져 버린다.
           const [cutoffTypes, offerings] = await Promise.all([
             listCutoffAdmissionTypes(u, d ?? ""),
             listOfferingCandidates(u, d ?? ""),
@@ -383,7 +386,7 @@ export function CutoffLookupTab({
           const merged = [...cutoffTypes, ...offerings.map((o) => o.admissionType)];
           const deduped: string[] = [];
           for (const type of merged) {
-            if (!deduped.some((kept) => admissionTypeSimilarity(kept, type) > 0)) deduped.push(type);
+            if (!deduped.some((kept) => admissionTypeSimilarity(kept, type) === 2)) deduped.push(type);
           }
           return deduped;
         }}
