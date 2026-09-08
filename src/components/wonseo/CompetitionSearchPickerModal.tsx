@@ -178,7 +178,7 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
             onPick={pickDepartment}
             extraOption={
               departments?.hasSummary && !departmentQuery.trim()
-                ? { label: "전체(학과 구분 없음)", onPick: () => pickDepartment(null) }
+                ? { label: "전체(학과 구분 없음)", onPick: () => pickDepartment(null), selected: department === null }
                 : undefined
             }
           />
@@ -221,7 +221,7 @@ function PickColumn({
   items: string[];
   selected: string | null;
   onPick: (v: string) => void;
-  extraOption?: { label: string; onPick: () => void };
+  extraOption?: { label: string; onPick: () => void; selected: boolean };
 }) {
   return (
     <div className="flex flex-col min-h-0 border border-slate-200 rounded-2xl overflow-hidden">
@@ -244,9 +244,14 @@ function PickColumn({
               <button
                 type="button"
                 onClick={extraOption.onPick}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+                className={`w-full flex items-center justify-between gap-1.5 text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                  extraOption.selected
+                    ? "bg-indigo-100 border-indigo-300 text-indigo-800"
+                    : "bg-indigo-50/60 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
+                }`}
               >
-                {extraOption.label}
+                <span className="truncate">{extraOption.label}</span>
+                {extraOption.selected && <Check className="w-3.5 h-3.5 shrink-0 text-indigo-600" />}
               </button>
             )}
             {items.length === 0 && !extraOption && (
