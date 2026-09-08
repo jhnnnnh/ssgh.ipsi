@@ -127,19 +127,41 @@ function parseTrackAndCore(s: string): { track: "교과" | "종합" | null; core
   const track = s.includes("종합") ? "종합" : s.includes("교과") ? "교과" : null;
   // "숙명인재-면접"처럼 하이픈·가운뎃점 같은 구분 기호가 섞여 들어간 이름은, 같은
   // 전형인데도 다른 원본은 그 기호 없이 적어 두면("숙명인재면접형") 문자열이 안
-  // 겹쳐서 다르다고 오판한다. 괄호뿐 아니라 이런 구분 기호도 같이 지운다.
+  // 겹쳐서 다르다고 오판한다. 괄호뿐 아니라 이런 구분 기호도 같이 지운다. 영문
+  // 대소문자도(예: 충북대 "sw우수인재" vs "SW우수인재전형") 소문자로 맞춘다.
   const core = s
+    .toLowerCase()
     .replace(/\s+/g, "")
     .replace(/전형|교과|종합|[()\-·/_]/g, "")
     .trim();
   return { track, core };
 }
 
-/** 전형명 전용 유사도. 트랙(교과/종합)이 서로 다르면(둘 다 트랙 표기가 있는데 다르면)
- * 무조건 다른 전형으로 보고, 트랙이 같거나 한쪽에만 트랙 표기가 있으면 핵심 이름(트랙·
- * "전형"·괄호를 뺀 나머지)을 nameSimilarity로 비교한다. matchesHint(검색 결과 필터)와
- * 입결 자동 채움에서 공통으로 쓴다. */
+/** 문자열 비교 알고리즘만으로는 절대 판정할 수 없어서(예: 세종대 "창의인재"와 "세종인재"처럼
+ * 아예 다른 이름을 쓰는 경우) 사람이 직접 두 데이터를 대조해 "같은 전형"이라고 확인한
+ * 표기 쌍이다. 이 목록에 있는 쌍만 예외로 인정하고, 일반 규칙 자체를 느슨하게 만들지는
+ * 않는다 — 그러면 진짜 다른 전형(예: 을지대 "지역의료-특별", 영남대 "지역-의약학")까지
+ * 잘못 묶일 위험이 커진다. */
+const CONFIRMED_ADMISSION_TYPE_ALIASES: [string, string][] = [
+  ["종합(고교생활Ⅰ)", "고교생활우수자전형Ⅰ"], // 전남대
+  ["종합(학교생활-면접)", "학교생활우수자(면접)전형"], // 동의대
+  ["종합(CAU탐구형)", "탐구형인재전형"], // 중앙대
+  ["종합(CAU융합형)", "융합형인재전형"], // 중앙대
+  ["교과(지역의료-일반)", "지역의료인재전형(일반형)"], // 을지대
+  ["종합(창의인재-면접)", "세종인재전형(면접형)"], // 세종대
+  ["종합(창의인재-서류)", "세종인재전형(서류형)"], // 세종대
+];
+
+function isConfirmedAdmissionTypeAlias(a: string, b: string): boolean {
+  return CONFIRMED_ADMISSION_TYPE_ALIASES.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+}
+
+/** 전형명 전용 유사도. 사람이 확인한 예외 쌍이면 무조건 같다고 보고, 아니면 트랙(교과/종합)이
+ * 서로 다를 때(둘 다 트랙 표기가 있는데 다르면) 무조건 다른 전형으로 보고, 트랙이 같거나
+ * 한쪽에만 트랙 표기가 있으면 핵심 이름(트랙·"전형"·괄호를 뺀 나머지)을 nameSimilarity로
+ * 비교한다. matchesHint(검색 결과 필터)와 입결 자동 채움에서 공통으로 쓴다. */
 export function admissionTypeSimilarity(a: string, b: string): number {
+  if (isConfirmedAdmissionTypeAlias(a, b)) return 2;
   const pa = parseTrackAndCore(a);
   const pb = parseTrackAndCore(b);
   if (pa.track && pb.track && pa.track !== pb.track) return 0;
