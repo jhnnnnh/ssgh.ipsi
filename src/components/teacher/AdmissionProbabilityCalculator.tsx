@@ -15,7 +15,7 @@ import {
   searchCutoffsForLookup,
   searchCutoffCandidatesWithPreview,
   trackFromCategory,
-  normalize,
+  normalizeKeepingTrack,
   nameSimilarity,
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
@@ -42,10 +42,11 @@ const YEAR_COLS = ["2026", "2025", "2024"] as const;
 
 /** 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
  * (예: "학생부종합전형" vs "학생부종합(학생부종합전형)"), 정확히 같은 문자열만 찾으면 실제로
- * 있는 데이터도 없는 것처럼 사라진다. */
+ * 있는 데이터도 없는 것처럼 사라진다. 트랙(교과/종합)까지 지우는 normalize()를 쓰면 정반대
+ * 문제가 생겨서(학생부교과를 학생부종합과 "같다"고 오판) normalizeKeepingTrack()을 쓴다. */
 function matchesHint(admissionType: string, hint: string): boolean {
   if (!hint) return true;
-  return nameSimilarity(normalize(admissionType), normalize(hint)) > 0;
+  return nameSimilarity(normalizeKeepingTrack(admissionType), normalizeKeepingTrack(hint)) > 0;
 }
 
 function mergeTriple(existing: [string, string, string], incoming?: [string, string, string]): [string, string, string] {
@@ -220,10 +221,10 @@ export function AdmissionProbabilityCalculator({
         return;
       }
 
-      const normalizedType = normalize(type);
+      const normalizedType = normalizeKeepingTrack(type);
       const matchedGroup =
         groups.find((g) => g.admissionType === type) ??
-        (normalizedType ? groups.find((g) => normalize(g.admissionType).includes(normalizedType)) : undefined);
+        (normalizedType ? groups.find((g) => normalizeKeepingTrack(g.admissionType).includes(normalizedType)) : undefined);
       const matchedOffering = offerings.find((o) => matchesHint(o.admissionType, type));
 
       const filledTriples = matchedGroup

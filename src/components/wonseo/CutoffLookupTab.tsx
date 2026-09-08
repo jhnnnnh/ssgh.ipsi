@@ -15,7 +15,7 @@ import {
   searchCutoffsForLookup,
   searchCutoffCandidatesWithPreview,
   trackFromCategory,
-  normalize,
+  normalizeKeepingTrack,
   nameSimilarity,
   type CutoffLookupGroup,
   type CutoffCandidatePreview,
@@ -43,10 +43,12 @@ type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" |
 /** 세부 전형명이 비어 있으면 전부 통과, 있으면 느슨한(비슷한 이름 포함) 매칭만 통과시킨다.
  * 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
  * (예: "학생부종합전형" vs "학생부종합(학생부종합전형)"), 정확히 같은 문자열만 찾으면
- * 실제로는 있는 데이터도 없는 것처럼 사라져 버린다. */
+ * 실제로는 있는 데이터도 없는 것처럼 사라져 버린다. 트랙(교과/종합)까지 지우는 normalize()를
+ * 쓰면 정반대 문제가 생긴다 — 학생부교과를 선택했는데 학생부종합 결과까지 "이름이 같다"고
+ * 뭉쳐서 보여주게 된다. 트랙은 남기는 normalizeKeepingTrack()을 쓴다. */
 function matchesHint(admissionType: string, hint: string): boolean {
   if (!hint) return true;
-  return nameSimilarity(normalize(admissionType), normalize(hint)) > 0;
+  return nameSimilarity(normalizeKeepingTrack(admissionType), normalizeKeepingTrack(hint)) > 0;
 }
 
 function OfferingMethod({ o }: { o: MergedOffering }) {

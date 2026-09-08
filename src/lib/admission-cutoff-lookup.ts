@@ -111,7 +111,7 @@ export function nameSimilarity(a: string, b: string): number {
  * 하는 비교에 그대로 쓰면 "학생부종합"과 "교과(학생부교과)"가 둘 다 "학생부"로 뭉개져서
  * 완전히 다른 트랙인데도 "똑같다"고 오판한다(실제로 카드에 학생부종합으로 적었는데
  * 학생부교과 입결이 잘못 채워지는 사고가 있었다). */
-function normalizeKeepingTrack(s: string): string {
+export function normalizeKeepingTrack(s: string): string {
   return s
     .replace(/\s+/g, "")
     .replace(/전형|[()]/g, "")
@@ -159,7 +159,10 @@ export async function fetchRecentResultsBestEffort(
   const rows = await fetchCutoffRows(university, department);
   if (rows.length === 0) return [];
 
-  const hint = normalize(hintAdmissionType);
+  // normalize()는 "교과"/"종합"까지 지우기 때문에, 힌트가 "학생부종합"처럼 트랙
+  // 이름뿐일 때 교과 전형과도 완전히 같다고 오판해 엉뚱한 트랙의 입결을 조용히
+  // 채워버릴 수 있다(실제로 있었던 사고). 트랙은 남기는 normalizeKeepingTrack()을 쓴다.
+  const hint = normalizeKeepingTrack(hintAdmissionType);
   const trackOf = new Map<string, string | null>();
   for (const row of rows) {
     if (row.admission_type && !trackOf.has(row.admission_type)) {
@@ -169,7 +172,7 @@ export async function fetchRecentResultsBestEffort(
 
   let best: { type: string; score: number; track: string | null } | null = null;
   for (const [type, track] of trackOf) {
-    const score = nameSimilarity(normalize(type), hint);
+    const score = nameSimilarity(normalizeKeepingTrack(type), hint);
     if (score === 0) continue;
     const better =
       !best ||
