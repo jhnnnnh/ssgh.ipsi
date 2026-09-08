@@ -361,6 +361,22 @@ export type Database = {
         };
         Returns: { admission_type: string; department: string; track: string | null }[];
       };
+      autocomplete_competition_universities: {
+        Args: { p_query?: string; p_limit?: number };
+        Returns: { university: string }[];
+      };
+      autocomplete_competition_departments: {
+        Args: { p_university: string; p_limit?: number };
+        Returns: { department: string }[];
+      };
+      autocomplete_competition_has_summary: {
+        Args: { p_university: string };
+        Returns: boolean;
+      };
+      autocomplete_competition_admission_types: {
+        Args: { p_university: string; p_department?: string | null };
+        Returns: { admission_type: string }[];
+      };
       autocomplete_offering_universities: {
         Args: { p_query: string; p_limit?: number };
         Returns: { university: string }[];

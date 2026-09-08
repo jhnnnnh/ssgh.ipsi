@@ -88,6 +88,43 @@ function toSeries(row: Row, matchLevel: CompetitionSeries["matchLevel"]): Compet
   };
 }
 
+/**
+ * "작년 경쟁률 조회"용 대학→학과→전형 단계별 선택 팝업이 쓰는 자동완성. 세부전형명을
+ * admission_cutoffs(대학어디가) 표기 자동완성으로 입력받으면 이 아카이브의 전형명 표기와
+ * 달라서(예: "교과(교과성적)" vs "교과성적우수인재전형") 못 찾거나, 비워두면 전형이 전부
+ * 쏟아지는 문제가 있었다. 이 아카이브 데이터 자체에서 대학→학과→전형을 순서대로 골라
+ * 나가면 마지막에는 항상 유일한 시계열 하나로 좁혀진다.
+ */
+export async function fetchCompetitionUniversityOptions(query: string): Promise<string[]> {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("autocomplete_competition_universities", { p_query: query, p_limit: 200 });
+  return (data ?? []).map((r) => r.university);
+}
+
+export async function fetchCompetitionDepartmentOptions(
+  university: string,
+): Promise<{ departments: string[]; hasSummary: boolean }> {
+  const supabase = createClient();
+  const [{ data: deptData }, { data: hasSummary }] = await Promise.all([
+    supabase.rpc("autocomplete_competition_departments", { p_university: university, p_limit: 500 }),
+    supabase.rpc("autocomplete_competition_has_summary", { p_university: university }),
+  ]);
+  return { departments: (deptData ?? []).map((r) => r.department), hasSummary: hasSummary ?? false };
+}
+
+/** department가 null이면 "전체(학과 구분 없음)" 요약 전형 목록을 가져온다. */
+export async function fetchCompetitionAdmissionTypeOptions(
+  university: string,
+  department: string | null,
+): Promise<string[]> {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("autocomplete_competition_admission_types", {
+    p_university: university,
+    p_department: department,
+  });
+  return (data ?? []).map((r) => r.admission_type);
+}
+
 export type CompetitionLookupResult =
   | { kind: "matched"; series: CompetitionSeries }
   /** 이름만으로는 어느 전형인지 하나로 못 좁혔다 — 자동으로 아무거나 고르면 틀린 그래프를

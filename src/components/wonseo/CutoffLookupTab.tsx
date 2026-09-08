@@ -23,6 +23,7 @@ import {
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
 import { CompetitionHistoryModal } from "@/components/wonseo/CompetitionHistoryModal";
+import { CompetitionSearchPickerModal } from "@/components/wonseo/CompetitionSearchPickerModal";
 import { MyCardPickerModal } from "@/components/wonseo/MyCardPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
@@ -84,6 +85,7 @@ export function CutoffLookupTab({
   const [caDepartment, setCaDepartment] = useState("");
   const [caAdmissionType, setCaAdmissionType] = useState("");
   const [competitionOpen, setCompetitionOpen] = useState(false);
+  const [competitionPickerOpen, setCompetitionPickerOpen] = useState(false);
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
@@ -175,10 +177,17 @@ export function CutoffLookupTab({
   }
 
   function handleCompetitionSearch() {
-    if (!caUniversity.trim() || !caDepartment.trim()) {
-      showToast("대학명과 학과명을 입력해 주세요.", "error");
+    if (!caUniversity.trim()) {
+      showToast("대학명을 입력해 주세요.", "error");
       return;
     }
+    setCompetitionOpen(true);
+  }
+
+  function handleCompetitionPicked(uni: string, dept: string | null, type: string) {
+    setCaUniversity(uni);
+    setCaDepartment(dept ?? "");
+    setCaAdmissionType(type);
     setCompetitionOpen(true);
   }
 
@@ -400,66 +409,40 @@ export function CutoffLookupTab({
             작년 경쟁률 조회
           </h3>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            위 모집정보·입결 조회와 별개로, 대학+학과만 알면 바로 작년 원서접수 기간의 시간대별 경쟁률
-            그래프를 볼 수 있어요.
+            위 모집정보·입결 조회와 별개로, 대학→학과→전형을 순서대로 골라서 바로 작년
+            원서접수 기간의 시간대별 경쟁률 그래프를 볼 수 있어요.
           </p>
         </div>
 
-        {myCards && myCards.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-2">
+          {myCards && myCards.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCardPickerTarget("competition")}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              내 원서 카드에서 불러오기
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setCardPickerTarget("competition")}
-            className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+            onClick={() => setCompetitionPickerOpen(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
           >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            내 원서 카드에서 불러오기
+            <Search className="w-3.5 h-3.5" />
+            대학·학과·전형 선택
           </button>
+        </div>
+
+        {caUniversity && (
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            선택됨: <span className="font-bold text-slate-700">{caUniversity}</span>
+            {caDepartment && <> · <span className="font-bold text-slate-700">{caDepartment}</span></>}
+            {caAdmissionType && <> · <span className="font-bold text-slate-700">{caAdmissionType}</span></>}
+          </p>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">대학교명</label>
-            <AutocompleteInput
-              value={caUniversity}
-              onChange={(v) => {
-                setCaUniversity(v);
-                setCaDepartment("");
-                setCaAdmissionType("");
-              }}
-              onSearch={searchCutoffUniversities}
-              placeholder="OO대학교"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">모집단위 / 학과</label>
-            <AutocompleteInput
-              value={caDepartment}
-              onChange={(v) => {
-                setCaDepartment(v);
-                setCaAdmissionType("");
-              }}
-              onSearch={(q) => searchCutoffDepartments(q, caUniversity)}
-              placeholder="OO학과 또는 OO학부"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">세부 전형명 (선택)</label>
-            <AutocompleteInput
-              value={caAdmissionType}
-              onChange={setCaAdmissionType}
-              onSearch={
-                caUniversity.trim() && caDepartment.trim()
-                  ? (q) => searchCutoffAdmissionTypes(q, caUniversity, caDepartment)
-                  : undefined
-              }
-              revealOnFocus
-              placeholder="예: 일반전형"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
         <button
           type="button"
           onClick={handleCompetitionSearch}
@@ -469,6 +452,12 @@ export function CutoffLookupTab({
           <span>작년 경쟁률 보기</span>
         </button>
       </Card>
+
+      <CompetitionSearchPickerModal
+        open={competitionPickerOpen}
+        onClose={() => setCompetitionPickerOpen(false)}
+        onComplete={handleCompetitionPicked}
+      />
 
       <CompetitionHistoryModal
         open={competitionOpen}

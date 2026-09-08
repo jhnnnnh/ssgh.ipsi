@@ -232,7 +232,8 @@ export function CompetitionHistoryModal({
           </button>
         </div>
         <p className="px-5 pt-1 text-xs text-slate-400">
-          {university} · {department}
+          {university}
+          {department && ` · ${department}`}
         </p>
 
         <div className="p-5">
