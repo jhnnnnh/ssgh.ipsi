@@ -20,8 +20,33 @@ import {
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates } from "@/lib/admission-offering-lookup";
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
+import {
+  predictCutKernel4D,
+  predictCutKernel2D,
+  PARAMS_50,
+  PARAMS_70,
+  PARAMS_50_2D,
+  PARAMS_70_2D,
+  type KernelDatabaseRow,
+  type LevelBin,
+} from "@/lib/admission-cut-kernel-predictor";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
+
+type KernelModelData = { database50: KernelDatabaseRow[]; database70: KernelDatabaseRow[]; bins50: LevelBin[]; bins70: LevelBin[] };
+
+/** 교과전형 커널 예측용 데이터는 모든 컴포넌트 인스턴스가 같은 걸 쓰면 되므로 모듈
+ * 스코프에서 한 번만 불러와 재사용한다(대학·학과가 바뀔 때마다 다시 받을 필요 없음). */
+let kernelModelPromise: Promise<KernelModelData> | null = null;
+function loadKernelModel(): Promise<KernelModelData> {
+  if (!kernelModelPromise) {
+    kernelModelPromise = fetch("/api/admission-cut-model").then((res) => {
+      if (!res.ok) throw new Error("failed to load kernel model");
+      return res.json();
+    });
+  }
+  return kernelModelPromise;
+}
 
 type MyCard = Pick<
   WonseoCard,
@@ -138,6 +163,7 @@ export function AdmissionProbabilityCalculator({
 
   useEffect(() => {
     prefetchCutoffUniversities();
+    loadKernelModel().catch(() => {});
   }, []);
 
   // 학생 화면에서는 교사 화면의 학생 선택 <select>가 없으니, 자기 자신의 studentId로
@@ -263,7 +289,57 @@ export function AdmissionProbabilityCalculator({
     });
   }
 
-  function handleQuery() {
+  /** 교과전형이고 3개년 컷이 전부 있을 때만 커널 모델(3개년 추세 반영)을 쓴다. 종합전형이거나
+   * 데이터가 부족하면 undefined를 돌려주고, estimateAdmission이 알아서 기존 방식(최근연도값+
+   * 경쟁률 선형보정)으로 대체한다. 모집인원·경쟁률까지 있으면 4차원, 없으면 2차원 축소판. */
+  async function computeKernelPrediction(
+    c50: Triple,
+    c70: Triple,
+    quota: Triple,
+    targetQuota: number,
+    expectedCompetition: number,
+  ): Promise<EstimatorInput["kernelPrediction"] | undefined> {
+    if (!form.admissionType.includes("교과")) return undefined;
+    if (c50.some((v) => v <= 0) || c70.some((v) => v <= 0)) return undefined;
+
+    let model: KernelModelData;
+    try {
+      model = await loadKernelModel();
+    } catch {
+      return undefined;
+    }
+
+    // 배열은 [2026, 2025, 2024] 순 — 방법론 문서의 x1(n년, 가장 과거)~x3(n+2년, 가장 최근) 순으로 뒤집는다.
+    const level50 = (c50[2] + c50[1] + c50[0]) / 3;
+    const step2_50 = c50[0] - c50[1];
+    const level70 = (c70[2] + c70[1] + c70[0]) / 3;
+    const step2_70 = c70[0] - c70[1];
+
+    const canUse4D = targetQuota > 0 && quota[0] > 0 && expectedCompetition > 0;
+
+    if (canUse4D) {
+      const capChange = Math.log(targetQuota) - Math.log(quota[0]);
+      const p50 = predictCutKernel4D(
+        { level: level50, step2: step2_50, capChange, compRaw: expectedCompetition },
+        model.database50,
+        model.bins50,
+        PARAMS_50,
+      );
+      const p70 = predictCutKernel4D(
+        { level: level70, step2: step2_70, capChange, compRaw: expectedCompetition },
+        model.database70,
+        model.bins70,
+        PARAMS_70,
+      );
+      return { cut50: p50, cut70: p70 };
+    }
+
+    const p50 = predictCutKernel2D({ level: level50, step2: step2_50 }, model.database50, PARAMS_50_2D);
+    const p70 = predictCutKernel2D({ level: level70, step2: step2_70 }, model.database70, PARAMS_70_2D);
+    return { cut50: p50, cut70: p70 };
+  }
+
+  async function handleQuery() {
     // 내신 등급이 비어 있으면 parseNum이 조용히 0을 돌려주는데, 등급 스케일에서는 0이
     // "가장 좋은 등급"보다도 더 좋은 값으로 계산돼 버려서 등급을 입력 안 했는데도
     // 확률이 나오는(그것도 아주 높게 나오는) 심각한 오류가 있었다. 반드시 실제 값을
@@ -274,15 +350,24 @@ export function AdmissionProbabilityCalculator({
       showToast("내신 등급을 입력해 주세요.", "error");
       return;
     }
+    const c50 = form.c50.map(parseNum) as Triple;
+    const c70 = form.c70.map(parseNum) as Triple;
+    const quota = form.quota.map(parseIntNum) as Triple;
+    const targetQuota = parseIntNum(form.targetQuota);
+    const expectedCompetition = parseNum(form.expectedCompetition);
+
+    const kernelPrediction = await computeKernelPrediction(c50, c70, quota, targetQuota, expectedCompetition);
+
     const input: EstimatorInput = {
       userScore: parsedScore,
-      targetQuota: parseIntNum(form.targetQuota),
-      expectedCompetition: parseNum(form.expectedCompetition),
-      c50: form.c50.map(parseNum) as Triple,
-      c70: form.c70.map(parseNum) as Triple,
-      quota: form.quota.map(parseIntNum) as Triple,
+      targetQuota,
+      expectedCompetition,
+      c50,
+      c70,
+      quota,
       turnover: form.turnover.map(parseIntNum) as Triple,
       applicants: form.applicants.map(parseNum) as Triple,
+      kernelPrediction,
     };
     setQueriedScore(input.userScore);
     setResult(estimateAdmission(input));
@@ -443,7 +528,7 @@ export function AdmissionProbabilityCalculator({
 
           <button
             type="button"
-            onClick={handleQuery}
+            onClick={() => void handleQuery()}
             className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5"
           >
             <Search className="w-3.5 h-3.5" />
@@ -497,10 +582,20 @@ export function AdmissionProbabilityCalculator({
                 <div className="bg-white p-3">
                   <p className="text-[10px] text-slate-400">50%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p50Predicted.toFixed(2)} 등급</p>
+                  {ok.kernelInfo && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      90% 구간 {ok.kernelInfo.cut50.p10.toFixed(2)}~{ok.kernelInfo.cut50.p90.toFixed(2)}
+                    </p>
+                  )}
                 </div>
                 <div className="bg-white p-3">
                   <p className="text-[10px] text-slate-400">70%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p70Predicted.toFixed(2)} 등급</p>
+                  {ok.kernelInfo && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      90% 구간 {ok.kernelInfo.cut70.p10.toFixed(2)}~{ok.kernelInfo.cut70.p90.toFixed(2)}
+                    </p>
+                  )}
                 </div>
                 <div className="bg-white p-3">
                   <p className="text-[10px] text-slate-400">마지노선 대비 점수차</p>
@@ -510,33 +605,67 @@ export function AdmissionProbabilityCalculator({
                 </div>
               </div>
 
+              {ok.usedKernelModel ? (
+                <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  3개년 추세를 반영한 통계 모델로 계산했어요(교과전형 한정). 유효 유사사례 수:{" "}
+                  {Math.round(ok.kernelInfo!.cut50.effectiveN)}개(50%컷) / {Math.round(ok.kernelInfo!.cut70.effectiveN)}개(70%컷) —
+                  수가 적을수록 예측구간이 넓어져 신뢰도가 낮다는 뜻이에요.
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                  종합전형이거나 3개년 입결이 모두 갖춰지지 않아, 최근연도값 기준의 기존 방식으로
+                  계산했어요.
+                </p>
+              )}
+
               <details className="border border-slate-200 rounded-xl bg-white">
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">
                   이 수치는 어떻게 계산되었나요?
                 </summary>
                 <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3 space-y-4">
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">1. 기준 시계열값 산정</h4>
-                    <p>
-                      입결 컷은 확률보행(random walk)적 성격이 강해, 다년도 가중평균은 최신 국면을 과거
-                      국면으로 희석시켜 추정량에 체계적 편의(bias)를 유발합니다. 이를 피하기 위해 최신
-                      관측치(t년)를 기준 추정량으로 채택하는 마르코프적 접근을 취합니다.
-                    </p>
-                    <Formula>X′(t+1) = X(t)</Formula>
-                  </section>
+                  {ok.usedKernelModel ? (
+                    <section>
+                      <h4 className="font-bold text-slate-800 mb-1">1~2. 3개년 추세 기반 국소가중(커널) 예측</h4>
+                      <p>
+                        과거 3개년 컷을 &ldquo;3개년 평균(수준)&rdquo;과 &ldquo;가장 최근 1년의 변화량(추세)&rdquo; 두 요소로
+                        요약하고, 여기에 정원 증감률과 이번 해 예상 경쟁률(과거 수준 구간별로 정규화한
+                        값)까지 더한 4개 지표로 비슷한 과거 사례들을 찾습니다. 비슷할수록 더 큰 가중치를
+                        주는 가중평균으로 다음 해 컷을 추정합니다(leave-one-out 검증 결과 오차 ±0.5등급
+                        이내 적중률 약 80%). 종합전형은 아직 별도 검증이 없어 이 방식을 적용하지 않습니다.
+                      </p>
+                      <Formula>
+                        {"수준 = (x₁+x₂+x₃)/3,  추세 = x₃-x₂  (x₁~x₃: 과거 3개년, x₃가 최신)"}
+                        {"\n정원변화 = ln(올해 정원) - ln(작년 정원),  경쟁률_국소 = (올해 예상 경쟁률 - μ_구간) / σ_구간"}
+                        {"\n거리² = Σ ((사례값 - 목표값) / 대역폭)²  →  가중치 = exp(-거리²/2)"}
+                        {"\nX′ = Σ(가중치 × 사례의 실제 다음해 컷) / Σ가중치"}
+                      </Formula>
+                    </section>
+                  ) : (
+                    <>
+                      <section>
+                        <h4 className="font-bold text-slate-800 mb-1">1. 기준 시계열값 산정</h4>
+                        <p>
+                          입결 컷은 확률보행(random walk)적 성격이 강해, 다년도 가중평균은 최신 국면을 과거
+                          국면으로 희석시켜 추정량에 체계적 편의(bias)를 유발합니다. 이를 피하기 위해 최신
+                          관측치(t년)를 기준 추정량으로 채택하는 마르코프적 접근을 취합니다.
+                        </p>
+                        <Formula>X′(t+1) = X(t)</Formula>
+                      </section>
 
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">2. 경쟁률 공변량 보정 (선택 입력)</h4>
-                    <p>
-                      전년 대비 경쟁률 변화율(ρ)은 컷 이동량에 대해 유의한 설명력을 가지는 공변량입니다(R²
-                      ≈ 0.44). 단순선형회귀로 절편과 기울기를 추정해 조건부 기댓값을 보정합니다.
-                    </p>
-                    <Formula>
-                      {"ρ = C(t+1)_예상 / C(t)"}
-                      {"\nX′₅₀ = X₅₀(t) + (β₀ + β₁ρ)   (β₀, β₁: 경쟁률보정계수)"}
-                      {"\nX′₇₀ = X₇₀(t) + (β₀′ + β₁′ρ)  (β₀′, β₁′: 경쟁률보정계수)"}
-                    </Formula>
-                  </section>
+                      <section>
+                        <h4 className="font-bold text-slate-800 mb-1">2. 경쟁률 공변량 보정 (선택 입력)</h4>
+                        <p>
+                          전년 대비 경쟁률 변화율(ρ)은 컷 이동량에 대해 유의한 설명력을 가지는 공변량입니다(R²
+                          ≈ 0.44). 단순선형회귀로 절편과 기울기를 추정해 조건부 기댓값을 보정합니다.
+                        </p>
+                        <Formula>
+                          {"ρ = C(t+1)_예상 / C(t)"}
+                          {"\nX′₅₀ = X₅₀(t) + (β₀ + β₁ρ)   (β₀, β₁: 경쟁률보정계수)"}
+                          {"\nX′₇₀ = X₇₀(t) + (β₀′ + β₁′ρ)  (β₀′, β₁′: 경쟁률보정계수)"}
+                        </Formula>
+                      </section>
+                    </>
+                  )}
 
                   <section>
                     <h4 className="font-bold text-slate-800 mb-1">3. 마지노선(등록 상한 경계) 추정 — 다중선형회귀</h4>

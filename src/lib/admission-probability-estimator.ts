@@ -24,6 +24,16 @@ export type EstimatorInput = {
   quota: [number, number, number];
   turnover: [number, number, number];
   applicants: [number, number, number];
+  /**
+   * 교과전형이고 커널 모델용 데이터를 불러왔을 때, `admission-cut-kernel-predictor.ts`로
+   * 미리 계산해 둔 50%/70%컷 예측치(3개년 추세를 반영한 국소가중 방식,
+   * `입결예측_방법론_v2.md` 참고). 없으면 기존의 "최근연도값 + 경쟁률 선형보정"
+   * 방식으로 대체한다(종합전형 등 이 방법론이 검증되지 않은 경우).
+   */
+  kernelPrediction?: {
+    cut50: { predicted: number; p10: number; p90: number; effectiveN: number };
+    cut70: { predicted: number; p10: number; p90: number; effectiveN: number };
+  };
 };
 
 export type EstimatorResult = {
@@ -49,6 +59,13 @@ export type EstimatorResult = {
   competitionRatioChange: number;
   competitionAdjusted: boolean;
   dataYears: number;
+  /** 커널 모델(3개년 추세 반영)로 계산했는지, 아니면 기존 방식(최근연도값+선형보정)인지. */
+  usedKernelModel: boolean;
+  /** 커널 모델일 때만: 컷 자체의 예측구간(90%)과 유효표본수 — 예측 신뢰도 표시용. */
+  kernelInfo?: {
+    cut50: { p10: number; p90: number; effectiveN: number };
+    cut70: { p10: number; p90: number; effectiveN: number };
+  };
 };
 
 function projectCutline(y2026: number, y2025: number, y2024: number) {
@@ -84,15 +101,27 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
   }
   const dataYears = Math.min(p50.dataYears, p70.dataYears);
 
-  let cut50 = p50.predicted;
-  let cut70 = p70.predicted;
-
-  const lastYearCompetition = competitionRatios?.[0] ? competitionRatios[0] : 0;
+  let cut50: number;
+  let cut70: number;
   let competitionRatioChange = 0;
-  if (expectedCompetition > 0 && lastYearCompetition > 0) {
-    competitionRatioChange = expectedCompetition / lastYearCompetition;
-    cut50 = competitionAdjust(cut50, competitionRatioChange, 0.1399, -0.2303);
-    cut70 = competitionAdjust(cut70, competitionRatioChange, 0.1424, -0.2404);
+  const usedKernelModel = Boolean(input.kernelPrediction);
+
+  if (input.kernelPrediction) {
+    cut50 = input.kernelPrediction.cut50.predicted;
+    cut70 = input.kernelPrediction.cut70.predicted;
+    const lastYearCompetition = competitionRatios?.[0] ? competitionRatios[0] : 0;
+    if (expectedCompetition > 0 && lastYearCompetition > 0) {
+      competitionRatioChange = expectedCompetition / lastYearCompetition;
+    }
+  } else {
+    cut50 = p50.predicted;
+    cut70 = p70.predicted;
+    const lastYearCompetition = competitionRatios?.[0] ? competitionRatios[0] : 0;
+    if (expectedCompetition > 0 && lastYearCompetition > 0) {
+      competitionRatioChange = expectedCompetition / lastYearCompetition;
+      cut50 = competitionAdjust(cut50, competitionRatioChange, 0.1399, -0.2303);
+      cut70 = competitionAdjust(cut70, competitionRatioChange, 0.1424, -0.2404);
+    }
   }
   if (cut70 < cut50) cut70 = cut50 + 0.01;
 
@@ -189,5 +218,20 @@ export function estimateAdmission(input: EstimatorInput): EstimatorResult | { in
     competitionRatioChange,
     competitionAdjusted: competitionRatioChange > 0,
     dataYears,
+    usedKernelModel,
+    kernelInfo: input.kernelPrediction
+      ? {
+          cut50: {
+            p10: input.kernelPrediction.cut50.p10,
+            p90: input.kernelPrediction.cut50.p90,
+            effectiveN: input.kernelPrediction.cut50.effectiveN,
+          },
+          cut70: {
+            p10: input.kernelPrediction.cut70.p10,
+            p90: input.kernelPrediction.cut70.p90,
+            effectiveN: input.kernelPrediction.cut70.effectiveN,
+          },
+        }
+      : undefined,
   };
 }
