@@ -15,8 +15,7 @@ import {
   searchCutoffsForLookup,
   searchCutoffCandidatesWithPreview,
   trackFromCategory,
-  normalizeKeepingTrack,
-  nameSimilarity,
+  admissionTypeSimilarity,
   type CutoffLookupGroup,
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
@@ -41,14 +40,11 @@ const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grad
 type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" | "sub_category" | "level">;
 
 /** 세부 전형명이 비어 있으면 전부 통과, 있으면 느슨한(비슷한 이름 포함) 매칭만 통과시킨다.
- * 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
- * (예: "학생부종합전형" vs "학생부종합(학생부종합전형)"), 정확히 같은 문자열만 찾으면
- * 실제로는 있는 데이터도 없는 것처럼 사라져 버린다. 트랙(교과/종합)까지 지우는 normalize()를
- * 쓰면 정반대 문제가 생긴다 — 학생부교과를 선택했는데 학생부종합 결과까지 "이름이 같다"고
- * 뭉쳐서 보여주게 된다. 트랙은 남기는 normalizeKeepingTrack()을 쓴다. */
+ * admissionTypeSimilarity를 쓰므로 트랙(교과/종합)이 다르면 무조건 걸러지고, 같은 전형을
+ * 두 원본이 표기만 다르게 적어도(예: "교과(지역인재)" vs "지역인재전형(교과)") 잡힌다. */
 function matchesHint(admissionType: string, hint: string): boolean {
   if (!hint) return true;
-  return nameSimilarity(normalizeKeepingTrack(admissionType), normalizeKeepingTrack(hint)) > 0;
+  return admissionTypeSimilarity(admissionType, hint) > 0;
 }
 
 function OfferingMethod({ o }: { o: MergedOffering }) {
@@ -375,12 +371,20 @@ export function CutoffLookupTab({
           // 올해 새로 생긴 전형(예: 작년까지 교과만 모집하다 올해 종합을 신설)은
           // admission_cutoffs(과거 입결)에는 아직 없고 admission_offerings(이번 학년도
           // 모집정보)에만 있을 수 있다. 입결이 없을 뿐 실제로 모집하는 전형이니 선택
-          // 목록에서는 보여야 한다 — 그래서 두 출처를 합친다(입결은 당연히 못 뜬다).
+          // 목록에서는 보여야 한다 — 그래서 두 출처를 합친다(입결은 당연히 못 뜬다). 다만
+          // 두 출처가 같은 전형을 다르게 적어 둔 경우가 흔해서(예: "교과(지역인재)" vs
+          // "지역인재전형(교과)") 그대로 합치면 같은 전형이 두 번 보인다 — 입결 쪽 표기를
+          // 우선해 하나로 합친다.
           const [cutoffTypes, offerings] = await Promise.all([
             listCutoffAdmissionTypes(u, d ?? ""),
             listOfferingCandidates(u, d ?? ""),
           ]);
-          return Array.from(new Set([...cutoffTypes, ...offerings.map((o) => o.admissionType)]));
+          const merged = [...cutoffTypes, ...offerings.map((o) => o.admissionType)];
+          const deduped: string[] = [];
+          for (const type of merged) {
+            if (!deduped.some((kept) => admissionTypeSimilarity(kept, type) > 0)) deduped.push(type);
+          }
+          return deduped;
         }}
         admissionTypeAllLabel="전체 전형 보기"
         cards={myCards ?? []}

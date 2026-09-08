@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X, Search, LayoutGrid, Check } from "lucide-react";
-import { pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
+import { pickBestFuzzyOption, pickBestFuzzyAdmissionType } from "@/lib/admission-cutoff-lookup";
 import { MyCardPickerModal, type PickableCard } from "@/components/wonseo/MyCardPickerModal";
 
 /**
@@ -138,7 +138,7 @@ export function CascadingPickerModal<
       const typeHint = card.sub_category?.trim() || card.category?.trim() || "";
       const typeList = await fetchAdmissionTypes(uniGuess, deptGuess);
       setAdmissionTypes(typeList);
-      const typeGuess = typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyOption(typeList, typeHint)) : null;
+      const typeGuess = typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyAdmissionType(typeList, typeHint)) : null;
       setAdmissionType(typeGuess);
       setAdmissionTypeQuery(typeGuess ?? "");
     } finally {

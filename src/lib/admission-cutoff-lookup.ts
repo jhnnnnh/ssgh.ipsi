@@ -118,6 +118,48 @@ export function normalizeKeepingTrack(s: string): string {
     .trim();
 }
 
+/** 전형명을 "트랙(교과/종합)"과 "핵심 이름"으로 나눈다. 입결 쪽은 "교과(지역인재)"처럼
+ * 트랙을 앞에, 전형데이터 쪽은 "지역인재전형(교과)"처럼 트랙을 뒤에 적는 등 같은 전형도
+ * 두 원본이 트랙 수식어를 서로 다른 위치에 넣어서, 문자열을 그대로 이어 붙여 비교하면
+ * (normalizeKeepingTrack처럼) 순서가 달라 안 겹친다고 오판할 수 있다. 트랙과 핵심 이름을
+ * 분리해서 트랙은 트랙끼리, 핵심 이름은 핵심 이름끼리 비교하면 위치와 무관하게 맞는다. */
+function parseTrackAndCore(s: string): { track: "교과" | "종합" | null; core: string } {
+  const track = s.includes("종합") ? "종합" : s.includes("교과") ? "교과" : null;
+  const core = s
+    .replace(/\s+/g, "")
+    .replace(/전형|교과|종합|[()]/g, "")
+    .trim();
+  return { track, core };
+}
+
+/** 전형명 전용 유사도. 트랙(교과/종합)이 서로 다르면(둘 다 트랙 표기가 있는데 다르면)
+ * 무조건 다른 전형으로 보고, 트랙이 같거나 한쪽에만 트랙 표기가 있으면 핵심 이름(트랙·
+ * "전형"·괄호를 뺀 나머지)을 nameSimilarity로 비교한다. matchesHint(검색 결과 필터)와
+ * 입결 자동 채움에서 공통으로 쓴다. */
+export function admissionTypeSimilarity(a: string, b: string): number {
+  const pa = parseTrackAndCore(a);
+  const pb = parseTrackAndCore(b);
+  if (pa.track && pb.track && pa.track !== pb.track) return 0;
+  return nameSimilarity(pa.core, pb.core);
+}
+
+/** pickBestFuzzyOption과 같은 역할이지만 전형명 전용으로, admissionTypeSimilarity를 써서
+ * 트랙이 다르면 절대 안 고르고 트랙 표기 위치가 달라도 같은 전형을 알아본다. */
+export function pickBestFuzzyAdmissionType(options: string[], hint: string): string | null {
+  if (!hint.trim()) return null;
+  const hintCore = parseTrackAndCore(hint).core;
+  let best: { value: string; score: number; coreLenDiff: number } | null = null;
+  for (const o of options) {
+    const score = admissionTypeSimilarity(o, hint);
+    if (score === 0) continue;
+    const coreLenDiff = Math.abs(parseTrackAndCore(o).core.length - hintCore.length);
+    if (!best || score > best.score || (score === best.score && coreLenDiff < best.coreLenDiff)) {
+      best = { value: o, score, coreLenDiff };
+    }
+  }
+  return best?.value ?? null;
+}
+
 /** 이름이 정확히 같은 후보가 없을 때, 문자열 목록 중 힌트와 이름이 가장 비슷한 하나를
  * 고른다. "내 원서 카드에서 불러오기"처럼 수기로 입력한 학교/학과/전형명이 실제 목록
  * 표기와 정확히 같지 않을 때(예: "경제학과" vs "경제학부(경제학전공)") 각종 선택 팝업의
@@ -159,10 +201,6 @@ export async function fetchRecentResultsBestEffort(
   const rows = await fetchCutoffRows(university, department);
   if (rows.length === 0) return [];
 
-  // normalize()는 "교과"/"종합"까지 지우기 때문에, 힌트가 "학생부종합"처럼 트랙
-  // 이름뿐일 때 교과 전형과도 완전히 같다고 오판해 엉뚱한 트랙의 입결을 조용히
-  // 채워버릴 수 있다(실제로 있었던 사고). 트랙은 남기는 normalizeKeepingTrack()을 쓴다.
-  const hint = normalizeKeepingTrack(hintAdmissionType);
   const trackOf = new Map<string, string | null>();
   for (const row of rows) {
     if (row.admission_type && !trackOf.has(row.admission_type)) {
@@ -172,7 +210,7 @@ export async function fetchRecentResultsBestEffort(
 
   let best: { type: string; score: number; track: string | null } | null = null;
   for (const [type, track] of trackOf) {
-    const score = nameSimilarity(normalizeKeepingTrack(type), hint);
+    const score = admissionTypeSimilarity(type, hintAdmissionType);
     if (score === 0) continue;
     const better =
       !best ||
