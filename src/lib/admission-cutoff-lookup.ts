@@ -125,9 +125,12 @@ export function normalizeKeepingTrack(s: string): string {
  * 분리해서 트랙은 트랙끼리, 핵심 이름은 핵심 이름끼리 비교하면 위치와 무관하게 맞는다. */
 function parseTrackAndCore(s: string): { track: "교과" | "종합" | null; core: string } {
   const track = s.includes("종합") ? "종합" : s.includes("교과") ? "교과" : null;
+  // "숙명인재-면접"처럼 하이픈·가운뎃점 같은 구분 기호가 섞여 들어간 이름은, 같은
+  // 전형인데도 다른 원본은 그 기호 없이 적어 두면("숙명인재면접형") 문자열이 안
+  // 겹쳐서 다르다고 오판한다. 괄호뿐 아니라 이런 구분 기호도 같이 지운다.
   const core = s
     .replace(/\s+/g, "")
-    .replace(/전형|교과|종합|[()]/g, "")
+    .replace(/전형|교과|종합|[()\-·/_]/g, "")
     .trim();
   return { track, core };
 }
