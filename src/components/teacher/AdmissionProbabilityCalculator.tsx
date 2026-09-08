@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Download, LayoutGrid } from "lucide-react";
+import { Search, Download } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
   prefetchCutoffUniversities,
-  searchCutoffAdmissionTypes,
-  searchCutoffDepartments,
-  searchCutoffUniversities,
+  listCutoffUniversities,
+  listCutoffDepartments,
+  listCutoffAdmissionTypes,
 } from "@/lib/admission-cutoff-autocomplete";
 import {
   searchCutoffsForLookup,
@@ -21,7 +20,7 @@ import {
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
-import { MyCardPickerModal } from "@/components/wonseo/MyCardPickerModal";
+import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
 type MyCard = Pick<
@@ -118,7 +117,6 @@ export function AdmissionProbabilityCalculator({
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
   const [cardPickerOpen, setCardPickerOpen] = useState(false);
-  const effectiveStudentId = studentId ?? teacherStudentId;
 
   // 세부전형명 하나로 못 좁혔을 때 보여줄 후보들 — 같은 학과 안의 다른 전형(typeCandidates)
   // 또는 학과 자체가 없어서 이름이 비슷한 다른 학과(deptCandidates).
@@ -128,6 +126,12 @@ export function AdmissionProbabilityCalculator({
   useEffect(() => {
     prefetchCutoffUniversities();
   }, []);
+
+  // 학생 화면에서는 교사 화면의 학생 선택 <select>가 없으니, 자기 자신의 studentId로
+  // 카드를 곧바로 불러온다(교사 화면은 select의 onChange가 loadCards를 직접 부른다).
+  useEffect(() => {
+    if (studentId) loadCards(studentId);
+  }, [studentId]);
 
   function loadCards(id: string) {
     setTeacherStudentId(id);
@@ -144,7 +148,10 @@ export function AdmissionProbabilityCalculator({
       .then(({ data }) => setMyCards(data ?? []));
   }
 
-  function pickMyCard(card: MyCard) {
+  /** 대학·학과·전형 선택 팝업에서 카드를 고른 시점에 호출된다. 대학/학과/전형은 팝업이
+   * 실제 입결 데이터 기준으로 알아서 매칭해 채워주므로(onComplete), 여기서는 카드 자체의
+   * 값인 최근 3개년 입결·모집정원·내신등급만 채운다. */
+  function handleCardSelected(card: MyCard) {
     const filled = yearsToTriples(card.recent_results ?? [], (y) => ({
       c50: y.cut50 ?? "",
       c70: y.cut70 ?? "",
@@ -158,15 +165,16 @@ export function AdmissionProbabilityCalculator({
     const userScore = cardGrade && Number.isFinite(parseFloat(cardGrade)) ? cardGrade : "";
     setForm((f) => ({
       ...f,
-      university: card.university ?? "",
-      department: card.department ?? "",
-      admissionType: card.sub_category?.trim() || card.category?.trim() || "",
       targetQuota: card.enrollment != null ? String(card.enrollment) : "",
       userScore: userScore || f.userScore,
       ...filled,
     }));
     setTypeCandidates(null);
     setDeptCandidates(null);
+  }
+
+  function handlePicked(uni: string, dept: string | null, type: string) {
+    setForm((f) => ({ ...f, university: uni, department: dept ?? "", admissionType: type }));
   }
 
   function applyGroupToForm(group: CutoffLookupGroup) {
@@ -301,54 +309,22 @@ export function AdmissionProbabilityCalculator({
               ))}
             </select>
           )}
-          {effectiveStudentId && myCards && myCards.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setCardPickerOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold transition"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              내 원서 카드에서 불러오기
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setCardPickerOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold transition"
+          >
+            <Search className="w-3.5 h-3.5" />
+            대학·학과·전형 선택
+          </button>
 
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">대학교명</label>
-              <AutocompleteInput
-                value={form.university}
-                onChange={(v) => setForm((f) => ({ ...f, university: v, department: "", admissionType: "" }))}
-                onSearch={searchCutoffUniversities}
-                placeholder="OO대학교"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">모집단위 / 학과</label>
-              <AutocompleteInput
-                value={form.department}
-                onChange={(v) => setForm((f) => ({ ...f, department: v, admissionType: "" }))}
-                onSearch={(q) => searchCutoffDepartments(q, form.university)}
-                placeholder="OO학과 또는 OO학부"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">세부 전형명</label>
-              <AutocompleteInput
-                value={form.admissionType}
-                onChange={(v) => updateField("admissionType", v)}
-                onSearch={
-                  form.university.trim() && form.department.trim()
-                    ? (q) => searchCutoffAdmissionTypes(q, form.university, form.department)
-                    : undefined
-                }
-                revealOnFocus
-                placeholder="예: 학생부교과(일반전형)"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
+          {form.university && (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              선택됨: <span className="font-bold text-slate-700">{form.university}</span>
+              {form.department && <> · <span className="font-bold text-slate-700">{form.department}</span></>}
+              {form.admissionType && <> · <span className="font-bold text-slate-700">{form.admissionType}</span></>}
+            </p>
+          )}
 
           <button
             type="button"
@@ -665,11 +641,16 @@ export function AdmissionProbabilityCalculator({
         </div>
       </div>
 
-      <MyCardPickerModal
+      <CascadingPickerModal
         open={cardPickerOpen}
         onClose={() => setCardPickerOpen(false)}
+        onComplete={handlePicked}
+        fetchUniversities={listCutoffUniversities}
+        fetchDepartments={async (u) => ({ list: await listCutoffDepartments(u), hasSummary: false })}
+        fetchAdmissionTypes={(u, d) => listCutoffAdmissionTypes(u, d ?? "")}
+        admissionTypeAllLabel="전체 전형 보기"
         cards={myCards ?? []}
-        onPick={pickMyCard}
+        onCardSelected={handleCardSelected}
       />
     </div>
   );

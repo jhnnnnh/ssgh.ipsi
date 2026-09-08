@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp, FileBarChart, LayoutGrid } from "lucide-react";
-import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
+import { Search, TrendingUp, FileBarChart } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/providers/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
   prefetchCutoffUniversities,
-  searchCutoffAdmissionTypes,
-  searchCutoffDepartments,
-  searchCutoffUniversities,
+  listCutoffUniversities,
+  listCutoffDepartments,
+  listCutoffAdmissionTypes,
 } from "@/lib/admission-cutoff-autocomplete";
 import {
   searchCutoffsForLookup,
@@ -21,10 +20,14 @@ import {
   type CutoffLookupGroup,
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
+import {
+  fetchCompetitionUniversityOptions,
+  fetchCompetitionDepartmentOptions,
+  fetchCompetitionAdmissionTypeOptions,
+} from "@/lib/admission-competition-lookup";
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
 import { CompetitionHistoryModal } from "@/components/wonseo/CompetitionHistoryModal";
-import { CompetitionSearchPickerModal } from "@/components/wonseo/CompetitionSearchPickerModal";
-import { MyCardPickerModal } from "@/components/wonseo/MyCardPickerModal";
+import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
 const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grade_50" | "grade_70"; label: string }[] = [
@@ -81,6 +84,8 @@ export function CutoffLookupTab({
   const [candidates, setCandidates] = useState<CutoffCandidatePreview[] | null>(null);
   const [findingCandidates, setFindingCandidates] = useState(false);
 
+  const [lookupPickerOpen, setLookupPickerOpen] = useState(false);
+
   const [caUniversity, setCaUniversity] = useState("");
   const [caDepartment, setCaDepartment] = useState("");
   const [caAdmissionType, setCaAdmissionType] = useState("");
@@ -89,7 +94,6 @@ export function CutoffLookupTab({
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
-  const [cardPickerTarget, setCardPickerTarget] = useState<"lookup" | null>(null);
   const effectiveStudentId = studentId ?? teacherStudentId;
 
   useEffect(() => {
@@ -154,13 +158,11 @@ export function CutoffLookupTab({
     void runSearch(university.trim(), department.trim(), admissionType.trim());
   }
 
-  function pickMyCard(card: MyCard) {
-    if (!card.university || !card.department) return;
-    const type = card.sub_category ?? card.category ?? "";
-    setUniversity(card.university);
-    setDepartment(card.department);
+  function handleLookupPicked(uni: string, dept: string | null, type: string) {
+    setUniversity(uni);
+    setDepartment(dept ?? "");
     setAdmissionType(type);
-    void runSearch(card.university, card.department, type);
+    void runSearch(uni, dept ?? "", type);
   }
 
   function applyCandidate(c: CutoffCandidatePreview) {
@@ -192,87 +194,44 @@ export function CutoffLookupTab({
         <div>
           <h3 className="text-sm font-bold text-slate-800">모집 정보 및 입결 조회</h3>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            대학명·모집단위·세부 전형명으로 이번 학년도 모집정보와 2023~2026학년도 수시 입결을 함께 조회할 수
-            있어요. 세부 전형명은 비워두면 그 학과에 등록된 전형을 전부 보여줘요.
+            대학→학과→전형을 순서대로 골라서 이번 학년도 모집정보와 2023~2026학년도 수시
+            입결을 함께 조회할 수 있어요. 전형은 &quot;전체 전형 보기&quot;를 고르면 그
+            학과에 등록된 전형을 전부 보여줘요.
           </p>
         </div>
 
-        {(effectiveStudentId || roster) && (
-          <div className="flex flex-col sm:flex-row gap-2">
-            {!studentId && roster && (
-              <select
-                value={teacherStudentId}
-                onChange={(e) => setTeacherStudentId(e.target.value)}
-                className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">학생 선택(내 카드 불러오기)</option>
-                {roster.map((r) => (
-                  <option key={r.student_id} value={r.student_id}>
-                    {r.student_id} {r.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {effectiveStudentId && myCards && myCards.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCardPickerTarget("lookup")}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                내 원서 카드에서 불러오기
-              </button>
-            )}
-            {effectiveStudentId && myCards && myCards.length === 0 && (
-              <p className="text-[11px] text-slate-400 self-center">등록된 원서 카드가 없어요.</p>
-            )}
-          </div>
+        {!studentId && roster && (
+          <select
+            value={teacherStudentId}
+            onChange={(e) => setTeacherStudentId(e.target.value)}
+            className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">학생 선택(내 카드 불러오기)</option>
+            {roster.map((r) => (
+              <option key={r.student_id} value={r.student_id}>
+                {r.student_id} {r.name}
+              </option>
+            ))}
+          </select>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">대학교명</label>
-            <AutocompleteInput
-              value={university}
-              onChange={(v) => {
-                setUniversity(v);
-                setDepartment("");
-                setAdmissionType("");
-              }}
-              onSearch={searchCutoffUniversities}
-              placeholder="OO대학교"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">모집단위 / 학과</label>
-            <AutocompleteInput
-              value={department}
-              onChange={(v) => {
-                setDepartment(v);
-                setAdmissionType("");
-              }}
-              onSearch={(q) => searchCutoffDepartments(q, university)}
-              placeholder="OO학과 또는 OO학부"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">세부 전형명 (선택)</label>
-            <AutocompleteInput
-              value={admissionType}
-              onChange={setAdmissionType}
-              onSearch={
-                university.trim() && department.trim()
-                  ? (q) => searchCutoffAdmissionTypes(q, university, department)
-                  : undefined
-              }
-              revealOnFocus
-              placeholder="예: 일반전형"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setLookupPickerOpen(true)}
+          className="flex items-center justify-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+        >
+          <Search className="w-3.5 h-3.5" />
+          대학·학과·전형 선택
+        </button>
+
+        {university && (
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+            선택됨: <span className="font-bold text-slate-700">{university}</span>
+            {department && <> · <span className="font-bold text-slate-700">{department}</span></>}
+            {admissionType && <> · <span className="font-bold text-slate-700">{admissionType}</span></>}
+          </p>
+        )}
+
         <button
           type="button"
           onClick={handleSearch}
@@ -434,10 +393,27 @@ export function CutoffLookupTab({
         </button>
       </Card>
 
-      <CompetitionSearchPickerModal
+      <CascadingPickerModal
+        open={lookupPickerOpen}
+        onClose={() => setLookupPickerOpen(false)}
+        onComplete={handleLookupPicked}
+        fetchUniversities={listCutoffUniversities}
+        fetchDepartments={async (u) => ({ list: await listCutoffDepartments(u), hasSummary: false })}
+        fetchAdmissionTypes={(u, d) => listCutoffAdmissionTypes(u, d ?? "")}
+        admissionTypeAllLabel="전체 전형 보기"
+        cards={myCards ?? []}
+      />
+
+      <CascadingPickerModal
         open={competitionPickerOpen}
         onClose={() => setCompetitionPickerOpen(false)}
         onComplete={handleCompetitionPicked}
+        fetchUniversities={() => fetchCompetitionUniversityOptions("")}
+        fetchDepartments={async (u) => {
+          const { departments, hasSummary } = await fetchCompetitionDepartmentOptions(u);
+          return { list: departments, hasSummary };
+        }}
+        fetchAdmissionTypes={fetchCompetitionAdmissionTypeOptions}
         cards={myCards ?? []}
       />
 
@@ -448,13 +424,6 @@ export function CutoffLookupTab({
         department={caDepartment.trim()}
         hintAdmissionType={caAdmissionType.trim()}
         onPickManually={() => setCompetitionPickerOpen(true)}
-      />
-
-      <MyCardPickerModal
-        open={cardPickerTarget != null}
-        onClose={() => setCardPickerTarget(null)}
-        cards={myCards ?? []}
-        onPick={pickMyCard}
       />
     </div>
   );

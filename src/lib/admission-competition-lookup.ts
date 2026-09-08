@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
-import { normalize, nameSimilarity } from "@/lib/admission-cutoff-lookup";
+import { nameSimilarity, pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
+export { pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
 
 export type CompetitionPoint = {
   /** 그 대학 작년 원서접수 시작 시각으로부터 경과한 분. "최종" 집계 지점은 null. */
@@ -65,29 +66,10 @@ async function fetchAllDepartmentRows(university: string): Promise<Row[]> {
   return fetchAllDepartmentRowsExact(altUniversity);
 }
 
-/** 이름이 정확히 같은 후보가 없을 때, 문자열 목록 중 힌트와 이름이 가장 비슷한 하나를
- * 고른다. "내 원서 카드에서 불러오기"처럼 수기로 입력한 학교/학과/전형명이 아카이브 표기와
- * 정확히 같지 않을 때(예: "경제학과" vs "경제학부(경제학전공)") 대학·학과·전형 선택
- * 팝업의 각 칸을 미리 채워 넣는 데 쓴다. nameSimilarity는 포함 관계만 보고 0/1/2점으로만
- * 채점하기 때문에(예: "학생부교과" 계열 전형명은 서로 다 "학생부"를 포함해서) 같은 점수의
- * 후보가 여러 개 나올 수 있다 — 그럴 때는 정규화한 길이가 힌트와 가장 가까운(=군더더기가
- * 가장 적어 진짜 같은 이름일 가능성이 가장 높은) 후보를 고른다. */
-export function pickBestFuzzyOption(options: string[], hint: string): string | null {
-  const normalizedHint = normalize(hint);
-  if (!normalizedHint) return null;
-  let best: { value: string; score: number; lengthDiff: number } | null = null;
-  for (const o of options) {
-    const normalizedOption = normalize(o);
-    const score = nameSimilarity(normalizedOption, normalizedHint);
-    if (score === 0) continue;
-    const lengthDiff = Math.abs(normalizedOption.length - normalizedHint.length);
-    if (!best || score > best.score || (score === best.score && lengthDiff < best.lengthDiff)) {
-      best = { value: o, score, lengthDiff };
-    }
-  }
-  return best?.value ?? null;
-}
-
+/** "내 원서 카드에서 불러오기"는 학생·교사가 수기로 입력한 학과명을 그대로 쓰기 때문에
+ * 아카이브에 저장된 학과명과 정확히 같지 않을 수 있다(예: "경제학과" vs
+ * "경제학부(경제학전공)"). 정확히 일치하는 학과가 없을 때, 그 대학의 학과들 중 이름이
+ * 가장 비슷한 학과로 한 번 더 시도한다. */
 function pickBestFuzzyDepartment(rows: Row[], hintDepartment: string): string | null {
   const uniqueDepts = Array.from(new Set(rows.map((r) => r.department).filter((d): d is string => d != null)));
   return pickBestFuzzyOption(uniqueDepts, hintDepartment);

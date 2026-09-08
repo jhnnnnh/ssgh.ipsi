@@ -2,34 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { X, Search, LayoutGrid, Check } from "lucide-react";
-import {
-  fetchCompetitionUniversityOptions,
-  fetchCompetitionDepartmentOptions,
-  fetchCompetitionAdmissionTypeOptions,
-  pickBestFuzzyOption,
-} from "@/lib/admission-competition-lookup";
+import { pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
 import { MyCardPickerModal, type PickableCard } from "@/components/wonseo/MyCardPickerModal";
 
 /**
- * "작년 경쟁률 조회"의 세부전형명 자동완성이 admission_cutoffs(대학어디가) 표기를
- * 보여주는데 실제 경쟁률 아카이브는 전형명 표기가 달라서(예: "교과(교과성적)" vs
- * "교과성적우수인재전형") 골라도 못 찾거나, 비워두면 그 대학의 전형이 전부 쏟아지는
- * 문제가 있었다. 대학·학과·전형 세 칸을 한 화면에서 순서대로(대학을 골라야 학과 칸이,
- * 학과를 골라야 전형 칸이 열리는 식으로) 검색·선택하게 해서, 마지막에 고르는 전형이
- * 항상 아카이브에 실제로 있는 유일한 데이터가 되게 한다. "내 원서 카드에서 불러오기"는
- * 카드의 수기 입력값과 이름이 가장 비슷한 것을 각 칸에 미리 채워만 주고, 실제 선택은
- * 사람이 확인 후 마지막 칸에서 확정한다.
+ * "내 원서 카드에서 불러오기"가 있는 모든 화면(작년 경쟁률 조회, 모집 정보·입결 조회,
+ * 합격 가능성 추정)에서 같은 방식을 쓰도록 만든 공용 대학→학과→(전형) 선택 팝업이다.
+ * 대학/학과/전형 세 칸을 한 화면에서 순서대로(대학을 골라야 학과 칸이, 학과를 골라야
+ * 전형 칸이 열리는 식으로) 검색·선택하게 해서, 카드에 수기로 입력된 값이 실제 데이터
+ * 표기와 달라도 마지막에 고르는 값은 항상 실제로 존재하는 데이터가 되게 한다. "내 원서
+ * 카드에서 불러오기"는 카드의 수기 입력값과 이름이 가장 비슷한 것을 각 칸에 미리 채워만
+ * 주고, 실제 선택은 사람이 확인한 뒤 확정한다. 대상 데이터가 다르면(경쟁률 아카이브 vs
+ * 입결/모집정보) fetch* 콜백만 바꿔서 재사용한다.
  */
-export function CompetitionSearchPickerModal<T extends PickableCard & { university: string | null; department: string | null }>({
+export function CascadingPickerModal<
+  T extends PickableCard & { university: string | null; department: string | null },
+>({
   open,
   onClose,
   onComplete,
+  fetchUniversities,
+  fetchDepartments,
+  fetchAdmissionTypes,
+  admissionTypeAllLabel,
   cards,
+  onCardSelected,
 }: {
   open: boolean;
   onClose: () => void;
   onComplete: (university: string, department: string | null, admissionType: string) => void;
+  fetchUniversities: () => Promise<string[]>;
+  fetchDepartments: (university: string) => Promise<{ list: string[]; hasSummary: boolean }>;
+  fetchAdmissionTypes: (university: string, department: string | null) => Promise<string[]>;
+  /** 있으면 전형 칸에 "전체 전형 보기"류 항목을 추가해서 admissionType=""으로 완료할 수
+   * 있게 한다(전형 선택이 필수가 아닌 화면에서 쓴다). */
+  admissionTypeAllLabel?: string;
   cards?: T[];
+  onCardSelected?: (card: T) => void;
 }) {
   const [universityQuery, setUniversityQuery] = useState("");
   const [universities, setUniversities] = useState<string[] | null>(null);
@@ -58,7 +67,8 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
     setAdmissionTypeQuery("");
     setAdmissionTypes(null);
     setAdmissionType(null);
-    fetchCompetitionUniversityOptions("").then(setUniversities);
+    fetchUniversities().then(setUniversities);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function pickUniversity(u: string) {
@@ -69,7 +79,7 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
     setAdmissionTypeQuery("");
     setAdmissionTypes(null);
     setAdmissionType(null);
-    fetchCompetitionDepartmentOptions(u).then(({ departments: list, hasSummary }) => setDepartments({ list, hasSummary }));
+    fetchDepartments(u).then(setDepartments);
   }
 
   function pickDepartment(d: string | null) {
@@ -77,7 +87,7 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
     setAdmissionTypeQuery("");
     setAdmissionTypes(null);
     setAdmissionType(null);
-    fetchCompetitionAdmissionTypeOptions(university, d).then(setAdmissionTypes);
+    fetchAdmissionTypes(university, d).then(setAdmissionTypes);
   }
 
   function pickAdmissionType(t: string) {
@@ -87,10 +97,11 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
 
   async function loadFromCard(card: T) {
     setCardPickerOpen(false);
+    onCardSelected?.(card);
     if (!card.university) return;
     setResolving(true);
     try {
-      const allUniversities = universities ?? (await fetchCompetitionUniversityOptions(""));
+      const allUniversities = universities ?? (await fetchUniversities());
       const uniGuess = allUniversities.includes(card.university)
         ? card.university
         : pickBestFuzzyOption(allUniversities, card.university);
@@ -100,10 +111,11 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
       }
       setUniversity(uniGuess);
       setUniversities(allUniversities);
+      setUniversityQuery("");
       setDepartmentQuery("");
       setAdmissionTypeQuery("");
 
-      const { departments: deptList, hasSummary } = await fetchCompetitionDepartmentOptions(uniGuess);
+      const { list: deptList, hasSummary } = await fetchDepartments(uniGuess);
       setDepartments({ list: deptList, hasSummary });
 
       let deptGuess: string | null = null;
@@ -113,11 +125,9 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
       setDepartment(deptGuess);
 
       const typeHint = card.sub_category?.trim() || card.category?.trim() || "";
-      const typeList = await fetchCompetitionAdmissionTypeOptions(uniGuess, deptGuess);
+      const typeList = await fetchAdmissionTypes(uniGuess, deptGuess);
       setAdmissionTypes(typeList);
-      setAdmissionType(
-        typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyOption(typeList, typeHint)) : null,
-      );
+      setAdmissionType(typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyOption(typeList, typeHint)) : null);
     } finally {
       setResolving(false);
     }
@@ -191,6 +201,11 @@ export function CompetitionSearchPickerModal<T extends PickableCard & { universi
             items={filteredAdmissionTypes}
             selected={admissionType}
             onPick={pickAdmissionType}
+            extraOption={
+              admissionTypeAllLabel && !admissionTypeQuery.trim()
+                ? { label: admissionTypeAllLabel, onPick: () => pickAdmissionType(""), selected: false }
+                : undefined
+            }
           />
         </div>
       </div>

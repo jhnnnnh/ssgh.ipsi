@@ -35,6 +35,11 @@ export async function searchCutoffUniversities(query: string): Promise<Autocompl
   return all.filter((u) => u.includes(q)).map((u) => ({ value: u, label: u }));
 }
 
+/** 대학·학과·전형 선택 팝업처럼 자동완성이 아니라 전체 목록이 필요한 곳에서 쓴다. */
+export async function listCutoffUniversities(): Promise<string[]> {
+  return loadUniversities();
+}
+
 type DeptRow = { university: string; department: string };
 const departmentCache = new Map<string, DeptRow[]>();
 const departmentPromises = new Map<string, Promise<DeptRow[]>>();
@@ -68,6 +73,11 @@ export async function searchCutoffDepartments(query: string, university: string)
   return all
     .filter((r) => r.department.includes(q))
     .map((r) => ({ value: r.department, label: r.department, hint: trimmed ? undefined : r.university }));
+}
+
+export async function listCutoffDepartments(university: string): Promise<string[]> {
+  const all = await loadDepartments(university.trim());
+  return all.map((r) => r.department);
 }
 
 type TypeRow = { admission_type: string; department: string; track: string | null };
@@ -109,4 +119,9 @@ export async function searchCutoffAdmissionTypes(
   return all
     .filter((r) => !q || r.admission_type.includes(q))
     .map((r) => ({ value: r.admission_type, label: r.admission_type, hint: trimmedDept ? undefined : r.department }));
+}
+
+export async function listCutoffAdmissionTypes(university: string, department: string): Promise<string[]> {
+  const all = await loadAdmissionTypes(university.trim(), department.trim());
+  return all.map((r) => r.admission_type);
 }
