@@ -23,7 +23,6 @@ import {
   fetchCompetitionUniversityOptions,
   fetchCompetitionDepartmentOptions,
   fetchCompetitionAdmissionTypeOptions,
-  findOfficialAdmissionTypeName,
 } from "@/lib/admission-competition-lookup";
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
 import { CompetitionResultPanel } from "@/components/wonseo/CompetitionResultPanel";
@@ -46,21 +45,6 @@ type MyCard = Pick<WonseoCard, "id" | "university" | "department" | "category" |
 function matchesHint(admissionType: string, hint: string): boolean {
   if (!hint) return true;
   return admissionTypeSimilarity(admissionType, hint) > 0;
-}
-
-/** 평소엔 안 보이다가, 경쟁률 아카이브 기준 공식 명칭이 확실히 있을 때만 이름 옆에 작은
- * 참고 아이콘을 붙인다. 마우스를 올리면(모바일은 길게 누르면) 브라우저 기본 툴팁으로
- * 공식 명칭을 보여준다 — 평소 화면은 그대로 두고, 필요할 때만 확인하는 용도. */
-function OfficialNameHint({ officialName }: { officialName?: string }) {
-  if (!officialName) return null;
-  return (
-    <span
-      title={`경쟁률 자료(원서접수 사이트) 기준 공식 명칭: ${officialName}`}
-      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-slate-300 text-slate-400 text-[9px] font-bold cursor-help shrink-0"
-    >
-      i
-    </span>
-  );
 }
 
 function OfferingMethod({ o }: { o: MergedOffering }) {
@@ -97,9 +81,6 @@ export function CutoffLookupTab({
   const [offerings, setOfferings] = useState<MergedOffering[]>([]);
   const [candidates, setCandidates] = useState<CutoffCandidatePreview[] | null>(null);
   const [findingCandidates, setFindingCandidates] = useState(false);
-  // 전형명 옆에 참고로 보여줄 "경쟁률 아카이브(실제 원서접수 사이트) 기준 공식 명칭".
-  // 확실한 것만 채워지고, 없으면 그 전형은 이 맵에 아예 안 들어간다(원래 이름 그대로 표시).
-  const [officialTypeNames, setOfficialTypeNames] = useState<Record<string, string>>({});
 
   const [lookupPickerOpen, setLookupPickerOpen] = useState(false);
 
@@ -155,18 +136,6 @@ export function CutoffLookupTab({
       setCutoffGroups(filteredGroups);
       setOfferings(filteredOfferings);
       setSearched(true);
-
-      const rawTypes = Array.from(
-        new Set([...filteredGroups.map((g) => g.admissionType), ...filteredOfferings.map((o) => o.admissionType)]),
-      );
-      setOfficialTypeNames({});
-      void Promise.all(rawTypes.map((t) => findOfficialAdmissionTypeName(uni, dept, t))).then((found) => {
-        const map: Record<string, string> = {};
-        rawTypes.forEach((t, i) => {
-          if (found[i]) map[t] = found[i] as string;
-        });
-        setOfficialTypeNames(map);
-      });
 
       if (filteredGroups.length === 0 && filteredOfferings.length === 0) {
         setFindingCandidates(true);
@@ -255,7 +224,6 @@ export function CutoffLookupTab({
                   <div key={o.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-800 text-sm">{o.admissionType}</span>
-                      <OfficialNameHint officialName={officialTypeNames[o.admissionType]} />
                       {o.track && (
                         <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                           {o.track}
@@ -281,7 +249,6 @@ export function CutoffLookupTab({
                   <div key={g.admissionType} className="border border-slate-200 rounded-xl p-3 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-800 text-sm">{g.admissionType}</span>
-                      <OfficialNameHint officialName={officialTypeNames[g.admissionType]} />
                       {g.track && (
                         <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                           {g.track}
