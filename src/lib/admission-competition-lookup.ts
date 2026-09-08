@@ -202,14 +202,19 @@ export async function fetchCompetitionSeries(
 }
 
 /**
- * 작년 원서접수 시작 시각을 그대로 1년 뒤로 옮겨 "올해 시작 시각"으로 가정한다(대학마다
- * 실제 올해 접수 일정을 따로 입력받지 않는 대신 쓰는 단순 추정치 — 수시 접수는 매년
- * 비슷한 시기에 진행되는 편이라 그래프에서 "지금 이 시점"을 대략적으로 짚는 용도로는
- * 충분하다). 연/월/일/시/분만 옮기고 나머지는 그대로 둔다.
+ * 작년 원서접수 시작 시각을 대략 1년 뒤로 옮겨 "올해 시작 시각"으로 가정한다(대학마다
+ * 실제 올해 접수 일정을 따로 입력받지 않는 대신 쓰는 단순 추정치). 그래프는 날짜가 아니라
+ * 요일로 작년과 올해를 맞춰 보는 용도라("월화수목금" 라벨), 단순히 캘린더 날짜를 +1년
+ * 하면 1년이 365일(윤년이면 366일)이라 요일이 하루이틀 밀려버린다 — 그러면 실제로는
+ * 화요일인데 그래프의 "지금" 표시가 수요일 자리에 찍히는 식으로 어긋난다. 그래서 +1년한
+ * 날짜에서 요일이 작년 시작 요일과 같아지도록 며칠(0~6일) 더 보정해 맞춘다.
  */
 export function assumeThisYearStart(lastYearStartIso: string): Date {
   const d = new Date(lastYearStartIso);
-  return new Date(d.getFullYear() + 1, d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
+  const naive = new Date(d.getFullYear() + 1, d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
+  const weekdayCorrection = (d.getDay() - naive.getDay() + 7) % 7;
+  naive.setDate(naive.getDate() + weekdayCorrection);
+  return naive;
 }
 
 /** 지금 이 순간이, 올해 시작 시각(추정)으로부터 몇 분 지났는지. */
