@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { Search } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -16,9 +16,10 @@ import {
   searchCutoffCandidatesWithPreview,
   trackFromCategory,
   normalize,
-  type CutoffLookupGroup,
+  nameSimilarity,
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
+import { listOfferingCandidates } from "@/lib/admission-offering-lookup";
 import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
@@ -38,6 +39,19 @@ type MyCard = Pick<
 type Triple = [number, number, number];
 
 const YEAR_COLS = ["2026", "2025", "2024"] as const;
+
+/** 모집정보(이투스)와 입결(대학어디가)은 같은 전형을 서로 다른 표기로 적어 두는 일이 흔해서
+ * (예: "학생부종합전형" vs "학생부종합(학생부종합전형)"), 정확히 같은 문자열만 찾으면 실제로
+ * 있는 데이터도 없는 것처럼 사라진다. */
+function matchesHint(admissionType: string, hint: string): boolean {
+  if (!hint) return true;
+  return nameSimilarity(normalize(admissionType), normalize(hint)) > 0;
+}
+
+function mergeTriple(existing: [string, string, string], incoming?: [string, string, string]): [string, string, string] {
+  if (!incoming) return existing;
+  return existing.map((v, i) => (v.trim() ? v : incoming[i])) as [string, string, string];
+}
 
 const TIER_COLOR: Record<EstimatorResult["tier"]["key"], { fg: string; bg: string; border: string }> = {
   safe: { fg: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
@@ -118,9 +132,8 @@ export function AdmissionProbabilityCalculator({
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
   const [cardPickerOpen, setCardPickerOpen] = useState(false);
 
-  // 세부전형명 하나로 못 좁혔을 때 보여줄 후보들 — 같은 학과 안의 다른 전형(typeCandidates)
-  // 또는 학과 자체가 없어서 이름이 비슷한 다른 학과(deptCandidates).
-  const [typeCandidates, setTypeCandidates] = useState<CutoffLookupGroup[] | null>(null);
+  // 대학·학과·전형 선택 팝업이 고르는 학과 자체가 admission_cutoffs에 없을 때(드묾)
+  // 이름이 비슷한 다른 학과를 대신 보여준다(카드 만들 때 "비슷한 학과 입결 찾기"와 같은 방식).
   const [deptCandidates, setDeptCandidates] = useState<CutoffCandidatePreview[] | null>(null);
 
   useEffect(() => {
@@ -169,78 +182,76 @@ export function AdmissionProbabilityCalculator({
       userScore: userScore || f.userScore,
       ...filled,
     }));
-    setTypeCandidates(null);
     setDeptCandidates(null);
   }
 
+  /** 대학·학과·전형 선택 팝업이 완료되면(카드로 불러왔든 직접 골랐든) 바로 실행된다.
+   * 대학·학과·전형은 팝업이 이미 admission_cutoffs 실제 데이터 기준으로 골라준 값이라
+   * 그대로 채우고, 올해 모집 정원·과거 3개년 입결은 저장된 데이터에서 찾아 채운다.
+   * 단, 카드에서 불러와 이미 값이 있는 칸(비어 있지 않은 칸)은 덮어쓰지 않는다 — 카드에
+   * 학생이 직접 적어 둔 값이 우선이고, DB 조회는 빈 칸만 메꾸는 용도다. */
   function handlePicked(uni: string, dept: string | null, type: string) {
-    setForm((f) => ({ ...f, university: uni, department: dept ?? "", admissionType: type }));
-  }
-
-  function applyGroupToForm(group: CutoffLookupGroup) {
-    const filled = yearsToTriples(group.years, (m) => ({
-      c50: m.grade_50 ?? "",
-      c70: m.grade_70 ?? "",
-      quota: m.enrollment ?? "",
-      turnover: m.additional_pass ?? "",
-      applicants: m.competition_rate ?? "",
-    }));
-    setForm((f) => ({ ...f, admissionType: group.admissionType, ...filled }));
-    setTypeCandidates(null);
-    setDeptCandidates(null);
+    const departmentStr = dept ?? "";
+    setForm((f) => ({ ...f, university: uni, department: departmentStr, admissionType: type }));
+    void autoFillCutoffData(uni, departmentStr, type);
   }
 
   function applyDeptCandidate(c: CutoffCandidatePreview) {
     setForm((f) => ({ ...f, university: c.university, department: c.department }));
     setDeptCandidates(null);
-    // 후보 학과로 다시 검색해서(전형명 힌트 그대로) 정확히 하나로 좁혀지면 바로 채운다.
-    void runLoadCutoffData(c.university, c.department, form.admissionType.trim());
+    // 후보 학과로 다시 검색해서(전형명 힌트 그대로) 빈 칸을 채운다.
+    void autoFillCutoffData(c.university, c.department, form.admissionType.trim());
   }
 
-  /** 대학+학과+세부전형명으로 대학어디가 입결 원본을 찾아 3개년 표를 자동으로 채운다.
-   * "내 카드 불러오기"와 달리 카드 없이도, 직접 검색한 아무 학과나 넣어볼 수 있다.
-   * 전형명이 정확히 하나로 안 좁혀지면(입력한 글자가 포함된 전형이 여러 개거나, 비워
-   * 뒀거나) 후보 목록을 보여주고 직접 고르게 한다. 학과 자체를 못 찾으면 이름이
-   * 비슷한 다른 학과를 추천한다(카드 만들 때 "비슷한 학과 입결 찾기"와 같은 방식). */
-  async function runLoadCutoffData(uni: string, dept: string, type: string) {
+  /** 대학+학과+세부전형명으로 이번 학년도 모집 정원(모집정보)과 과거 3개년 입결(대학어디가)을
+   * 찾아, 비어 있는 칸만 채운다. 학과 자체를 못 찾으면 이름이 비슷한 다른 학과를 추천한다
+   * (카드 만들 때 "비슷한 학과 입결 찾기"와 같은 방식). */
+  async function autoFillCutoffData(uni: string, dept: string, type: string) {
+    if (!uni || !dept) return;
     setLoadingCutoffs(true);
-    setTypeCandidates(null);
     setDeptCandidates(null);
     try {
-      const groups = await searchCutoffsForLookup(uni, dept);
+      const [groups, offerings] = await Promise.all([searchCutoffsForLookup(uni, dept), listOfferingCandidates(uni, dept)]);
+
       if (groups.length === 0) {
         const candidates = await searchCutoffCandidatesWithPreview(uni, dept, trackFromCategory(type), type);
-        if (candidates.length === 0) {
-          showToast("일치하는 학과도, 비슷한 학과도 찾을 수 없습니다.", "error");
-          return;
-        }
-        setDeptCandidates(candidates);
+        if (candidates.length > 0) setDeptCandidates(candidates);
+        else showToast("저장된 입결 데이터를 찾을 수 없어요. 직접 입력해 주세요.", "error");
         return;
       }
 
       const normalizedType = normalize(type);
-      const matched = normalizedType ? groups.filter((g) => normalize(g.admissionType).includes(normalizedType)) : groups;
+      const matchedGroup =
+        groups.find((g) => g.admissionType === type) ??
+        (normalizedType ? groups.find((g) => normalize(g.admissionType).includes(normalizedType)) : undefined);
+      const matchedOffering = offerings.find((o) => matchesHint(o.admissionType, type));
 
-      if (matched.length === 1) {
-        applyGroupToForm(matched[0]);
-        showToast("입결 데이터를 불러왔습니다.", "success");
-        return;
-      }
-      // 0개(입력한 전형명과 겹치는 게 없음)거나 여러 개면 그 학과의 실제 전형 후보를 보여준다.
-      setTypeCandidates(matched.length > 0 ? matched : groups);
+      const filledTriples = matchedGroup
+        ? yearsToTriples(matchedGroup.years, (m) => ({
+            c50: m.grade_50 ?? "",
+            c70: m.grade_70 ?? "",
+            quota: m.enrollment ?? "",
+            turnover: m.additional_pass ?? "",
+            applicants: m.competition_rate ?? "",
+          }))
+        : null;
+
+      setForm((f) => ({
+        ...f,
+        targetQuota: f.targetQuota.trim()
+          ? f.targetQuota
+          : matchedOffering?.enrollment != null
+            ? String(matchedOffering.enrollment)
+            : f.targetQuota,
+        c50: mergeTriple(f.c50, filledTriples?.c50),
+        c70: mergeTriple(f.c70, filledTriples?.c70),
+        quota: mergeTriple(f.quota, filledTriples?.quota),
+        turnover: mergeTriple(f.turnover, filledTriples?.turnover),
+        applicants: mergeTriple(f.applicants, filledTriples?.applicants),
+      }));
     } finally {
       setLoadingCutoffs(false);
     }
-  }
-
-  function loadCutoffData() {
-    const uni = form.university.trim();
-    const dept = form.department.trim();
-    if (!uni || !dept) {
-      showToast("대학교명과 모집단위를 먼저 입력해 주세요.", "error");
-      return;
-    }
-    void runLoadCutoffData(uni, dept, form.admissionType.trim());
   }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -326,36 +337,7 @@ export function AdmissionProbabilityCalculator({
             </p>
           )}
 
-          <button
-            type="button"
-            onClick={loadCutoffData}
-            disabled={loadingCutoffs}
-            className="w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-60"
-          >
-            <Download className="w-3.5 h-3.5" />
-            {loadingCutoffs ? "불러오는 중..." : "입결 불러오기(대학·학과·전형으로 3개년 자동 입력)"}
-          </button>
-
-          {typeCandidates && (
-            <div className="space-y-1.5 border border-indigo-200 bg-indigo-50/40 rounded-xl p-3">
-              <p className="text-[11px] font-bold text-indigo-700">
-                입력한 세부전형명과 일치하는 전형이 여러 개예요. 하나를 골라 주세요.
-              </p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {typeCandidates.map((g) => (
-                  <button
-                    key={g.admissionType}
-                    type="button"
-                    onClick={() => applyGroupToForm(g)}
-                    className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl transition"
-                  >
-                    <span className="font-bold text-slate-800 text-xs">{g.admissionType}</span>
-                    <span className="shrink-0 text-[11px] font-bold text-indigo-600">선택</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {loadingCutoffs && <p className="text-xs text-slate-400">모집 정원·입결 불러오는 중...</p>}
 
           {deptCandidates && (
             <div className="space-y-1.5 border border-amber-200 bg-amber-50/50 rounded-xl p-3">

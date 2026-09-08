@@ -257,6 +257,7 @@ export function CompetitionResultPanel({
         <p className="text-xs text-slate-400 mt-0.5">
           {university}
           {department && ` · ${department}`}
+          {(chosen?.admissionType || hintAdmissionType) && ` · ${chosen?.admissionType || hintAdmissionType}`}
         </p>
       </div>
 
@@ -297,9 +298,6 @@ export function CompetitionResultPanel({
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               정확히 일치하는 학과 데이터가 없어, <strong>{chosen.admissionType}</strong> 전형 전체 경쟁률로 대신 보여드려요.
             </p>
-          )}
-          {chosen.matchLevel === "department" && chosen.admissionType !== hintAdmissionType && (
-            <p className="text-[11px] text-slate-400">전형: {chosen.admissionType}</p>
           )}
           <CompetitionChart series={chosen} />
         </div>
