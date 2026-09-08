@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { WEEKDAY_KR } from "@/lib/time";
+import { Card } from "@/components/ui/Card";
 import {
   fetchCompetitionSeries,
   currentElapsedMinutes,
-  formatElapsedMinutes,
   type CompetitionSeries,
   type CompetitionLookupResult,
 } from "@/lib/admission-competition-lookup";
@@ -28,6 +28,17 @@ function weekdayAt(startAt: string, elapsedMin: number): string {
 function timeOfDayAt(startAt: string, elapsedMin: number): string {
   const d = new Date(new Date(startAt).getTime() + elapsedMin * 60000);
   return `${String(d.getHours()).padStart(2, "0")}:00`;
+}
+
+/** 차트 위에 뜨는 말풍선(어두운 배경 + 흰 글씨) 위치를 계산한다. 점선이나 곡선 위에 그냥
+ * 얹으면 배경 없이는 글씨가 선에 묻혀 버리므로, 항상 배경 박스를 깔고 점 바로 위(모자라면
+ * 차트 위쪽 경계 안쪽)에 배치한다. */
+function tooltipBox(px: number, py: number, label: string) {
+  const boxW = label.length * 6 + 16;
+  let boxX = px - boxW / 2;
+  boxX = Math.max(PAD_L, Math.min(CHART_W - PAD_R - boxW, boxX));
+  const boxY = Math.max(PAD_T, py - 34);
+  return { boxX, boxY, boxW };
 }
 
 function CompetitionChart({ series }: { series: CompetitionSeries }) {
@@ -54,6 +65,10 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
 
   const nowElapsed = currentElapsedMinutes(series.startAt);
   const showNowMarker = nowElapsed >= 0 && nowElapsed <= maxElapsed;
+  const nowPoint =
+    showNowMarker && realPoints.length
+      ? realPoints.reduce((best, p) => (Math.abs(p.elapsedMin - nowElapsed) < Math.abs(best.elapsedMin - nowElapsed) ? p : best))
+      : null;
 
   function handleMoveAt(clientX: number) {
     if (!svgRef.current || realPoints.length === 0) return;
@@ -121,19 +136,31 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
         {linePath && <path d={linePath} fill="none" stroke="#4f46e5" strokeWidth={2} />}
 
         {showNowMarker && (
+          <line
+            x1={x(nowElapsed)}
+            x2={x(nowElapsed)}
+            y1={PAD_T}
+            y2={CHART_H - PAD_B}
+            stroke="#f43f5e"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+          />
+        )}
+        {showNowMarker && nowPoint && (
           <g>
-            <line
-              x1={x(nowElapsed)}
-              x2={x(nowElapsed)}
-              y1={PAD_T}
-              y2={CHART_H - PAD_B}
-              stroke="#f43f5e"
-              strokeWidth={1.5}
-              strokeDasharray="4 3"
-            />
-            <text x={x(nowElapsed)} y={PAD_T + 10} textAnchor="middle" fontSize={10} fontWeight={700} fill="#f43f5e">
-              지금
-            </text>
+            <circle cx={x(nowElapsed)} cy={y(nowPoint.ratio)} r={4} fill="#f43f5e" />
+            {(() => {
+              const label = `${nowPoint.ratio.toFixed(2)} : 1`;
+              const { boxX, boxY, boxW } = tooltipBox(x(nowElapsed), y(nowPoint.ratio), label);
+              return (
+                <g>
+                  <rect x={boxX} y={boxY} width={boxW} height={22} rx={6} fill="#f43f5e" />
+                  <text x={boxX + boxW / 2} y={boxY + 15} textAnchor="middle" fontSize={11} fontWeight={700} fill="white">
+                    {label}
+                  </text>
+                </g>
+              );
+            })()}
           </g>
         )}
 
@@ -151,10 +178,7 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
             <circle cx={x(hoverPoint.elapsedMin)} cy={y(hoverPoint.ratio)} r={4} fill="#4f46e5" />
             {(() => {
               const label = `${weekdayAt(series.startAt, hoverPoint.elapsedMin)}요일 ${timeOfDayAt(series.startAt, hoverPoint.elapsedMin)} 기준  ${hoverPoint.ratio.toFixed(2)} : 1`;
-              const boxW = label.length * 6 + 16;
-              let boxX = x(hoverPoint.elapsedMin) - boxW / 2;
-              boxX = Math.max(PAD_L, Math.min(CHART_W - PAD_R - boxW, boxX));
-              const boxY = Math.max(PAD_T, y(hoverPoint.ratio) - 34);
+              const { boxX, boxY, boxW } = tooltipBox(x(hoverPoint.elapsedMin), y(hoverPoint.ratio), label);
               return (
                 <g>
                   <rect x={boxX} y={boxY} width={boxW} height={22} rx={6} fill="#1e293b" />
@@ -173,21 +197,23 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
           작년 최종 경쟁률: <strong className="text-slate-800">{finalPoint.ratio.toFixed(2)} : 1</strong>
         </p>
       )}
-      {showNowMarker && <p className="text-xs text-slate-500">지금 시점(작년 기준 추정): {formatElapsedMinutes(nowElapsed)}</p>}
     </div>
   );
 }
 
-export function CompetitionHistoryModal({
+/**
+ * "작년 경쟁률" 결과를 팝업이 아니라 검색 박스 아래에 이어 붙는 카드로 보여준다(모집
+ * 정보·입결 조회 결과와 같은 방식). 대학·학과·전형이 바뀔 때마다(그리고 open이 true가
+ * 될 때마다) 다시 조회한다.
+ */
+export function CompetitionResultPanel({
   open,
-  onClose,
   university,
   department,
   hintAdmissionType,
   onPickManually,
 }: {
   open: boolean;
-  onClose: () => void;
   university: string;
   department: string;
   hintAdmissionType: string;
@@ -222,93 +248,75 @@ export function CompetitionHistoryModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 pt-5">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-            <TrendingUp className="w-4 h-4 text-indigo-600" />
-            작년 경쟁률
-          </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <p className="px-5 pt-1 text-xs text-slate-400">
+    <Card className="space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+          <TrendingUp className="w-4 h-4 text-indigo-600" />
+          작년 경쟁률
+        </h3>
+        <p className="text-xs text-slate-400 mt-0.5">
           {university}
           {department && ` · ${department}`}
         </p>
+      </div>
 
-        <div className="p-5">
-          {loading && <div className="py-16 text-center text-sm text-slate-400">불러오는 중...</div>}
+      {loading && <div className="py-16 text-center text-sm text-slate-400">불러오는 중...</div>}
 
-          {!loading && result?.kind === "none" && (
-            <div className="py-16 text-center text-sm text-slate-400">작년 데이터를 찾을 수 없습니다.</div>
-          )}
+      {!loading && result?.kind === "none" && (
+        <div className="py-16 text-center text-sm text-slate-400">작년 데이터를 찾을 수 없습니다.</div>
+      )}
 
-          {!loading && result?.kind === "ambiguous" && !chosen && (
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-700">
-                이름만으로는 전형을 하나로 좁히지 못했어요. 어느 전형인지 골라 주세요.
-              </p>
-              <div className="space-y-1.5">
-                {result.options.map((o, i) => (
-                  <button
-                    key={`${o.admissionType}-${i}`}
-                    type="button"
-                    onClick={() => setChosen(o)}
-                    className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl transition"
-                  >
-                    <span className="font-bold text-slate-800 text-xs">{o.admissionType}</span>
-                    <span className="shrink-0 text-[11px] font-bold text-indigo-600">선택</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!loading && chosen && (
-            <div className="space-y-3">
-              {chosen.matchLevel === "department" && chosen.department && chosen.department !== department && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  입력하신 학과명과 정확히 일치하는 데이터가 없어, 이름이 가장 비슷한{" "}
-                  <strong>{chosen.department}</strong>의 경쟁률로 대신 보여드려요.
-                </p>
-              )}
-              {chosen.matchLevel === "summary" && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  정확히 일치하는 학과 데이터가 없어, <strong>{chosen.admissionType}</strong> 전형 전체
-                  경쟁률로 대신 보여드려요.
-                </p>
-              )}
-              {chosen.matchLevel === "department" && chosen.admissionType !== hintAdmissionType && (
-                <p className="text-[11px] text-slate-400">전형: {chosen.admissionType}</p>
-              )}
-              <CompetitionChart series={chosen} />
-            </div>
-          )}
-
-          <div className="mt-4 border-t border-slate-100 pt-3 space-y-2">
-            {onPickManually && (
+      {!loading && result?.kind === "ambiguous" && !chosen && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-700">이름만으로는 전형을 하나로 좁히지 못했어요. 어느 전형인지 골라 주세요.</p>
+          <div className="space-y-1.5">
+            {result.options.map((o, i) => (
               <button
+                key={`${o.admissionType}-${i}`}
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onPickManually();
-                }}
-                className="w-full text-center text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+                onClick={() => setChosen(o)}
+                className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl transition"
               >
-                찾는 학교·학과·전형이 아닌가요? 직접 선택하기
+                <span className="font-bold text-slate-800 text-xs">{o.admissionType}</span>
+                <span className="shrink-0 text-[11px] font-bold text-indigo-600">선택</span>
               </button>
-            )}
-            <p className="text-[11px] text-slate-400">
-              2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.
-            </p>
+            ))}
           </div>
         </div>
+      )}
+
+      {!loading && chosen && (
+        <div className="space-y-3">
+          {chosen.matchLevel === "department" && chosen.department && chosen.department !== department && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              입력하신 학과명과 정확히 일치하는 데이터가 없어, 이름이 가장 비슷한 <strong>{chosen.department}</strong>의 경쟁률로
+              대신 보여드려요.
+            </p>
+          )}
+          {chosen.matchLevel === "summary" && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              정확히 일치하는 학과 데이터가 없어, <strong>{chosen.admissionType}</strong> 전형 전체 경쟁률로 대신 보여드려요.
+            </p>
+          )}
+          {chosen.matchLevel === "department" && chosen.admissionType !== hintAdmissionType && (
+            <p className="text-[11px] text-slate-400">전형: {chosen.admissionType}</p>
+          )}
+          <CompetitionChart series={chosen} />
+        </div>
+      )}
+
+      <div className="border-t border-slate-100 pt-3 space-y-2">
+        {onPickManually && (
+          <button
+            type="button"
+            onClick={onPickManually}
+            className="w-full text-center text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+          >
+            찾는 학교·학과·전형이 아닌가요? 직접 선택하기
+          </button>
+        )}
+        <p className="text-[11px] text-slate-400">2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.</p>
       </div>
-    </div>
+    </Card>
   );
 }

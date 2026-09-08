@@ -26,7 +26,7 @@ import {
   fetchCompetitionAdmissionTypeOptions,
 } from "@/lib/admission-competition-lookup";
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
-import { CompetitionHistoryModal } from "@/components/wonseo/CompetitionHistoryModal";
+import { CompetitionResultPanel } from "@/components/wonseo/CompetitionResultPanel";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
@@ -353,15 +353,15 @@ export function CutoffLookupTab({
           <TrendingUp className="w-3.5 h-3.5" />
           <span>작년 경쟁률 보기</span>
         </button>
-
-        {caUniversity && (
-          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-            선택됨: <span className="font-bold text-slate-700">{caUniversity}</span>
-            {caDepartment && <> · <span className="font-bold text-slate-700">{caDepartment}</span></>}
-            {caAdmissionType && <> · <span className="font-bold text-slate-700">{caAdmissionType}</span></>}
-          </p>
-        )}
       </Card>
+
+      <CompetitionResultPanel
+        open={competitionOpen}
+        university={caUniversity.trim()}
+        department={caDepartment.trim()}
+        hintAdmissionType={caAdmissionType.trim()}
+        onPickManually={() => setCompetitionPickerOpen(true)}
+      />
 
       <CascadingPickerModal
         open={lookupPickerOpen}
@@ -385,15 +385,6 @@ export function CutoffLookupTab({
         }}
         fetchAdmissionTypes={fetchCompetitionAdmissionTypeOptions}
         cards={myCards ?? []}
-      />
-
-      <CompetitionHistoryModal
-        open={competitionOpen}
-        onClose={() => setCompetitionOpen(false)}
-        university={caUniversity.trim()}
-        department={caDepartment.trim()}
-        hintAdmissionType={caAdmissionType.trim()}
-        onPickManually={() => setCompetitionPickerOpen(true)}
       />
     </div>
   );
