@@ -105,19 +105,33 @@ export function nameSimilarity(a: string, b: string): number {
   return 0;
 }
 
+/** normalize()와 달리 "교과"/"종합"은 남겨 두고 "전형"과 괄호·공백만 걷어낸다.
+ * normalize()가 "교과"/"종합"까지 지우는 건 서로 다른 원본(입결 vs 전형데이터)이 그
+ * 수식어를 다른 위치에 적는 문제를 풀기 위해서였는데, 전형 트랙(교과/종합) 자체를 맞춰야
+ * 하는 비교에 그대로 쓰면 "학생부종합"과 "교과(학생부교과)"가 둘 다 "학생부"로 뭉개져서
+ * 완전히 다른 트랙인데도 "똑같다"고 오판한다(실제로 카드에 학생부종합으로 적었는데
+ * 학생부교과 입결이 잘못 채워지는 사고가 있었다). */
+function normalizeKeepingTrack(s: string): string {
+  return s
+    .replace(/\s+/g, "")
+    .replace(/전형|[()]/g, "")
+    .trim();
+}
+
 /** 이름이 정확히 같은 후보가 없을 때, 문자열 목록 중 힌트와 이름이 가장 비슷한 하나를
  * 고른다. "내 원서 카드에서 불러오기"처럼 수기로 입력한 학교/학과/전형명이 실제 목록
  * 표기와 정확히 같지 않을 때(예: "경제학과" vs "경제학부(경제학전공)") 각종 선택 팝업의
- * 칸을 미리 채워 넣는 데 쓴다. nameSimilarity는 포함 관계만 보고 0/1/2점으로만 채점하기
- * 때문에(예: "학생부교과" 계열 이름은 서로 다 "학생부"를 포함해서) 같은 점수의 후보가
- * 여러 개 나올 수 있다 — 그럴 때는 정규화한 길이가 힌트와 가장 가까운(=군더더기가 가장
- * 적어 진짜 같은 이름일 가능성이 가장 높은) 후보를 고른다. */
+ * 칸을 미리 채워 넣는 데 쓴다. 전형명 비교이므로 교과/종합 트랙은 절대 뭉개면 안 돼서
+ * normalize() 대신 normalizeKeepingTrack()을 쓴다. nameSimilarity는 포함 관계만 보고
+ * 0/1/2점으로만 채점하기 때문에(예: "학생부교과" 계열 이름은 서로 다 "학생부교과"를
+ * 포함해서) 같은 점수의 후보가 여러 개 나올 수 있다 — 그럴 때는 정규화한 길이가 힌트와
+ * 가장 가까운(=군더더기가 가장 적어 진짜 같은 이름일 가능성이 가장 높은) 후보를 고른다. */
 export function pickBestFuzzyOption(options: string[], hint: string): string | null {
-  const normalizedHint = normalize(hint);
+  const normalizedHint = normalizeKeepingTrack(hint);
   if (!normalizedHint) return null;
   let best: { value: string; score: number; lengthDiff: number } | null = null;
   for (const o of options) {
-    const normalizedOption = normalize(o);
+    const normalizedOption = normalizeKeepingTrack(o);
     const score = nameSimilarity(normalizedOption, normalizedHint);
     if (score === 0) continue;
     const lengthDiff = Math.abs(normalizedOption.length - normalizedHint.length);
