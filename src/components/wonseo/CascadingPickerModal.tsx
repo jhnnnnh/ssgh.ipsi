@@ -73,6 +73,7 @@ export function CascadingPickerModal<
 
   function pickUniversity(u: string) {
     setUniversity(u);
+    setUniversityQuery(u);
     setDepartmentQuery("");
     setDepartments(null);
     setDepartment(undefined);
@@ -84,6 +85,7 @@ export function CascadingPickerModal<
 
   function pickDepartment(d: string | null) {
     setDepartment(d);
+    setDepartmentQuery(d ?? "");
     setAdmissionTypeQuery("");
     setAdmissionTypes(null);
     setAdmissionType(null);
@@ -91,7 +93,15 @@ export function CascadingPickerModal<
   }
 
   function pickAdmissionType(t: string) {
-    onComplete(university, department ?? null, t);
+    setAdmissionType(t);
+    setAdmissionTypeQuery(t);
+  }
+
+  const canConfirm = university !== "" && department !== undefined && admissionType !== null;
+
+  function handleConfirm() {
+    if (!canConfirm) return;
+    onComplete(university, department ?? null, admissionType ?? "");
     onClose();
   }
 
@@ -111,7 +121,7 @@ export function CascadingPickerModal<
       }
       setUniversity(uniGuess);
       setUniversities(allUniversities);
-      setUniversityQuery("");
+      setUniversityQuery(uniGuess);
       setDepartmentQuery("");
       setAdmissionTypeQuery("");
 
@@ -123,11 +133,14 @@ export function CascadingPickerModal<
         deptGuess = deptList.includes(card.department) ? card.department : pickBestFuzzyOption(deptList, card.department);
       }
       setDepartment(deptGuess);
+      setDepartmentQuery(deptGuess ?? "");
 
       const typeHint = card.sub_category?.trim() || card.category?.trim() || "";
       const typeList = await fetchAdmissionTypes(uniGuess, deptGuess);
       setAdmissionTypes(typeList);
-      setAdmissionType(typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyOption(typeList, typeHint)) : null);
+      const typeGuess = typeHint ? (typeList.includes(typeHint) ? typeHint : pickBestFuzzyOption(typeList, typeHint)) : null;
+      setAdmissionType(typeGuess);
+      setAdmissionTypeQuery(typeGuess ?? "");
     } finally {
       setResolving(false);
     }
@@ -187,7 +200,7 @@ export function CascadingPickerModal<
             selected={department ?? null}
             onPick={pickDepartment}
             extraOption={
-              departments?.hasSummary && !departmentQuery.trim()
+              departments?.hasSummary && (!departmentQuery.trim() || department === null)
                 ? { label: "전체(학과 구분 없음)", onPick: () => pickDepartment(null), selected: department === null }
                 : undefined
             }
@@ -202,11 +215,23 @@ export function CascadingPickerModal<
             selected={admissionType}
             onPick={pickAdmissionType}
             extraOption={
-              admissionTypeAllLabel && !admissionTypeQuery.trim()
-                ? { label: admissionTypeAllLabel, onPick: () => pickAdmissionType(""), selected: false }
+              admissionTypeAllLabel && (!admissionTypeQuery.trim() || admissionType === "")
+                ? { label: admissionTypeAllLabel, onPick: () => pickAdmissionType(""), selected: admissionType === "" }
                 : undefined
             }
           />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+          >
+            <Search className="w-3.5 h-3.5" />
+            검색
+          </button>
         </div>
       </div>
 
