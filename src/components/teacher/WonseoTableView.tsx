@@ -2,16 +2,41 @@
 
 import { cn } from "@/lib/cn";
 import { LEVEL_TABLE_CELL_STYLE } from "@/lib/wonseo-constants";
-import { WONSEO_TABLE_ROW_LABELS, buildWonseoTableData, wonseoTableCellValue } from "@/lib/wonseo-table-data";
+import {
+  WONSEO_SUBMITTED_TABLE_ROW_LABELS,
+  WONSEO_TABLE_ROW_LABELS,
+  buildSubmittedWonseoTableData,
+  buildWonseoTableData,
+  wonseoSubmittedTableCellValue,
+  wonseoTableCellValue,
+} from "@/lib/wonseo-table-data";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
-export function WonseoTableView({ roster, cards }: { roster: Roster[]; cards: WonseoCard[] }) {
-  const { maxChoices, students } = buildWonseoTableData(roster, cards);
+export function WonseoTableView({
+  roster,
+  cards,
+  variant = "all",
+}: {
+  roster: Roster[];
+  cards: WonseoCard[];
+  /** "submitted"면 접수 표시(is_submitted)된 카드만, 수험번호·날짜 행을 더해 보여준다. */
+  variant?: "all" | "submitted";
+}) {
+  const rowLabels: readonly string[] =
+    variant === "submitted" ? WONSEO_SUBMITTED_TABLE_ROW_LABELS : WONSEO_TABLE_ROW_LABELS;
+  const cellValue: (card: WonseoCard | undefined, label: string) => string =
+    variant === "submitted"
+      ? (card, label) => wonseoSubmittedTableCellValue(card, label as (typeof WONSEO_SUBMITTED_TABLE_ROW_LABELS)[number])
+      : (card, label) => wonseoTableCellValue(card, label as (typeof WONSEO_TABLE_ROW_LABELS)[number]);
+  const { maxChoices, students } =
+    variant === "submitted" ? buildSubmittedWonseoTableData(roster, cards) : buildWonseoTableData(roster, cards);
 
   if (students.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-xs font-semibold text-slate-500">등록된 원서 카드가 없습니다.</p>
+        <p className="text-xs font-semibold text-slate-500">
+          {variant === "submitted" ? "접수 표시된 원서가 없습니다." : "등록된 원서 카드가 없습니다."}
+        </p>
       </div>
     );
   }
@@ -48,7 +73,13 @@ export function WonseoTableView({ roster, cards }: { roster: Roster[]; cards: Wo
         </thead>
         <tbody>
           {students.map((student) => (
-            <StudentRows key={student.studentId} student={student} maxChoices={maxChoices} />
+            <StudentRows
+              key={student.studentId}
+              student={student}
+              maxChoices={maxChoices}
+              rowLabels={rowLabels}
+              cellValue={cellValue}
+            />
           ))}
         </tbody>
       </table>
@@ -59,17 +90,21 @@ export function WonseoTableView({ roster, cards }: { roster: Roster[]; cards: Wo
 function StudentRows({
   student,
   maxChoices,
+  rowLabels,
+  cellValue,
 }: {
   student: { studentId: string; name: string; cards: WonseoCard[] };
   maxChoices: number;
+  rowLabels: readonly string[];
+  cellValue: (card: WonseoCard | undefined, label: string) => string;
 }) {
   return (
     <>
-      {WONSEO_TABLE_ROW_LABELS.map((label, li) => (
+      {rowLabels.map((label, li) => (
         <tr key={label} className={cn("border-t", li === 0 ? "border-slate-400" : "border-slate-100")}>
           {li === 0 && (
             <td
-              rowSpan={WONSEO_TABLE_ROW_LABELS.length}
+              rowSpan={rowLabels.length}
               className="bg-indigo-50 text-slate-800 font-bold text-center align-middle px-2 py-2 border-r border-slate-200 whitespace-nowrap"
             >
               {student.name}
@@ -78,7 +113,7 @@ function StudentRows({
           <td className="text-slate-500 font-bold px-3 py-2 whitespace-nowrap">{label}</td>
           {Array.from({ length: maxChoices }, (_, i) => {
             const card = student.cards[i];
-            const value = wonseoTableCellValue(card, label);
+            const value = cellValue(card, label);
             const isLevel = label === "지원정도" && card;
             return (
               <td

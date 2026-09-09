@@ -7,6 +7,7 @@ import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPre
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
 import { RecentResultsSection } from "@/components/wonseo/RecentResultsSection";
 import { LEVEL_EMPHASIS_STYLE, STATUS_BADGE_STYLE, STATUS_OPTIONS } from "@/lib/wonseo-constants";
+import { normalizeDateInput } from "@/lib/time";
 import type { ScheduleEvent, WonseoCard, WonseoImage } from "@/lib/database.types";
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -16,18 +17,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="font-semibold text-slate-800 whitespace-pre-line">{value}</span>
     </p>
   );
-}
-
-/** "20261111"처럼 구분자 없이 숫자 8자리로 입력해도 "2026-11-11" 형식으로 맞춰 보여준다
- * (점·슬래시 등 다른 구분자로 입력해도 숫자만 추려 같은 방식으로 맞춘다). 8자리가 아니면
- * 자유 텍스트를 그대로 둔다 — 날짜가 아직 미정이거나 "추후 공지" 같은 메모여도 막지 않는다. */
-function normalizeDateInput(raw: string): string {
-  const trimmed = raw.trim();
-  const digitsOnly = trimmed.replace(/[^0-9]/g, "");
-  if (digitsOnly.length === 8) {
-    return `${digitsOnly.slice(0, 4)}-${digitsOnly.slice(4, 6)}-${digitsOnly.slice(6, 8)}`;
-  }
-  return trimmed;
 }
 
 /** 클릭하기 전에는 일반 텍스트처럼 보이다가, 클릭하면 그 자리에서 입력칸으로 바뀌는
