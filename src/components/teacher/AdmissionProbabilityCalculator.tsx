@@ -19,7 +19,13 @@ import {
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates } from "@/lib/admission-offering-lookup";
-import { estimateAdmission, type EstimatorInput, type EstimatorOutcome, type KernelModel } from "@/lib/admission-probability-estimator";
+import {
+  estimateAdmission,
+  type EstimatorInput,
+  type EstimatorOutcome,
+  type EstimatorResult,
+  type KernelModel,
+} from "@/lib/admission-probability-estimator";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
@@ -129,6 +135,7 @@ export function AdmissionProbabilityCalculator({
   const showToast = useToast();
   const [form, setForm] = useState<FormState>(emptyForm());
   const [result, setResult] = useState<EstimatorOutcome | null>(null);
+  const [queriedScore, setQueriedScore] = useState(0);
   const [querying, setQuerying] = useState(false);
   const [loadingCutoffs, setLoadingCutoffs] = useState(false);
 
@@ -280,11 +287,6 @@ export function AdmissionProbabilityCalculator({
       return;
     }
 
-    if (!form.admissionType.includes("교과")) {
-      setResult({ insufficient: true, reason: "학생부 교과전형만 지원해요. 종합전형은 아직 검증된 계산식이 없어요." });
-      return;
-    }
-
     setQuerying(true);
     try {
       const model = await loadKernelModel();
@@ -297,6 +299,7 @@ export function AdmissionProbabilityCalculator({
         quota: form.quota.map(parseIntNum) as Triple,
         turnover: form.turnover.map(parseIntNum) as Triple,
       };
+      setQueriedScore(parsedScore);
       setResult(estimateAdmission(input, model));
     } catch {
       showToast("과거 사례 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
@@ -476,14 +479,9 @@ export function AdmissionProbabilityCalculator({
               <p className="text-[11px] text-slate-400">{deptLabel || "대학·학과를 입력하면 표시됩니다"}</p>
               {!result && <p className="text-lg font-bold text-slate-400">분석 대기중</p>}
               {result && "insufficient" in result && <p className="text-lg font-bold text-slate-400">데이터 부족</p>}
-              {ok && (
-                <p className={`text-lg font-bold ${ok.prob >= 50 ? "text-emerald-700" : "text-rose-700"}`}>
-                  {ok.prob >= 50 ? "적정 이상" : "상향 지원"}
-                </p>
-              )}
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-slate-900">{ok ? `${Math.round(ok.prob)}%` : "—"}</p>
+              <p className="text-3xl font-bold text-slate-900">{ok ? `${ok.probLow}~${ok.probHigh}%` : "—"}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">추정 합격 가능성</p>
             </div>
           </Card>
@@ -507,68 +505,50 @@ export function AdmissionProbabilityCalculator({
                 </div>
               </div>
 
-              <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                비슷한 과거 사례 {Math.round(ok.effectiveN)}건을 참고해 계산했어요 — 수가 적을수록 예측이
-                불안정할 수 있어요.
-              </p>
+              <Card>
+                <ProbabilityChart result={ok} userScore={queriedScore} />
+              </Card>
 
               <details className="border border-slate-200 rounded-xl bg-white">
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">
                   이 수치는 어떻게 계산되었나요?
                 </summary>
-                <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3 space-y-4">
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">1. 비슷한 과거 사례 찾기 (국소가중 커널)</h4>
-                    <p>
-                      과거 3개년 컷을 &ldquo;3개년 평균(수준)&rdquo;과 &ldquo;가장 최근 1년의 변화량(추세)&rdquo;으로
-                      요약하고, 여기에 정원 증감률과 이번 해 예상 경쟁률(과거 수준 구간별로 정규화한 값)까지
-                      더한 지표로, 교과전형 학과 데이터베이스에서 비슷한 사례를 찾아 가중치를 매깁니다.
-                    </p>
-                    <Formula>
-                      {"수준50/수준70 = 과거 3개년 평균,  추세70 = 최근해 - 그 직전해"}
-                      {"\n정원변화 = ln(올해 정원) - ln(작년 정원),  경쟁률_국소 = (예상 경쟁률 - μ_구간) / σ_구간"}
-                      {"\n거리² = Σ ((사례값 - 목표값) / 대역폭)²  →  가중치 = exp(-거리²/2)"}
-                    </Formula>
-                  </section>
+                <div className="px-4 pb-5 text-[13px] leading-relaxed text-slate-600 border-t border-slate-100 pt-4 space-y-5">
+                  <p>
+                    성적만 보고 &ldquo;몇 등급이니까 몇 % 확률&rdquo;로 계산하지 않아요. 대신 전국의 학생부 교과
+                    전형 학과들 중에서, 지금 보고 있는 학과와 조건이 비슷한 학과들을 찾아서 그 학과들이
+                    실제로 어떻게 됐는지를 근거로 삼아요.
+                  </p>
 
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">2. 50%·70%컷 — 가중중앙값</h4>
-                    <p>
-                      가중평균이 아니라 가중중앙값을 씁니다. 컷 분포가 비대칭이라(소수의 미충원·이변 사례가
-                      꼬리를 만듦) 평균은 극단치에 끌려가지만 중앙값은 그렇지 않습니다.
-                    </p>
-                  </section>
-
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">3. 마지노선 배수 — 이 학과 자신의 데이터만 사용</h4>
-                    <p>
-                      다른 학과 사례와 무관하게, 이 학과의 가장 최근해 실제 합격자수(모집인원+충원인원)만으로
-                      &ldquo;마지노선이 50%컷·70%컷 스프레드의 몇 배 지점에 있는지&rdquo;를 구합니다(대교협 실측
-                      6개 학과·514명 데이터로 검증).
-                    </p>
-                    <Formula>
-                      {"합격자수 = 올해 모집인원 + 올해 충원인원 (35~132명 범위로 제한)"}
-                      {"\nratio = -2.289 + 1.184 × ln(합격자수),  하한 0.3"}
-                    </Formula>
-                  </section>
-
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">4. 몬테카를로 시뮬레이션 → 합격확률</h4>
-                    <p>
-                      마지노선을 하나의 숫자로 고정하지 않고, 1번의 가중치로 과거 실제 (50컷,70컷)을 1만 번
-                      복원추출 + 3번의 ratio를 오차 범위 안에서 정규분포로 흔들어 마지노선의 분포를 만듭니다.
-                      로지스틱 함수나 임의의 보정 계수 없이, 이 분포 중 내 성적으로 합격 가능한 비율을 그대로
-                      셉니다.
-                    </p>
-                    <Formula>
-                      {"마지노선[i] = sim50컷[i] + ratio[i] × (sim70컷[i] - sim50컷[i])  (i = 1..10000)"}
-                      {"\n합격확률 = (마지노선 ≥ 내 성적)의 비율"}
-                    </Formula>
-                  </section>
+                  <div className="space-y-3">
+                    <StepRow n={1} title="조건이 비슷한 학과 찾기">
+                      최근 3개년 컷의 평균 수준과 최근 흐름(오르는지 내리는지), 올해 정원이 작년보다
+                      늘었는지 줄었는지, 예상 경쟁률이 원래 이 정도 성적대에서 흔한 수준인지 등을 종합해
+                      &ldquo;가장 조건이 비슷한 학과들&rdquo;을 찾아요. 조건이 비슷할수록 더 많이 참고해요.
+                    </StepRow>
+                    <StepRow n={2} title="그 학과들의 실제 결과로 이번 컷 예측">
+                      찾아낸 비슷한 학과들이 실제로 그 다음 해에 받은 50%·70%컷 결과값을 바탕으로 이번
+                      해 컷을 예측해요. 어쩌다 한 번 크게 튄 사례에 휘둘리지 않도록, 가장 자주 나온
+                      값 쪽에 가깝게 계산해요.
+                    </StepRow>
+                    <StepRow n={3} title="이 학과만의 충원 패턴 반영">
+                      여기서부터는 다른 학과와 비교하지 않고, 이 학과 자신의 최근 실제 등록 인원(모집
+                      인원과 추가 합격 인원을 더한 값)만 사용해요. 정원이 넉넉한 학과일수록 추가 합격이
+                      더 많이 나는 경향이 실제 데이터로 확인돼서, 그 경향을 반영해 &ldquo;등록이 끝날 때까지
+                      성적이 얼마나 더 밀릴 수 있는지&rdquo;를 계산해요.
+                    </StepRow>
+                    <StepRow n={4} title="수많은 가상 시나리오로 확률 계산" last>
+                      위 정보들을 조합해 &ldquo;이런 조합이라면 어떻게 됐을까&rdquo;를 수천 번 가상으로
+                      반복해요. 그중 지금 성적으로 합격했을 시나리오가 몇 %였는지를 세어서 확률로
+                      보여줘요. 그래서 딱 떨어지는 숫자 하나가 아니라 범위로 나오는 거예요 — 참고할
+                      사례가 풍부할수록 범위가 좁아지고, 사례가 적어 조심스러운 경우일수록 범위가
+                      넓어져요.
+                    </StepRow>
+                  </div>
 
                   <p className="text-slate-400 border-t border-slate-100 pt-3">
-                    본 모형은 교과전형 한정으로 검증된 통계적 추정치이며, 표본 외 예측의 성격상 실제값과
-                    편차가 발생할 수 있습니다. 합격을 보증하지 않습니다.
+                    이 추정치는 과거 데이터를 근거로 한 통계적 참고 자료이며, 실제 합격을 보장하지
+                    않아요. 면접·자기소개서 등 정성평가가 섞인 전형에는 참고 정도로만 활용해 주세요.
                   </p>
                 </div>
               </details>
@@ -592,10 +572,146 @@ export function AdmissionProbabilityCalculator({
   );
 }
 
-function Formula({ children }: { children: React.ReactNode }) {
+function StepRow({ n, title, last, children }: { n: number; title: string; last?: boolean; children: React.ReactNode }) {
   return (
-    <pre className="mt-1.5 whitespace-pre-wrap break-words overflow-x-auto font-mono text-[11px] text-slate-700 bg-slate-100 rounded-lg p-2.5">
-      {children}
-    </pre>
+    <div className="flex gap-3">
+      <div className="flex flex-col items-center shrink-0">
+        <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+          {n}
+        </div>
+        {!last && <div className="w-px flex-1 bg-slate-200 mt-1" />}
+      </div>
+      <div className={last ? "" : "pb-1"}>
+        <p className="font-bold text-slate-800 text-xs mb-0.5">{title}</p>
+        <p>{children}</p>
+      </div>
+    </div>
+  );
+}
+
+/** 성적(등급)별 합격확률 곡선. 등급은 숫자가 작을수록 좋은 성적이라, x축 왼쪽일수록 좋은
+ * 성적 · 오른쪽일수록 낮은 성적이다. 사용자 성적 위치에 확률 범위(±)를 세로 막대로 함께
+ * 보여주고, 마우스를 올리면 그 지점의 등급·확률을 십자선과 말풍선으로 보여준다. */
+function ProbabilityChart({ result, userScore }: { result: EstimatorResult; userScore: number }) {
+  const [hoverX, setHoverX] = useState<number | null>(null);
+  const W = 460;
+  const H = 200;
+  const marginL = 34;
+  const marginR = 14;
+  const marginT = 14;
+  const marginB = 26;
+  const plotW = W - marginL - marginR;
+  const plotH = H - marginT - marginB;
+
+  const curve = result.curve;
+  const gMin = curve[0]?.grade ?? userScore - 1;
+  const gMax = curve[curve.length - 1]?.grade ?? userScore + 1;
+  const gRange = Math.max(gMax - gMin, 0.01);
+
+  const X = (g: number) => marginL + ((g - gMin) / gRange) * plotW;
+  const Y = (p: number) => marginT + plotH - (p / 100) * plotH;
+  const gradeAtX = (px: number) => gMin + ((px - marginL) / plotW) * gRange;
+
+  let pathD = "";
+  curve.forEach((pt, i) => {
+    pathD += `${i === 0 ? "M" : "L"}${X(pt.grade).toFixed(1)},${Y(pt.prob).toFixed(1)} `;
+  });
+
+  function nearestPoint(grade: number) {
+    let best = curve[0];
+    let bestDiff = Infinity;
+    for (const pt of curve) {
+      const diff = Math.abs(pt.grade - grade);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = pt;
+      }
+    }
+    return best;
+  }
+
+  const hoverPoint = hoverX != null ? nearestPoint(gradeAtX(hoverX)) : null;
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const px = ((e.clientX - rect.left) / rect.width) * W;
+          setHoverX(Math.max(marginL, Math.min(marginL + plotW, px)));
+        }}
+        onMouseLeave={() => setHoverX(null)}
+      >
+        <line x1={marginL} y1={marginT} x2={marginL} y2={marginT + plotH} stroke="#cbd5e1" />
+        <line x1={marginL} y1={marginT + plotH} x2={marginL + plotW} y2={marginT + plotH} stroke="#cbd5e1" />
+        {[0, 25, 50, 75, 100].map((p) => (
+          <g key={p}>
+            <line x1={marginL - 4} y1={Y(p)} x2={marginL + plotW} y2={Y(p)} stroke="#f1f5f9" />
+            <text x={marginL - 7} y={Y(p) + 3} fontSize={9} fill="#94a3b8" textAnchor="end">
+              {p}%
+            </text>
+          </g>
+        ))}
+
+        <line
+          x1={X(result.p50Predicted)}
+          y1={marginT}
+          x2={X(result.p50Predicted)}
+          y2={marginT + plotH}
+          stroke="#a5b4fc"
+          strokeWidth={1}
+          strokeDasharray="3,3"
+        />
+        <line
+          x1={X(result.p70Predicted)}
+          y1={marginT}
+          x2={X(result.p70Predicted)}
+          y2={marginT + plotH}
+          stroke="#a5b4fc"
+          strokeWidth={1}
+          strokeDasharray="3,3"
+        />
+
+        <path d={pathD} fill="none" stroke="#4f46e5" strokeWidth={2} />
+
+        {/* 사용자 성적 위치 — 확률 범위(±)를 세로 막대로 표시 */}
+        <line
+          x1={X(userScore)}
+          y1={Y(result.probHigh)}
+          x2={X(userScore)}
+          y2={Y(result.probLow)}
+          stroke="#4f46e5"
+          strokeWidth={3}
+          strokeLinecap="round"
+          opacity={0.35}
+        />
+        <circle cx={X(userScore)} cy={Y(result.prob)} r={4.5} fill="#4f46e5" stroke="#fff" strokeWidth={1.2} />
+
+        {hoverPoint && (
+          <>
+            <line
+              x1={X(hoverPoint.grade)}
+              y1={marginT}
+              x2={X(hoverPoint.grade)}
+              y2={marginT + plotH}
+              stroke="#64748b"
+              strokeWidth={1}
+            />
+            <circle cx={X(hoverPoint.grade)} cy={Y(hoverPoint.prob)} r={3.5} fill="#1e293b" />
+          </>
+        )}
+
+        <text x={marginL + plotW / 2} y={H - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
+          내신 등급 (숫자가 작을수록 좋은 성적)
+        </text>
+      </svg>
+      <p className="text-[11px] text-center text-slate-500 -mt-1">
+        {hoverPoint
+          ? `${hoverPoint.grade.toFixed(2)}등급 → 합격확률 약 ${Math.round(hoverPoint.prob)}%`
+          : `점선: 50%·70%컷 예측 / 굵은 점: 내 성적(${userScore.toFixed(2)}등급)`}
+      </p>
+    </div>
   );
 }

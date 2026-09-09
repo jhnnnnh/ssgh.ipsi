@@ -13,7 +13,9 @@
  *      몬테카를로 시뮬레이션
  *  [F] 시뮬레이션된 마지노선 중 사용자 성적 이상인 비율 = 합격확률(추가 보정 없음)
  *
- * 교과전형에 한해 검증됐다 — 종합전형에는 이 파이프라인을 적용하지 않는다.
+ * 비교 대상 DB(model.database)는 학생부 교과전형 데이터로만 만들어져 있다 — 종합전형
+ * 학과를 입력해도 계산 자체는 막지 않지만(표에 입력한 값만으로 결과를 낸다), 그 경우
+ * 참고하는 유사 사례들이 전부 교과전형이라는 점을 감안해야 한다.
  */
 
 import {
@@ -43,19 +45,40 @@ export type KernelModel = {
   bins: LevelBin[];
 };
 
+export type ProbCurvePoint = { grade: number; prob: number };
+
 export type EstimatorResult = {
   p50Predicted: number;
   p70Predicted: number;
-  /** 0~100. */
+  /** 0~100, 점추정치. */
   prob: number;
-  /** [B]단계 유효표본수 — 참고 사례가 적을수록 작아진다(화면에 강제 노출하지 않아도 되지만 참고용으로 남김). */
+  /** 0~100, 하한/상한 — 단일 수치보다 이 범위로 표기한다(아래 estimateProbabilityMargin 참고). */
+  probLow: number;
+  probHigh: number;
+  /** [B]단계 유효표본수. 범위 폭 계산에 쓰이며, 화면에 구체적인 숫자로 노출하지는 않는다. */
   effectiveN: number;
+  /** 성적(등급)에 따른 합격확률 곡선 — 결과를 시각화할 때 쓴다. */
+  curve: ProbCurvePoint[];
 };
 
 export type EstimatorOutcome = EstimatorResult | { insufficient: true; reason: string };
 
 function isTripleComplete(t: [number, number, number]): boolean {
   return t.every((v) => v > 0);
+}
+
+/**
+ * 확률을 단일 수치 대신 범위로 보여주기 위한 폭(±%p) 계산. 가중치를 쓴 추정값의 표준오차는
+ * 통계학에서 흔히 "유효표본수"(Kish's effective sample size — 이미 [B]단계에서 계산해 둔
+ * effectiveN)로 근사한다: SE ≈ √(p(1-p) / 유효표본수). 참고할 수 있는 비슷한 사례가
+ * 많을수록(유효표본수가 클수록) 범위는 좁아지고, 적을수록 넓어진다. 다만 이 폭이 너무 좁으면
+ * (과도한 확신) 실제보다 정밀해 보이고, 너무 넓으면(수치 자체가 무의미) 정보로서 가치가
+ * 없어지므로 3~20%p 사이로 제한한다.
+ */
+function estimateProbabilityMargin(probFraction: number, effectiveN: number): number {
+  const se = effectiveN > 0 ? Math.sqrt((probFraction * (1 - probFraction)) / effectiveN) : 0.2;
+  const marginPct = se * 100;
+  return Math.max(3, Math.min(20, marginPct));
 }
 
 export function estimateAdmission(input: EstimatorInput, model: KernelModel): EstimatorOutcome {
@@ -93,7 +116,40 @@ export function estimateAdmission(input: EstimatorInput, model: KernelModel): Es
 
   const ratioPoint = computeAdmitRatio(quota[0], Math.max(turnover[0], 0));
   const { simulated } = simulateMarginoseon(y50List, y70List, weights, ratioPoint, RATIO_STD);
-  const prob = admissionProbabilityFromSimulation(simulated, userScore) * 100;
+  const probFraction = admissionProbabilityFromSimulation(simulated, userScore);
+  const prob = probFraction * 100;
 
-  return { p50Predicted, p70Predicted, prob, effectiveN };
+  const margin = estimateProbabilityMargin(probFraction, effectiveN);
+  const probLow = Math.max(0, Math.round(prob - margin));
+  let probHigh = Math.min(100, Math.round(prob + margin));
+  if (probHigh <= probLow) probHigh = Math.min(100, probLow + 2);
+
+  const curve = buildProbabilityCurve(simulated, { p50Predicted, p70Predicted, userScore });
+
+  return { p50Predicted, p70Predicted, prob, probLow, probHigh, effectiveN, curve };
+}
+
+/** 결과 시각화용 곡선 — 성적(등급) 값을 촘촘히 훑으며 시뮬레이션된 마지노선 분포에서
+ * 그 성적으로 합격했다고 볼 수 있는 비율을 그대로 계산한다(로지스틱 근사가 아니라 [F]단계와
+ * 같은 방식의 실측 곡선). 표시 범위는 시뮬레이션 분포의 2~98 분위수를 기본으로, 50%컷·
+ * 70%컷·사용자 성적이 항상 보이도록 여유를 둔다. */
+function buildProbabilityCurve(
+  simulated: number[],
+  bounds: { p50Predicted: number; p70Predicted: number; userScore: number },
+): ProbCurvePoint[] {
+  const sorted = [...simulated].sort((a, b) => a - b);
+  const pct = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))))];
+  let lo = Math.min(pct(0.02), bounds.p50Predicted, bounds.userScore);
+  let hi = Math.max(pct(0.98), bounds.p70Predicted, bounds.userScore);
+  const pad = Math.max((hi - lo) * 0.08, 0.05);
+  lo -= pad;
+  hi += pad;
+
+  const POINTS = 41;
+  const curve: ProbCurvePoint[] = [];
+  for (let i = 0; i < POINTS; i++) {
+    const grade = lo + ((hi - lo) * i) / (POINTS - 1);
+    curve.push({ grade, prob: admissionProbabilityFromSimulation(simulated, grade) * 100 });
+  }
+  return curve;
 }
