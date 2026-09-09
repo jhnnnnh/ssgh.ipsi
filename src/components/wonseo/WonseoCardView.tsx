@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Star, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPreview";
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
@@ -28,6 +28,9 @@ export const WonseoCardView = forwardRef<
     showRecentResults: boolean;
     onEdit: () => void;
     onDelete: () => void;
+    /** 실제로 접수한 카드인지(별표) 표시·토글. */
+    isSubmitted: boolean;
+    onToggleSubmitted: () => void;
     minHeight?: number;
     /** 카드 동일높이 계산용 실측 대상. min-height가 걸리는 루트 대신 이 안쪽 요소를
      * 재야, 내용이 줄어들 때도 예전 min-height에 막히지 않고 실제 줄어든 높이를 감지한다. */
@@ -48,6 +51,8 @@ export const WonseoCardView = forwardRef<
     showRecentResults,
     onEdit,
     onDelete,
+    isSubmitted,
+    onToggleSubmitted,
     minHeight,
     measureRef,
     style,
@@ -118,6 +123,15 @@ export const WonseoCardView = forwardRef<
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onToggleSubmitted}
+            title={isSubmitted ? "접수 표시 해제" : "실제로 접수한 카드로 표시"}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+              isSubmitted ? "bg-amber-100 hover:bg-amber-200 text-amber-500" : "bg-slate-50 hover:bg-slate-100 text-slate-400"
+            }`}
+          >
+            <Star className="w-3.5 h-3.5" fill={isSubmitted ? "currentColor" : "none"} />
+          </button>
           <button
             onClick={onEdit}
             className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center"

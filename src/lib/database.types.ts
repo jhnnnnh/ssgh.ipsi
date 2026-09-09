@@ -103,8 +103,21 @@ export type WonseoCard = {
   memo: string | null;
   recent_results: RecentResultYear[];
   sort_order: number;
+  /** 실제로 원서를 접수한 카드인지(별표). true인 카드만 "접수한 원서" 화면에 모아 보여준다. */
+  is_submitted: boolean;
+  /** 접수 후 발급된 수험번호. "접수한 원서" 화면에서만 입력한다. */
+  application_number: string | null;
+  /** "접수한 원서" 화면에서 자유롭게 추가하는 일정(논술/면접/실기, 1차 발표 등). */
+  schedule_events: ScheduleEvent[];
   created_at: string;
   updated_at: string;
+};
+
+/** schedule_events 배열의 한 항목. */
+export type ScheduleEvent = {
+  label: string;
+  /** "YYYY-MM-DD" 또는 미정이면 빈 문자열. */
+  date: string;
 };
 
 /** 최근 입결 표의 한 연도 열. 모든 값은 대학마다 표기 형식이 달라 자유 텍스트로 둔다. */

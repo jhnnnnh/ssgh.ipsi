@@ -13,6 +13,8 @@ export function SortableWonseoCard({
   showRecentResults,
   onEdit,
   onDelete,
+  isSubmitted,
+  onToggleSubmitted,
   minHeight,
   setEqualHeightRef,
   isDragging,
@@ -26,6 +28,8 @@ export function SortableWonseoCard({
   showRecentResults: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  isSubmitted: boolean;
+  onToggleSubmitted: () => void;
   minHeight?: number;
   setEqualHeightRef: (el: HTMLElement | null) => void;
   isDragging: boolean;
@@ -44,6 +48,8 @@ export function SortableWonseoCard({
       showRecentResults={showRecentResults}
       onEdit={onEdit}
       onDelete={onDelete}
+      isSubmitted={isSubmitted}
+      onToggleSubmitted={onToggleSubmitted}
       autoAssign={autoAssign}
       rankLabel={rankLabel}
       onRankChange={onRankChange}

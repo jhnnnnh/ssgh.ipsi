@@ -125,6 +125,18 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     reload(selectedStudentId);
   }
 
+  async function handleToggleSubmitted(card: WonseoCard) {
+    const { error } = await supabase
+      .from("wonseo_cards")
+      .update({ is_submitted: !card.is_submitted })
+      .eq("id", card.id);
+    if (error) {
+      showToast("저장에 실패했습니다.", "error");
+      return;
+    }
+    reload(selectedStudentId);
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
@@ -359,6 +371,8 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                           showRecentResults={showRecentResults}
                           onEdit={() => openEdit(card)}
                           onDelete={() => handleDelete(card)}
+                          isSubmitted={card.is_submitted}
+                          onToggleSubmitted={() => handleToggleSubmitted(card)}
                         />
                       ))}
                     </div>
@@ -374,6 +388,8 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                           showRecentResults={showRecentResults}
                           onEdit={() => {}}
                           onDelete={() => {}}
+                          isSubmitted={activeCard.is_submitted}
+                          onToggleSubmitted={() => {}}
                         />
                       </div>
                     )}
