@@ -151,6 +151,13 @@ export function AdmissionProbabilityCalculator({
 
   const [competitionModalOpen, setCompetitionModalOpen] = useState(false);
 
+  // "대학·학과·전형 선택"에서 카드를 골라 handleCardSelected가 먼저 값을 채운 뒤, 이어서
+  // handlePicked가 실행되는 순서다(사용자가 팝업에서 "검색"을 눌러야 onComplete가 불림).
+  // 그 사이 이 플래그를 true로 켜 두면, handlePicked가 "카드에서 온 값이니 지우면 안
+  // 된다"고 판단해 병합(빈 칸만 채움)하고, 카드 없이 직접 고른 경우에는 false라서
+  // 이전에 다른 학과를 조회하며 남은 값을 먼저 비우고 새로 채운다.
+  const [cardFillPending, setCardFillPending] = useState(false);
+
   useEffect(() => {
     prefetchCutoffUniversities();
     loadKernelModel().catch(() => {});
@@ -199,16 +206,30 @@ export function AdmissionProbabilityCalculator({
       ...filled,
     }));
     setDeptCandidates(null);
+    setCardFillPending(true);
   }
 
   /** 대학·학과·전형 선택 팝업이 완료되면(카드로 불러왔든 직접 골랐든) 바로 실행된다.
    * 대학·학과·전형은 팝업이 이미 admission_cutoffs 실제 데이터 기준으로 골라준 값이라
    * 그대로 채우고, 올해 모집 정원·과거 3개년 입결은 저장된 데이터에서 찾아 채운다.
-   * 단, 카드에서 불러와 이미 값이 있는 칸(비어 있지 않은 칸)은 덮어쓰지 않는다 — 카드에
-   * 학생이 직접 적어 둔 값이 우선이고, DB 조회는 빈 칸만 메꾸는 용도다. */
+   *
+   * 카드에서 불러온 직후라면(cardFillPending) 카드가 이미 채운 값을 덮어쓰지 않는다 —
+   * 학생이 직접 적어 둔 값이 우선이고, DB 조회는 빈 칸만 메꾸는 용도다. 반대로 카드 없이
+   * 대학·학과·전형만 직접 새로 고른 거라면, 이전에 다른 학과를 조회하며 채워졌던 값이
+   * 그대로 남아 있으면 안 되므로(예: A학과의 모집 정원이 B학과에도 남아 있는 것처럼
+   * 보이는 문제) 먼저 비우고 새로 채운다. */
   function handlePicked(uni: string, dept: string | null, type: string) {
     const departmentStr = dept ?? "";
-    setForm((f) => ({ ...f, university: uni, department: departmentStr, admissionType: type }));
+    const fromCard = cardFillPending;
+    setCardFillPending(false);
+    setForm((f) => ({
+      ...(fromCard
+        ? f
+        : { ...f, targetQuota: "", c50: ["", "", ""], c70: ["", "", ""], quota: ["", "", ""], turnover: ["", "", ""], applicants: ["", "", ""] }),
+      university: uni,
+      department: departmentStr,
+      admissionType: type,
+    }));
     void autoFillCutoffData(uni, departmentStr, type);
   }
 
@@ -359,7 +380,10 @@ export function AdmissionProbabilityCalculator({
           )}
           <button
             type="button"
-            onClick={() => setCardPickerOpen(true)}
+            onClick={() => {
+              setCardPickerOpen(true);
+              setCardFillPending(false);
+            }}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold transition"
           >
             <Search className="w-3.5 h-3.5" />
