@@ -84,7 +84,11 @@ function InlineEditableText({
 /** 일정 한 건의 날짜. 클릭하기 전엔 일반 텍스트로 보이고, 클릭하면 자유 타이핑 입력칸 +
  * 달력 아이콘(누르면 네이티브 날짜 선택기)이 함께 뜬다. 세그먼트를 하나씩 클릭해서 채워야
  * 하는 &lt;input type="date"&gt; 특유의 불편함 대신, 숫자만 이어 쳐도(예: 20261111)
- * blur 시 "2026-11-11" 형식으로 자동 정리된다. */
+ * blur 시 "2026-11-11" 형식으로 자동 정리된다. 달력 아이콘은 편집 중에도 폭을 넓히지
+ * 않도록 입력칸 안쪽에 겹쳐 놓아서, 클릭 전/후 박스 폭이 항상 같다(width는 이 컴포넌트
+ * 안에 고정해 두고 호출부에서 따로 지정하지 않는다). */
+const SCHEDULE_DATE_WIDTH = "w-[84px]";
+
 function InlineEditableDate({
   value,
   placeholder,
@@ -101,7 +105,7 @@ function InlineEditableDate({
 
   if (editing) {
     return (
-      <span className="inline-flex items-center gap-0.5">
+      <span className={`relative inline-block ${SCHEDULE_DATE_WIDTH} shrink-0`}>
         <input
           autoFocus
           defaultValue={value}
@@ -114,16 +118,16 @@ function InlineEditableDate({
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") setEditing(false);
           }}
-          className="w-[92px] bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
+          className="w-full bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded pl-0.5 pr-3.5 text-xs font-semibold text-slate-800"
         />
         <button
           type="button"
           tabIndex={-1}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pickerRef.current?.showPicker?.()}
-          className="text-slate-400 hover:text-indigo-500 p-0.5"
+          className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500"
         >
-          <CalendarDays className="w-3.5 h-3.5" />
+          <CalendarDays className="w-3 h-3" />
         </button>
         <input
           ref={pickerRef}
@@ -142,7 +146,11 @@ function InlineEditableDate({
   }
   const displayValue = normalizeDateInput(value);
   return (
-    <button type="button" onClick={() => setEditing(true)} className={`${className} text-left cursor-text hover:bg-slate-100 rounded transition`}>
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className={`${SCHEDULE_DATE_WIDTH} shrink-0 truncate ${className} text-left cursor-text hover:bg-slate-100 rounded transition`}
+    >
       {displayValue || <span className="text-slate-400 font-normal">{placeholder}</span>}
     </button>
   );
@@ -378,21 +386,21 @@ export const WonseoCardView = forwardRef<
                 <div key={i} className="flex items-center gap-1.5">
                   <InlineEditableText
                     value={s.label}
-                    placeholder="예: 논술, 1차 발표"
+                    placeholder="논술 등"
                     onCommit={(text) => commitScheduleField(i, "label", text)}
-                    displayClassName="flex-1 min-w-0 font-semibold text-slate-800 truncate"
-                    inputClassName="flex-1 min-w-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
+                    displayClassName="w-20 shrink-0 truncate font-semibold text-slate-800"
+                    inputClassName="w-20 shrink-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
                   />
                   <InlineEditableDate
                     value={s.date}
                     placeholder="날짜"
                     onCommit={(text) => commitScheduleField(i, "date", text)}
-                    className="shrink-0 text-xs text-slate-500"
+                    className="text-xs text-slate-500"
                   />
                   <button
                     type="button"
                     onClick={() => removeSchedule(i)}
-                    className="w-7 h-7 shrink-0 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center"
+                    className="w-7 h-7 shrink-0 ml-auto rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
