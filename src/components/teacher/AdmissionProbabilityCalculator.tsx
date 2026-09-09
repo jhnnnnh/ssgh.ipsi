@@ -19,26 +19,14 @@ import {
   type CutoffCandidatePreview,
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates } from "@/lib/admission-offering-lookup";
-import { estimateAdmission, type EstimatorInput, type EstimatorResult } from "@/lib/admission-probability-estimator";
-import {
-  predictCutKernel4D,
-  predictCutKernel2D,
-  PARAMS_50,
-  PARAMS_70,
-  PARAMS_50_2D,
-  PARAMS_70_2D,
-  type KernelDatabaseRow,
-  type LevelBin,
-} from "@/lib/admission-cut-kernel-predictor";
+import { estimateAdmission, type EstimatorInput, type EstimatorOutcome, type KernelModel } from "@/lib/admission-probability-estimator";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
-type KernelModelData = { database50: KernelDatabaseRow[]; database70: KernelDatabaseRow[]; bins50: LevelBin[]; bins70: LevelBin[] };
-
-/** 교과전형 커널 예측용 데이터는 모든 컴포넌트 인스턴스가 같은 걸 쓰면 되므로 모듈
- * 스코프에서 한 번만 불러와 재사용한다(대학·학과가 바뀔 때마다 다시 받을 필요 없음). */
-let kernelModelPromise: Promise<KernelModelData> | null = null;
-function loadKernelModel(): Promise<KernelModelData> {
+/** 교과전형 커널 계산용 데이터(과거 사례 DB + 경쟁률 정규화 구간표)는 모든 컴포넌트
+ * 인스턴스가 같은 걸 쓰면 되므로 모듈 스코프에서 한 번만 불러와 재사용한다. */
+let kernelModelPromise: Promise<KernelModel> | null = null;
+function loadKernelModel(): Promise<KernelModel> {
   if (!kernelModelPromise) {
     kernelModelPromise = fetch("/api/admission-cut-model").then((res) => {
       if (!res.ok) throw new Error("failed to load kernel model");
@@ -78,20 +66,11 @@ function mergeTriple(existing: [string, string, string], incoming?: [string, str
   return existing.map((v, i) => (v.trim() ? v : incoming[i])) as [string, string, string];
 }
 
-const TIER_COLOR: Record<EstimatorResult["tier"]["key"], { fg: string; bg: string; border: string }> = {
-  safe: { fg: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-  watch: { fg: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
-  risk: { fg: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
-};
-
 function parseNum(v: string): number {
   return parseFloat(v) || 0;
 }
 function parseIntNum(v: string): number {
   return parseInt(v, 10) || 0;
-}
-function fmt2(n: number): string {
-  return (n >= 0 ? "+" : "") + n.toFixed(2);
 }
 
 function emptyForm() {
@@ -149,8 +128,8 @@ export function AdmissionProbabilityCalculator({
 }) {
   const showToast = useToast();
   const [form, setForm] = useState<FormState>(emptyForm());
-  const [result, setResult] = useState<EstimatorResult | { insufficient: true } | null>(null);
-  const [queriedScore, setQueriedScore] = useState(0);
+  const [result, setResult] = useState<EstimatorOutcome | null>(null);
+  const [querying, setQuerying] = useState(false);
   const [loadingCutoffs, setLoadingCutoffs] = useState(false);
 
   const [teacherStudentId, setTeacherStudentId] = useState("");
@@ -289,56 +268,6 @@ export function AdmissionProbabilityCalculator({
     });
   }
 
-  /** 교과전형이고 3개년 컷이 전부 있을 때만 커널 모델(3개년 추세 반영)을 쓴다. 종합전형이거나
-   * 데이터가 부족하면 undefined를 돌려주고, estimateAdmission이 알아서 기존 방식(최근연도값+
-   * 경쟁률 선형보정)으로 대체한다. 모집인원·경쟁률까지 있으면 4차원, 없으면 2차원 축소판. */
-  async function computeKernelPrediction(
-    c50: Triple,
-    c70: Triple,
-    quota: Triple,
-    targetQuota: number,
-    expectedCompetition: number,
-  ): Promise<EstimatorInput["kernelPrediction"] | undefined> {
-    if (!form.admissionType.includes("교과")) return undefined;
-    if (c50.some((v) => v <= 0) || c70.some((v) => v <= 0)) return undefined;
-
-    let model: KernelModelData;
-    try {
-      model = await loadKernelModel();
-    } catch {
-      return undefined;
-    }
-
-    // 배열은 [2026, 2025, 2024] 순 — 방법론 문서의 x1(n년, 가장 과거)~x3(n+2년, 가장 최근) 순으로 뒤집는다.
-    const level50 = (c50[2] + c50[1] + c50[0]) / 3;
-    const step2_50 = c50[0] - c50[1];
-    const level70 = (c70[2] + c70[1] + c70[0]) / 3;
-    const step2_70 = c70[0] - c70[1];
-
-    const canUse4D = targetQuota > 0 && quota[0] > 0 && expectedCompetition > 0;
-
-    if (canUse4D) {
-      const capChange = Math.log(targetQuota) - Math.log(quota[0]);
-      const p50 = predictCutKernel4D(
-        { level: level50, step2: step2_50, capChange, compRaw: expectedCompetition },
-        model.database50,
-        model.bins50,
-        PARAMS_50,
-      );
-      const p70 = predictCutKernel4D(
-        { level: level70, step2: step2_70, capChange, compRaw: expectedCompetition },
-        model.database70,
-        model.bins70,
-        PARAMS_70,
-      );
-      return { cut50: p50, cut70: p70 };
-    }
-
-    const p50 = predictCutKernel2D({ level: level50, step2: step2_50 }, model.database50, PARAMS_50_2D);
-    const p70 = predictCutKernel2D({ level: level70, step2: step2_70 }, model.database70, PARAMS_70_2D);
-    return { cut50: p50, cut70: p70 };
-  }
-
   async function handleQuery() {
     // 내신 등급이 비어 있으면 parseNum이 조용히 0을 돌려주는데, 등급 스케일에서는 0이
     // "가장 좋은 등급"보다도 더 좋은 값으로 계산돼 버려서 등급을 입력 안 했는데도
@@ -350,27 +279,30 @@ export function AdmissionProbabilityCalculator({
       showToast("내신 등급을 입력해 주세요.", "error");
       return;
     }
-    const c50 = form.c50.map(parseNum) as Triple;
-    const c70 = form.c70.map(parseNum) as Triple;
-    const quota = form.quota.map(parseIntNum) as Triple;
-    const targetQuota = parseIntNum(form.targetQuota);
-    const expectedCompetition = parseNum(form.expectedCompetition);
 
-    const kernelPrediction = await computeKernelPrediction(c50, c70, quota, targetQuota, expectedCompetition);
+    if (!form.admissionType.includes("교과")) {
+      setResult({ insufficient: true, reason: "학생부 교과전형만 지원해요. 종합전형은 아직 검증된 계산식이 없어요." });
+      return;
+    }
 
-    const input: EstimatorInput = {
-      userScore: parsedScore,
-      targetQuota,
-      expectedCompetition,
-      c50,
-      c70,
-      quota,
-      turnover: form.turnover.map(parseIntNum) as Triple,
-      applicants: form.applicants.map(parseNum) as Triple,
-      kernelPrediction,
-    };
-    setQueriedScore(input.userScore);
-    setResult(estimateAdmission(input));
+    setQuerying(true);
+    try {
+      const model = await loadKernelModel();
+      const input: EstimatorInput = {
+        userScore: parsedScore,
+        targetQuota: parseIntNum(form.targetQuota),
+        expectedCompetition: parseNum(form.expectedCompetition),
+        c50: form.c50.map(parseNum) as Triple,
+        c70: form.c70.map(parseNum) as Triple,
+        quota: form.quota.map(parseIntNum) as Triple,
+        turnover: form.turnover.map(parseIntNum) as Triple,
+      };
+      setResult(estimateAdmission(input, model));
+    } catch {
+      showToast("과거 사례 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
+    } finally {
+      setQuerying(false);
+    }
   }
 
   const ok = result && !("insufficient" in result) ? result : null;
@@ -529,10 +461,11 @@ export function AdmissionProbabilityCalculator({
           <button
             type="button"
             onClick={() => void handleQuery()}
-            className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5"
+            disabled={querying}
+            className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5"
           >
             <Search className="w-3.5 h-3.5" />
-            조회
+            {querying ? "계산 중..." : "조회"}
           </button>
         </Card>
 
@@ -543,205 +476,99 @@ export function AdmissionProbabilityCalculator({
               <p className="text-[11px] text-slate-400">{deptLabel || "대학·학과를 입력하면 표시됩니다"}</p>
               {!result && <p className="text-lg font-bold text-slate-400">분석 대기중</p>}
               {result && "insufficient" in result && <p className="text-lg font-bold text-slate-400">데이터 부족</p>}
-              {ok && <p className={`text-lg font-bold ${TIER_COLOR[ok.tier.key].fg}`}>{ok.tier.name} 지원</p>}
+              {ok && (
+                <p className={`text-lg font-bold ${ok.prob >= 50 ? "text-emerald-700" : "text-rose-700"}`}>
+                  {ok.prob >= 50 ? "적정 이상" : "상향 지원"}
+                </p>
+              )}
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-slate-900">
-                {ok ? `${ok.probRangeLow}~${ok.probRangeHigh}%` : "—"}
-              </p>
+              <p className="text-3xl font-bold text-slate-900">{ok ? `${Math.round(ok.prob)}%` : "—"}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">추정 합격 가능성</p>
             </div>
           </Card>
 
           {result && "insufficient" in result && (
             <Card>
-              <p className="text-xs text-slate-500">50%컷·70%컷 중 최소 1개년 데이터가 있어야 계산할 수 있어요.</p>
+              <p className="text-xs text-slate-500">{result.reason}</p>
             </Card>
           )}
 
           {ok && (
             <>
-              <Card className="space-y-2">
-                <div className="h-8 relative border border-slate-800 bg-slate-50 overflow-hidden">
-                  <div
-                    className={`absolute inset-y-0 left-0 opacity-30 ${TIER_COLOR[ok.tier.key].fg.replace("text-", "bg-")}`}
-                    style={{ width: `${Math.max(0, Math.min(100, ok.stripPos * 100))}%` }}
-                  />
-                  <div
-                    className="absolute inset-y-0 w-0.5 bg-slate-900"
-                    style={{ left: `${Math.max(0, Math.min(100, ok.stripPos * 100))}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                  <span>50% 컷 예측 {ok.p50Predicted.toFixed(2)}</span>
-                  <span>마지노선 추정 {ok.p100Predicted.toFixed(2)}</span>
-                </div>
-              </Card>
-
-              <div className="grid grid-cols-3 gap-px bg-slate-200 border border-slate-200">
+              <div className="grid grid-cols-2 gap-px bg-slate-200 border border-slate-200">
                 <div className="bg-white p-3">
                   <p className="text-[10px] text-slate-400">50%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p50Predicted.toFixed(2)} 등급</p>
-                  {ok.kernelInfo && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      90% 구간 {ok.kernelInfo.cut50.p10.toFixed(2)}~{ok.kernelInfo.cut50.p90.toFixed(2)}
-                    </p>
-                  )}
                 </div>
                 <div className="bg-white p-3">
                   <p className="text-[10px] text-slate-400">70%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p70Predicted.toFixed(2)} 등급</p>
-                  {ok.kernelInfo && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      90% 구간 {ok.kernelInfo.cut70.p10.toFixed(2)}~{ok.kernelInfo.cut70.p90.toFixed(2)}
-                    </p>
-                  )}
-                </div>
-                <div className="bg-white p-3">
-                  <p className="text-[10px] text-slate-400">마지노선 대비 점수차</p>
-                  <p className={`text-base font-bold ${ok.gap100 >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                    {fmt2(ok.gap100)} 등급
-                  </p>
                 </div>
               </div>
 
-              {ok.usedKernelModel ? (
-                <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                  3개년 추세를 반영한 통계 모델로 계산했어요(교과전형 한정). 유효 유사사례 수:{" "}
-                  {Math.round(ok.kernelInfo!.cut50.effectiveN)}개(50%컷) / {Math.round(ok.kernelInfo!.cut70.effectiveN)}개(70%컷) —
-                  수가 적을수록 예측구간이 넓어져 신뢰도가 낮다는 뜻이에요.
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                  종합전형이거나 3개년 입결이 모두 갖춰지지 않아, 최근연도값 기준의 기존 방식으로
-                  계산했어요.
-                </p>
-              )}
+              <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                비슷한 과거 사례 {Math.round(ok.effectiveN)}건을 참고해 계산했어요 — 수가 적을수록 예측이
+                불안정할 수 있어요.
+              </p>
 
               <details className="border border-slate-200 rounded-xl bg-white">
                 <summary className="px-4 py-3 text-xs font-bold text-slate-700 cursor-pointer select-none">
                   이 수치는 어떻게 계산되었나요?
                 </summary>
                 <div className="px-4 pb-4 text-xs leading-relaxed text-slate-600 border-t border-slate-100 pt-3 space-y-4">
-                  {ok.usedKernelModel ? (
-                    <section>
-                      <h4 className="font-bold text-slate-800 mb-1">1~2. 3개년 추세 기반 국소가중(커널) 예측</h4>
-                      <p>
-                        과거 3개년 컷을 &ldquo;3개년 평균(수준)&rdquo;과 &ldquo;가장 최근 1년의 변화량(추세)&rdquo; 두 요소로
-                        요약하고, 여기에 정원 증감률과 이번 해 예상 경쟁률(과거 수준 구간별로 정규화한
-                        값)까지 더한 4개 지표로 비슷한 과거 사례들을 찾습니다. 비슷할수록 더 큰 가중치를
-                        주는 가중평균으로 다음 해 컷을 추정합니다(leave-one-out 검증 결과 오차 ±0.5등급
-                        이내 적중률 약 80%). 종합전형은 아직 별도 검증이 없어 이 방식을 적용하지 않습니다.
-                      </p>
-                      <Formula>
-                        {"수준 = (x₁+x₂+x₃)/3,  추세 = x₃-x₂  (x₁~x₃: 과거 3개년, x₃가 최신)"}
-                        {"\n정원변화 = ln(올해 정원) - ln(작년 정원),  경쟁률_국소 = (올해 예상 경쟁률 - μ_구간) / σ_구간"}
-                        {"\n거리² = Σ ((사례값 - 목표값) / 대역폭)²  →  가중치 = exp(-거리²/2)"}
-                        {"\nX′ = Σ(가중치 × 사례의 실제 다음해 컷) / Σ가중치"}
-                      </Formula>
-                    </section>
-                  ) : (
-                    <>
-                      <section>
-                        <h4 className="font-bold text-slate-800 mb-1">1. 기준 시계열값 산정</h4>
-                        <p>
-                          입결 컷은 확률보행(random walk)적 성격이 강해, 다년도 가중평균은 최신 국면을 과거
-                          국면으로 희석시켜 추정량에 체계적 편의(bias)를 유발합니다. 이를 피하기 위해 최신
-                          관측치(t년)를 기준 추정량으로 채택하는 마르코프적 접근을 취합니다.
-                        </p>
-                        <Formula>X′(t+1) = X(t)</Formula>
-                      </section>
-
-                      <section>
-                        <h4 className="font-bold text-slate-800 mb-1">2. 경쟁률 공변량 보정 (선택 입력)</h4>
-                        <p>
-                          전년 대비 경쟁률 변화율(ρ)은 컷 이동량에 대해 유의한 설명력을 가지는 공변량입니다(R²
-                          ≈ 0.44). 단순선형회귀로 절편과 기울기를 추정해 조건부 기댓값을 보정합니다.
-                        </p>
-                        <Formula>
-                          {"ρ = C(t+1)_예상 / C(t)"}
-                          {"\nX′₅₀ = X₅₀(t) + (β₀ + β₁ρ)   (β₀, β₁: 경쟁률보정계수)"}
-                          {"\nX′₇₀ = X₇₀(t) + (β₀′ + β₁′ρ)  (β₀′, β₁′: 경쟁률보정계수)"}
-                        </Formula>
-                      </section>
-                    </>
-                  )}
-
                   <section>
-                    <h4 className="font-bold text-slate-800 mb-1">3. 마지노선(등록 상한 경계) 추정 — 다중선형회귀</h4>
+                    <h4 className="font-bold text-slate-800 mb-1">1. 비슷한 과거 사례 찾기 (국소가중 커널)</h4>
                     <p>
-                      50%컷·70%컷은 등록자 분포상의 두 분위수일 뿐, 그 자체로는 정원이 최종 충족되는
-                      경계(마지노선)를 특정하지 못합니다. 두 분위수 사이의 국소 기울기를 외삽하는 단순
-                      선형모형은 분포의 왜도(skewness)를 반영하지 못해 잔차가 커지므로, 충원비율(φ)을 추가
-                      설명변수로 도입한 다중회귀모형을 사용합니다.
+                      과거 3개년 컷을 &ldquo;3개년 평균(수준)&rdquo;과 &ldquo;가장 최근 1년의 변화량(추세)&rdquo;으로
+                      요약하고, 여기에 정원 증감률과 이번 해 예상 경쟁률(과거 수준 구간별로 정규화한 값)까지
+                      더한 지표로, 교과전형 학과 데이터베이스에서 비슷한 사례를 찾아 가중치를 매깁니다.
                     </p>
                     <Formula>
-                      {"Δ = 70%컷 − 50%컷  (국소 분산의 대리지표)"}
-                      {"\n확장량 = α + γ₁·φ_최종 + γ₂·Δ   (α, γ₁, γ₂: 마지노선회귀계수, φ_최종: 4-1 참고)"}
-                      {"\n마지노선 = X′₇₀ + 확장량"}
+                      {"수준50/수준70 = 과거 3개년 평균,  추세70 = 최근해 - 그 직전해"}
+                      {"\n정원변화 = ln(올해 정원) - ln(작년 정원),  경쟁률_국소 = (예상 경쟁률 - μ_구간) / σ_구간"}
+                      {"\n거리² = Σ ((사례값 - 목표값) / 대역폭)²  →  가중치 = exp(-거리²/2)"}
                     </Formula>
                   </section>
 
                   <section>
-                    <h4 className="font-bold text-slate-800 mb-1">4. 표본크기 척도보정 (scale correction)</h4>
+                    <h4 className="font-bold text-slate-800 mb-1">2. 50%·70%컷 — 가중중앙값</h4>
                     <p>
-                      충원비율(φ)이 동일하더라도 모집단 크기(정원)가 작을수록 추합 인원 1~2명의 등락이
-                      φ에 미치는 상대적 영향은 커집니다(이산 변량의 상대분산이 표본크기에 반비례). 이를
-                      반영해 정원 규모에 따라 φ를 역제곱근 척도로 보정합니다.
+                      가중평균이 아니라 가중중앙값을 씁니다. 컷 분포가 비대칭이라(소수의 미충원·이변 사례가
+                      꼬리를 만듦) 평균은 극단치에 끌려가지만 중앙값은 그렇지 않습니다.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h4 className="font-bold text-slate-800 mb-1">3. 마지노선 배수 — 이 학과 자신의 데이터만 사용</h4>
+                    <p>
+                      다른 학과 사례와 무관하게, 이 학과의 가장 최근해 실제 합격자수(모집인원+충원인원)만으로
+                      &ldquo;마지노선이 50%컷·70%컷 스프레드의 몇 배 지점에 있는지&rdquo;를 구합니다(대교협 실측
+                      6개 학과·514명 데이터로 검증).
                     </p>
                     <Formula>
-                      {"λ = √(참조정원 / 정원),  λ ∈ [최소보정계수, 최대보정계수]"}
-                      {"\nφ_보정 = (φ·λ) / (1 + φ·λ)"}
+                      {"합격자수 = 올해 모집인원 + 올해 충원인원 (35~132명 범위로 제한)"}
+                      {"\nratio = -2.289 + 1.184 × ln(합격자수),  하한 0.3"}
                     </Formula>
                   </section>
 
                   <section>
-                    <h4 className="font-bold text-slate-800 mb-1">4-1. 충원비율 변동성 보정 (안정성 가중치)</h4>
+                    <h4 className="font-bold text-slate-800 mb-1">4. 몬테카를로 시뮬레이션 → 합격확률</h4>
                     <p>
-                      과거 충원비율이 연도마다 들쭉날쭉할수록 그 값의 표본 신뢰도는 낮아집니다. 변동계수(CV,
-                      표준편차/평균)가 클수록 확장량 산정에 반영되는 충원비율을 그만큼 완만하게 낮춰,
-                      정원이 작아 특정 연도의 충원비율이 일시적으로 크게 튄 경우 마지노선이 과도하게
-                      외삽되지 않도록 합니다.
+                      마지노선을 하나의 숫자로 고정하지 않고, 1번의 가중치로 과거 실제 (50컷,70컷)을 1만 번
+                      복원추출 + 3번의 ratio를 오차 범위 안에서 정규분포로 흔들어 마지노선의 분포를 만듭니다.
+                      로지스틱 함수나 임의의 보정 계수 없이, 이 분포 중 내 성적으로 합격 가능한 비율을 그대로
+                      셉니다.
                     </p>
                     <Formula>
-                      {"CV = 연도별 충원비율의 표준편차 / 평균"}
-                      {"\n안정성가중치 = clip(1 / (1 + CV), 최소안정가중치, 1.0)"}
-                      {"\nφ_최종 = φ_보정 × 안정성가중치"}
+                      {"마지노선[i] = sim50컷[i] + ratio[i] × (sim70컷[i] - sim50컷[i])  (i = 1..10000)"}
+                      {"\n합격확률 = (마지노선 ≥ 내 성적)의 비율"}
                     </Formula>
                   </section>
-
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">5. 합격확률의 확률론적 정의</h4>
-                    <p>
-                      분위수상의 순위와 사건 확률은 서로 다른 층위의 개념입니다. 등록자 중앙값(50%컷)은
-                      이미 사건이 실현된 값이므로 그 지점의 사후확률은 0.5에 수렴하지 않고 상당히 높은
-                      값(경험적으로 0.9 부근)을 가집니다. 반면 마지노선은 정의상 채택/기각이 정확히
-                      양분되는 임계점(threshold)이므로, 로지스틱 함수의 변곡점(확률 0.5)을 이 지점에
-                      고정합니다.
-                    </p>
-                    <Formula>
-                      {"P(합격) = 1 / (1 + e^(−k(Xₜ − x)))"}
-                      {"\nk = ln(9) / (Xₜ − X′₅₀) × w  — ln(9)=logit(0.9), Xₜ=마지노선, x=입력 등급, w=신뢰가중치"}
-                    </Formula>
-                  </section>
-
-                  <section>
-                    <h4 className="font-bold text-slate-800 mb-1">6. 신뢰가중치(w) — 표본 안정성 보정</h4>
-                    <p>
-                      경쟁률은 표본크기의 대리지표로 기능합니다. 과거 평균 경쟁률이 낮을수록 연도 간
-                      분산이 커지는 이분산성(heteroscedasticity)이 나타나므로, 로지스틱 곡선의 기울기 k에
-                      가중치를 곱해 과도한 확신(overconfidence)을 방지합니다.
-                    </p>
-                    <Formula>{"w = clip(경쟁률평균 / 참조경쟁률, 최소신뢰도, 1.0)"}</Formula>
-                  </section>
-
-                  <ProbCurve result={ok} userScore={queriedScore} />
 
                   <p className="text-slate-400 border-t border-slate-100 pt-3">
-                    본 모형의 계수는 복수 연도·복수 학과 표본에 대한 회귀분석으로 추정된 값이며, 표본 외
-                    예측(out-of-sample prediction)의 성격상 실제값과 편차가 발생할 수 있습니다. 특히
-                    정성평가 요소가 결합된 전형은 잔차의 분산이 커집니다. 본 추정치는 통계적 근사이며
-                    합격을 보증하지 않습니다.
+                    본 모형은 교과전형 한정으로 검증된 통계적 추정치이며, 표본 외 예측의 성격상 실제값과
+                    편차가 발생할 수 있습니다. 합격을 보증하지 않습니다.
                   </p>
                 </div>
               </details>
@@ -770,62 +597,5 @@ function Formula({ children }: { children: React.ReactNode }) {
     <pre className="mt-1.5 whitespace-pre-wrap break-words overflow-x-auto font-mono text-[11px] text-slate-700 bg-slate-100 rounded-lg p-2.5">
       {children}
     </pre>
-  );
-}
-
-function ProbCurve({ result, userScore }: { result: EstimatorResult; userScore: number }) {
-  const W = 460,
-    H = 220;
-  const marginL = 34,
-    marginR = 14,
-    marginT = 14,
-    marginB = 28;
-  const plotW = W - marginL - marginR;
-  const plotH = H - marginT - marginB;
-
-  const cut50 = result.p50Predicted,
-    cut70 = result.p70Predicted,
-    cut100 = result.p100Predicted;
-  const pad = Math.max(cut100 - cut50, 0.1) * 0.5;
-  const xMin = Math.min(cut50, userScore) - pad;
-  const xMax = Math.max(cut100, userScore) + pad;
-  const xRange = Math.max(xMax - xMin, 0.01);
-
-  const X = (g: number) => marginL + ((g - xMin) / xRange) * plotW;
-  const Y = (p: number) => marginT + plotH - p * plotH;
-
-  const steps = 60;
-  let pathD = "";
-  for (let i = 0; i <= steps; i++) {
-    const g = xMin + (xRange * i) / steps;
-    const z = result.k * (cut100 - g);
-    const p = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, z))));
-    pathD += `${i === 0 ? "M" : "L"}${X(g).toFixed(1)},${Y(p).toFixed(1)} `;
-  }
-
-  const userZ = result.k * (cut100 - userScore);
-  const userP = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, userZ))));
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto border border-slate-200 bg-slate-50">
-      <line x1={marginL} y1={marginT} x2={marginL} y2={marginT + plotH} stroke="#333" />
-      <line x1={marginL} y1={marginT + plotH} x2={marginL + plotW} y2={marginT + plotH} stroke="#333" />
-      {[0, 0.25, 0.5, 0.75, 1.0].map((p) => (
-        <g key={p}>
-          <line x1={marginL - 4} y1={Y(p)} x2={marginL} y2={Y(p)} stroke="#94a3b8" />
-          <text x={marginL - 7} y={Y(p) + 3} fontSize={9} fill="#94a3b8" textAnchor="end">
-            {Math.round(p * 100)}%
-          </text>
-        </g>
-      ))}
-      <line x1={X(cut50)} y1={marginT} x2={X(cut50)} y2={marginT + plotH} stroke="#059669" strokeWidth={1.3} strokeDasharray="4,3" />
-      <line x1={X(cut70)} y1={marginT} x2={X(cut70)} y2={marginT + plotH} stroke="#b45309" strokeWidth={1.3} strokeDasharray="4,3" />
-      <line x1={X(cut100)} y1={marginT} x2={X(cut100)} y2={marginT + plotH} stroke="#dc2626" strokeWidth={1.3} strokeDasharray="4,3" />
-      <path d={pathD} fill="none" stroke="#555" strokeWidth={1.6} />
-      <circle cx={X(userScore)} cy={Y(userP)} r={4.5} fill="#4f46e5" stroke="#fff" strokeWidth={1.2} />
-      <text x={marginL + plotW / 2} y={H - 6} fontSize={10} textAnchor="middle" fill="#555">
-        내신 등급 →
-      </text>
-    </svg>
   );
 }

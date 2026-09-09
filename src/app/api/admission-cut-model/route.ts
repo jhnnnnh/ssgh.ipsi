@@ -4,10 +4,10 @@ import { requireTeacher } from "@/lib/supabase/require-teacher";
 import { buildLevelBinTable, type KernelDatabaseRow } from "@/lib/admission-cut-kernel-predictor";
 
 /**
- * `입결예측_방법론_v2.md`의 "database"(과거 (university,department,교과전형) 그룹별
- * level/step2/capChange/compRaw/y 한 행씩)와 level 구간별 경쟁률 정규화 lookup 테이블을
- * admission_cutoffs 원본에서 매번 새로 계산해 돌려준다. 커널 예측 자체는 클라이언트에서
- * 이 데이터를 받아 계산한다(계산량이 가벼워서 왕복은 이 조회 한 번이면 충분하다).
+ * `합격가능성_계산구조_v3_최종.md`의 "DB"(과거 (university,department,교과전형) 그룹별
+ * level50/level70/trend70/capChange/compRaw/y50/y70 한 행씩)와 level50 구간별 경쟁률
+ * 정규화 lookup 테이블을 admission_cutoffs 원본에서 매번 새로 계산해 돌려준다. 커널
+ * 계산·몬테카를로 시뮬레이션 자체는 클라이언트에서 이 데이터를 받아 수행한다.
  */
 
 type CutoffRow = {
@@ -80,8 +80,7 @@ export async function GET() {
     groups.set(key, list);
   }
 
-  const database50: KernelDatabaseRow[] = [];
-  const database70: KernelDatabaseRow[] = [];
+  const database: KernelDatabaseRow[] = [];
 
   for (const groupRows of groups.values()) {
     const byYear = new Map<number, CutoffRow>();
@@ -117,27 +116,18 @@ export async function GET() {
       continue;
     }
 
-    const capChange = Math.log(r3.enrollment) - Math.log(r2.enrollment);
-    const compRaw = r3.competition_rate;
-
-    database50.push({
-      level: (r0.grade_50 + r1.grade_50 + r2.grade_50) / 3,
-      step2: r2.grade_50 - r1.grade_50,
-      capChange,
-      compRaw,
-      y: r3.grade_50,
-    });
-    database70.push({
-      level: (r0.grade_70 + r1.grade_70 + r2.grade_70) / 3,
-      step2: r2.grade_70 - r1.grade_70,
-      capChange,
-      compRaw,
-      y: r3.grade_70,
+    database.push({
+      level50: (r0.grade_50 + r1.grade_50 + r2.grade_50) / 3,
+      level70: (r0.grade_70 + r1.grade_70 + r2.grade_70) / 3,
+      trend70: r2.grade_70 - r1.grade_70,
+      capChange: Math.log(r3.enrollment) - Math.log(r2.enrollment),
+      compRaw: r3.competition_rate,
+      y50: r3.grade_50,
+      y70: r3.grade_70,
     });
   }
 
-  const bins50 = buildLevelBinTable(database50);
-  const bins70 = buildLevelBinTable(database70);
+  const bins = buildLevelBinTable(database);
 
-  return NextResponse.json({ database50, database70, bins50, bins70 });
+  return NextResponse.json({ database, bins });
 }

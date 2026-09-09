@@ -1,18 +1,31 @@
 /**
- * 학생부 교과 합격 가능성 추정 엔진. 사용자가 별도로 만들어 검증한 리서치(대교협 실측
- * 지원자 데이터 7개 학과 900명+, 국립부경대 2023~2026년 68개 학과-전형 4개년 데이터)를
- * 그대로 옮긴 것으로, 계수를 임의로 바꾸지 않는다. 원본: 학생부_교과_합격_예측_리마스터.html
+ * 학생부 교과 합격 가능성 추정 엔진 v3. `합격가능성_계산구조_v3_최종.md` 스펙을 그대로
+ * 옮긴 것으로, 계수를 임의로 바꾸지 않는다.
  *
- * 핵심 결론:
- *  A. 50%/70%컷은 "최종 등록자" 분포의 퍼센타일일 뿐 합격확률이 아니다. 확률이 정확히
- *     50%가 되는 지점은 등록 마지노선(100%컷) 그 자체다.
- *  B. 마지노선까지의 확장폭은 스프레드(70%-50%컷)만으로 안 되고, 충원비율이 핵심
- *     변수다(6개 학과 다중회귀로 확인: 확장폭 = -0.155 + 0.4105×충원비율 + 1.5181×스프레드).
- *  C. 3개년 가중평균은 최근 추세를 과거로 희석시켜 편향을 만든다 — "최근연도값 + 경쟁률
- *     보정"이 편향을 크게 줄인다(bias 약 0.10→0.03).
- *  D. 경쟁률이 낮은(=표본이 얕은) 학과는 컷이 해마다 크게 출렁이므로, 신뢰도 보정으로
- *     확률 곡선을 완만하게(50% 쪽으로 신중하게) 만든다.
+ * 이전 버전(50컷 예측식 → 70컷 예측식 → 마지노선 확장 회귀식 → 로지스틱 확률 변환식을
+ * 순서대로 이어붙이던 방식)은 폐기했다. 새 구조는 "비슷한 과거 사례를 찾아 그 실제
+ * 결과를 몬테카를로로 세어 확률을 구하는" 하나의 통합 파이프라인이다:
+ *
+ *  [B] 5차원(수준50/수준70/추세70/정원변화/국소경쟁률) 커널로 비슷한 과거 사례에 가중치를 매김
+ *  [C] 그 가중치의 가중중앙값으로 50%컷·70%컷을 화면에 표시
+ *  [D] 이 학과 "자신의" 가장 최근해 합격자수(모집인원+충원인원)만으로 마지노선 배수(ratio)를 구함
+ *  [E] [B]의 가중치로 과거 (50컷,70컷)을 복원추출 + ratio를 정규분포로 흔들어 마지노선을
+ *      몬테카를로 시뮬레이션
+ *  [F] 시뮬레이션된 마지노선 중 사용자 성적 이상인 비율 = 합격확률(추가 보정 없음)
+ *
+ * 교과전형에 한해 검증됐다 — 종합전형에는 이 파이프라인을 적용하지 않는다.
  */
+
+import {
+  computeKernelWeights,
+  weightedMedian,
+  computeAdmitRatio,
+  simulateMarginoseon,
+  admissionProbabilityFromSimulation,
+  RATIO_STD,
+  type KernelDatabaseRow,
+  type LevelBin,
+} from "@/lib/admission-cut-kernel-predictor";
 
 export type EstimatorInput = {
   userScore: number;
@@ -23,215 +36,64 @@ export type EstimatorInput = {
   c70: [number, number, number];
   quota: [number, number, number];
   turnover: [number, number, number];
-  applicants: [number, number, number];
-  /**
-   * 교과전형이고 커널 모델용 데이터를 불러왔을 때, `admission-cut-kernel-predictor.ts`로
-   * 미리 계산해 둔 50%/70%컷 예측치(3개년 추세를 반영한 국소가중 방식,
-   * `입결예측_방법론_v2.md` 참고). 없으면 기존의 "최근연도값 + 경쟁률 선형보정"
-   * 방식으로 대체한다(종합전형 등 이 방법론이 검증되지 않은 경우).
-   */
-  kernelPrediction?: {
-    cut50: { predicted: number; p10: number; p90: number; effectiveN: number };
-    cut70: { predicted: number; p10: number; p90: number; effectiveN: number };
-  };
+};
+
+export type KernelModel = {
+  database: KernelDatabaseRow[];
+  bins: LevelBin[];
 };
 
 export type EstimatorResult = {
-  insufficient?: boolean;
-  prob: number;
-  probRangeLow: number;
-  probRangeHigh: number;
-  tier: { name: string; key: "safe" | "watch" | "risk" };
-  k: number;
   p50Predicted: number;
   p70Predicted: number;
-  p100Predicted: number;
-  expansion: number;
-  turnoverRatioProxy: number;
-  gap50: number;
-  gap70: number;
-  gap100: number;
-  stripPos: number;
-  expectedRate: number;
-  expectedTurnoverCount: number;
-  avgCompetitionRatio: number;
-  competitionConfidence: number;
-  competitionRatioChange: number;
-  competitionAdjusted: boolean;
-  dataYears: number;
-  /** 커널 모델(3개년 추세 반영)로 계산했는지, 아니면 기존 방식(최근연도값+선형보정)인지. */
-  usedKernelModel: boolean;
-  /** 커널 모델일 때만: 컷 자체의 예측구간(90%)과 유효표본수 — 예측 신뢰도 표시용. */
-  kernelInfo?: {
-    cut50: { p10: number; p90: number; effectiveN: number };
-    cut70: { p10: number; p90: number; effectiveN: number };
-  };
+  /** 0~100. */
+  prob: number;
+  /** [B]단계 유효표본수 — 참고 사례가 적을수록 작아진다(화면에 강제 노출하지 않아도 되지만 참고용으로 남김). */
+  effectiveN: number;
 };
 
-function projectCutline(y2026: number, y2025: number, y2024: number) {
-  const years = [y2026, y2025, y2024].filter((y) => y > 0);
-  if (years.length === 0) return { predicted: 0, dataYears: 0, base: 0 };
-  const base = years[0];
-  return { predicted: base, dataYears: years.length, base };
+export type EstimatorOutcome = EstimatorResult | { insufficient: true; reason: string };
+
+function isTripleComplete(t: [number, number, number]): boolean {
+  return t.every((v) => v > 0);
 }
 
-function competitionAdjust(predictedCut: number, ratio: number, intercept: number, slope: number) {
-  if (!ratio || ratio <= 0) return predictedCut;
-  return predictedCut + intercept + slope * ratio;
-}
+export function estimateAdmission(input: EstimatorInput, model: KernelModel): EstimatorOutcome {
+  const { c50, c70, quota, turnover, targetQuota, expectedCompetition, userScore } = input;
 
-function estimateExpansion(cut50: number, cut70: number, turnoverRatio: number) {
-  const spread = Math.max(cut70 - cut50, 0.01);
-  const A = -0.155,
-    B1 = 0.4105,
-    B2 = 1.5181;
-  let expansion = A + B1 * turnoverRatio + B2 * spread;
-  expansion = Math.max(expansion, spread * 0.3);
-  return expansion;
-}
-
-export function estimateAdmission(input: EstimatorInput): EstimatorResult | { insufficient: true } {
-  const { userScore, targetQuota, c50, c70, quota, turnover, applicants: competitionRatios, expectedCompetition } = input;
-
-  const p50 = projectCutline(c50[0], c50[1], c50[2]);
-  const p70 = projectCutline(c70[0], c70[1], c70[2]);
-
-  if (p50.dataYears === 0 || p70.dataYears === 0) {
-    return { insufficient: true };
+  if (!isTripleComplete(c50) || !isTripleComplete(c70)) {
+    return { insufficient: true, reason: "과거 3개년 50%·70%컷이 모두 있어야 계산할 수 있어요." };
   }
-  const dataYears = Math.min(p50.dataYears, p70.dataYears);
-
-  let cut50: number;
-  let cut70: number;
-  let competitionRatioChange = 0;
-  const usedKernelModel = Boolean(input.kernelPrediction);
-
-  if (input.kernelPrediction) {
-    cut50 = input.kernelPrediction.cut50.predicted;
-    cut70 = input.kernelPrediction.cut70.predicted;
-    const lastYearCompetition = competitionRatios?.[0] ? competitionRatios[0] : 0;
-    if (expectedCompetition > 0 && lastYearCompetition > 0) {
-      competitionRatioChange = expectedCompetition / lastYearCompetition;
-    }
-  } else {
-    cut50 = p50.predicted;
-    cut70 = p70.predicted;
-    const lastYearCompetition = competitionRatios?.[0] ? competitionRatios[0] : 0;
-    if (expectedCompetition > 0 && lastYearCompetition > 0) {
-      competitionRatioChange = expectedCompetition / lastYearCompetition;
-      cut50 = competitionAdjust(cut50, competitionRatioChange, 0.1399, -0.2303);
-      cut70 = competitionAdjust(cut70, competitionRatioChange, 0.1424, -0.2404);
-    }
+  if (quota[0] <= 0) {
+    return { insufficient: true, reason: "가장 최근해(2026) 모집 인원이 있어야 계산할 수 있어요." };
   }
-  if (cut70 < cut50) cut70 = cut50 + 0.01;
+  if (model.database.length === 0) {
+    return { insufficient: true, reason: "비교할 과거 사례 데이터를 불러오지 못했어요." };
+  }
 
-  const r = [0, 1, 2].map((i) => (quota[i] > 0 ? turnover[i] / quota[i] : 0));
-  const validR = r.filter((_v, i) => quota[i] > 0);
-  const expectedRate = validR.length
-    ? (0.5 * (r[0] || 0) + 0.3 * (r[1] || 0) + 0.2 * (r[2] || 0)) /
-      ((quota[0] > 0 ? 0.5 : 0) + (quota[1] > 0 ? 0.3 : 0) + (quota[2] > 0 ? 0.2 : 0) || 1)
-    : 0.4;
-  const expectedTurnoverCount = Math.round(targetQuota * expectedRate);
+  // 배열은 [2026, 2025, 2024] 순 — 방법론 문서의 x1(가장 과거)~x3(가장 최근) 순으로 뒤집는다.
+  const level50 = (c50[2] + c50[1] + c50[0]) / 3;
+  const level70 = (c70[2] + c70[1] + c70[0]) / 3;
+  const trend70 = c70[0] - c70[1];
 
-  const SCALE_QUOTA = 15;
-  const quotaScaleFactor = targetQuota > 0 ? Math.sqrt(SCALE_QUOTA / targetQuota) : 1.0;
-  const adjustedRate = expectedRate * Math.max(0.6, Math.min(1.6, quotaScaleFactor));
-  const turnoverRatioProxy = adjustedRate / (1 + adjustedRate);
-
-  const validRatios = (competitionRatios || []).filter((v) => v > 0);
-  const avgCompetitionRatio = validRatios.length ? validRatios.reduce((a, b) => a + b, 0) / validRatios.length : 0;
-  const REFERENCE_COMPETITION = 4.0;
-  const competitionConfidence =
-    avgCompetitionRatio > 0 ? Math.max(0.5, Math.min(1.0, avgCompetitionRatio / REFERENCE_COMPETITION)) : 1.0;
-
-  // 충원비율이 연도별로 들쭉날쭉할수록(변동계수가 클수록) 그 값의 표본 신뢰도가
-  // 낮다고 보고, 확장량 산정에 반영되는 충원비율을 그 변동성만큼 완만하게
-  // 낮춘다. 고정된 상한값 대신 실제 관측된 연도 간 분산에 따라 자동으로
-  // 조정되므로, 정원이 작아 충원비율이 극단적으로 튀는 학과에서 마지노선이
-  // 과도하게 외삽되는 것을 데이터 기반으로 억제한다.
-  const validRMean = validR.length ? validR.reduce((a, b) => a + b, 0) / validR.length : 0;
-  const turnoverVariance =
-    validR.length >= 2 ? validR.reduce((sum, v) => sum + (v - validRMean) ** 2, 0) / validR.length : 0;
-  const turnoverCV = validRMean > 0 ? Math.sqrt(turnoverVariance) / validRMean : 0;
-  const turnoverConsistency = validR.length >= 2 ? Math.max(0.5, Math.min(1.0, 1 / (1 + turnoverCV))) : 1.0;
-
-  const expansion = estimateExpansion(cut50, cut70, turnoverRatioProxy * turnoverConsistency);
-  let cut100 = cut70 + expansion;
-  if (cut100 < cut70 + 0.01) cut100 = cut70 + 0.01;
-
-  const LOGIT_AT_50CUT = Math.log(0.9 / 0.1);
-  const distTo50 = Math.max(cut100 - cut50, 0.02);
-  const k = (LOGIT_AT_50CUT / distTo50) * competitionConfidence;
-
-  const z = k * (cut100 - userScore);
-  const zClamped = Math.max(-25, Math.min(25, z));
-  const prob = 1 / (1 + Math.exp(-zClamped));
-  const finalProb = Math.max(1, Math.min(99, Math.round(prob * 100)));
-
-  // 정식으로 검증된 신뢰구간은 아니고, 마지노선(100%컷) 추정치의 실증 오차(MAE 약
-  // 0.02~0.03등급, 원 도구 검증 당시 기준)를 정규분포로 가정해 역산한 반경이다.
-  // 0.03등급 ≈ 표준편차의 약 1배 수준으로, 실제 결과가 이 범위 안에 들어올 확률은
-  // 대략 67% 정도로 추정된다(더 넓혔던 0.045등급 기준으로는 약 85%).
-  const BASE_RADIUS = 0.03;
-  const radius = BASE_RADIUS * (1 + (1 - competitionConfidence));
-  const zLow = k * (cut100 - (userScore + radius));
-  const zHigh = k * (cut100 - (userScore - radius));
-  const probLow = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, zLow))));
-  const probHigh = 1 / (1 + Math.exp(-Math.max(-25, Math.min(25, zHigh))));
-  const probRangeLow = Math.max(1, Math.min(99, Math.round(probLow * 100)));
-  let probRangeHigh = Math.min(99, Math.round(probHigh * 100));
-  if (probRangeHigh <= probRangeLow) probRangeHigh = Math.min(99, probRangeLow + 2);
-
-  const stripSpan = Math.max(cut100 - cut50, 0.05);
-  let stripPos = (userScore - cut50) / stripSpan;
-  stripPos = Math.max(-0.4, Math.min(1.4, stripPos));
-
-  const gap50 = cut50 - userScore;
-  const gap70 = cut70 - userScore;
-  const gap100 = cut100 - userScore;
-
-  let tier: EstimatorResult["tier"];
-  if (finalProb >= 85) tier = { name: "안정", key: "safe" };
-  else if (finalProb >= 65) tier = { name: "적정", key: "safe" };
-  else if (finalProb >= 40) tier = { name: "소신", key: "watch" };
-  else tier = { name: "상향", key: "risk" };
-
-  return {
-    prob: finalProb,
-    probRangeLow,
-    probRangeHigh,
-    tier,
-    k,
-    p50Predicted: cut50,
-    p70Predicted: cut70,
-    p100Predicted: cut100,
-    expansion,
-    turnoverRatioProxy,
-    gap50,
-    gap70,
-    gap100,
-    stripPos,
-    expectedRate,
-    expectedTurnoverCount,
-    avgCompetitionRatio,
-    competitionConfidence,
-    competitionRatioChange,
-    competitionAdjusted: competitionRatioChange > 0,
-    dataYears,
-    usedKernelModel,
-    kernelInfo: input.kernelPrediction
-      ? {
-          cut50: {
-            p10: input.kernelPrediction.cut50.p10,
-            p90: input.kernelPrediction.cut50.p90,
-            effectiveN: input.kernelPrediction.cut50.effectiveN,
-          },
-          cut70: {
-            p10: input.kernelPrediction.cut70.p10,
-            p90: input.kernelPrediction.cut70.p90,
-            effectiveN: input.kernelPrediction.cut70.effectiveN,
-          },
-        }
-      : undefined,
+  const target: { level50: number; level70: number; trend70: number; capChange?: number; compRaw?: number } = {
+    level50,
+    level70,
+    trend70,
   };
+  if (targetQuota > 0 && quota[0] > 0) target.capChange = Math.log(targetQuota) - Math.log(quota[0]);
+  if (expectedCompetition > 0) target.compRaw = expectedCompetition;
+
+  const { weights, effectiveN } = computeKernelWeights(target, model.database, model.bins);
+  const y50List = model.database.map((r) => r.y50);
+  const y70List = model.database.map((r) => r.y70);
+
+  const p50Predicted = weightedMedian(y50List, weights);
+  const p70Predicted = weightedMedian(y70List, weights);
+
+  const ratioPoint = computeAdmitRatio(quota[0], Math.max(turnover[0], 0));
+  const { simulated } = simulateMarginoseon(y50List, y70List, weights, ratioPoint, RATIO_STD);
+  const prob = admissionProbabilityFromSimulation(simulated, userScore) * 100;
+
+  return { p50Predicted, p70Predicted, prob, effectiveN };
 }
