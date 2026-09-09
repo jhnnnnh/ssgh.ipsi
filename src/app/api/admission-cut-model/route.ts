@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { requireTeacher } from "@/lib/supabase/require-teacher";
 import { buildLevelBinTable, type KernelDatabaseRow } from "@/lib/admission-cut-kernel-predictor";
 
 /**
@@ -188,11 +187,15 @@ let cache: CachedModel | null = null;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
 export async function GET() {
-  const teacher = await requireTeacher();
-  if (!teacher) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+  const supabase = await createServerClient();
+  // 교사뿐 아니라 학생도 "합격 가능성 추정"을 쓰므로, 교사 전용이 아니라 로그인 여부만
+  // 확인한다(실제 행 접근 권한은 admission_cutoffs의 RLS가 별도로 검증한다).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
 
   if (!cache || Date.now() - cache.builtAt > CACHE_TTL_MS) {
-    const supabase = await createServerClient();
     let rows: CutoffRow[];
     try {
       rows = await fetchAllCutoffs(supabase);
