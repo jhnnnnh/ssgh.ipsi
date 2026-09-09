@@ -179,7 +179,7 @@ export function CascadingPickerModal<
 
         {resolving && <p className="px-5 pt-3 text-[11px] text-slate-400">카드와 가장 비슷한 항목을 찾는 중...</p>}
 
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-hidden min-h-0 flex-1">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-y-auto min-h-0 flex-1">
           <PickColumn
             title="1. 대학"
             query={universityQuery}

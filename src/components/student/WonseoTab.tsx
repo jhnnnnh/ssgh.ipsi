@@ -249,12 +249,12 @@ export function WonseoTab({ studentId }: { studentId: string }) {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-sm border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-bold tracking-tight text-slate-900">나의 수시 카드</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap">나의 수시 카드</h3>
           <button
             onClick={() => setView((v) => (v === "all" ? "submitted" : "all"))}
             className={cn(
-              "text-xs font-bold px-2.5 py-0.5 rounded-full border transition flex items-center gap-1",
+              "shrink-0 whitespace-nowrap text-xs font-bold px-2.5 py-0.5 rounded-full border transition flex items-center gap-1",
               view === "submitted"
                 ? "bg-amber-500 border-amber-500 text-white"
                 : "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100",
@@ -265,14 +265,17 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           </button>
         </div>
         <div
-          className={cn("flex items-center gap-2 shrink-0", view !== "all" && "invisible pointer-events-none")}
+          className={cn(
+            "flex items-center gap-2 flex-wrap shrink-0",
+            view !== "all" && "invisible pointer-events-none",
+          )}
           aria-hidden={view !== "all"}
         >
           <button
             onClick={() => setShowRecentResults((v) => !v)}
             tabIndex={view === "all" ? 0 : -1}
             className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
               showRecentResults
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-600",
@@ -285,7 +288,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             onClick={handleToggleAutoAssign}
             tabIndex={view === "all" ? 0 : -1}
             className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
               autoAssign
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-600",
@@ -297,7 +300,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           <button
             onClick={openCreate}
             tabIndex={view === "all" ? 0 : -1}
-            className="pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+            className="shrink-0 whitespace-nowrap pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>원서 추가</span>

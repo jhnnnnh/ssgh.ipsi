@@ -43,7 +43,7 @@ export function MyCardPickerModal<T extends PickableCard>({
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto">
+        <div className="p-5 overflow-y-auto flex-1 min-h-0">
           {cards.length === 0 ? (
             <p className="text-center text-xs text-slate-400 py-10">등록된 원서 카드가 없어요.</p>
           ) : (

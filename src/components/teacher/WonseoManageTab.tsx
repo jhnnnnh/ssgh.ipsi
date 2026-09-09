@@ -321,11 +321,11 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setViewMode("cards")}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
               viewMode === "cards"
                 ? "bg-indigo-600 text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -337,7 +337,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           <button
             onClick={() => setViewMode("table")}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
               viewMode === "table"
                 ? "bg-indigo-600 text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -349,7 +349,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           <button
             onClick={() => setViewMode("submittedTable")}
             className={cn(
-              "px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
               viewMode === "submittedTable"
                 ? "bg-amber-500 text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -381,7 +381,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   <button
                     onClick={() => setStudentView((v) => (v === "all" ? "submitted" : "all"))}
                     className={cn(
-                      "shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-full border transition flex items-center gap-1",
+                      "shrink-0 whitespace-nowrap text-xs font-bold px-2.5 py-1.5 rounded-full border transition flex items-center gap-1",
                       studentView === "submitted"
                         ? "bg-amber-500 border-amber-500 text-white"
                         : "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100",
@@ -395,7 +395,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
               {selectedStudentId && (
                 <div
                   className={cn(
-                    "flex items-center gap-2 shrink-0",
+                    "flex items-center gap-2 flex-wrap shrink-0",
                     studentView !== "all" && "invisible pointer-events-none",
                   )}
                   aria-hidden={studentView !== "all"}
@@ -404,7 +404,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                     onClick={() => setShowRecentResults((v) => !v)}
                     tabIndex={studentView === "all" ? 0 : -1}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+                      "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
                       showRecentResults
                         ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                         : "bg-slate-100 hover:bg-slate-200 text-slate-600",
@@ -417,7 +417,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                     onClick={handleToggleAutoAssign}
                     tabIndex={studentView === "all" ? 0 : -1}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+                      "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
                       autoAssign
                         ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                         : "bg-slate-100 hover:bg-slate-200 text-slate-600",
@@ -429,7 +429,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   <button
                     onClick={openCreate}
                     tabIndex={studentView === "all" ? 0 : -1}
-                    className="pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-2xs flex items-center gap-1.5"
+                    className="shrink-0 whitespace-nowrap pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-2xs flex items-center gap-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>원서 추가</span>

@@ -218,10 +218,18 @@ html {
   font-display: swap;
 }
 
+/* 한글은 띄어쓰기 없이도 글자 사이 어디서든 줄바꿈될 수 있다는 CSS 기본 규칙 때문에,
+   화면이 좁아지면(특히 모바일) 이름·버튼 글자 같은 짧은 단어가 "김O"/"O"처럼 음절
+   중간에서 잘려 두 줄로 넘어가곤 했다. word-break: keep-all은 한글도 (영어처럼) 띄어쓰기
+   단위로만 줄을 바꾸게 강제해 이 문제를 막는다. 다만 그러면 띄어쓰기 없는 아주 긴 문자열
+   (예: 영문 URL)은 줄바꿈될 곳이 없어 넘칠 수 있어서, overflow-wrap: break-word로 그런
+   경우에만 예외적으로 끊어서라도 줄바꿈되게 안전장치를 같이 둔다. */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 ::-webkit-scrollbar {

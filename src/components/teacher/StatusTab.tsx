@@ -433,7 +433,7 @@ export function StatusTab() {
                       {formatTime(s.start_time)} ~ {formatTime(s.end_time)}
                     </span>
                     {s.is_booked && (
-                      <span className="text-[11px] font-bold emphasis-title bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                      <span className="whitespace-nowrap text-[11px] font-bold emphasis-title bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                         {s.student_id} {s.student_name}
                       </span>
                     )}
