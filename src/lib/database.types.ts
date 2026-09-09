@@ -117,6 +117,37 @@ export type ScheduleEvent = {
   date: string;
 };
 
+/** admission_probability_saves.input 스냅샷. 계산기 입력 폼과 같은 모양이라 저장한 걸
+ * 그대로 폼에 다시 채울 수 있다. */
+export type AdmissionProbabilitySaveInput = {
+  userScore: string;
+  targetQuota: string;
+  expectedCompetition: string;
+  c50: [string, string, string];
+  c70: [string, string, string];
+  quota: [string, string, string];
+  turnover: [string, string, string];
+  applicants: [string, string, string];
+};
+
+/** "합격 가능성 추정" 계산 결과 저장 한 건. 목록에서 다시 계산하지 않고 바로 보여줄 수
+ * 있도록 계산 시점의 결과 요약(prob 등)도 함께 스냅샷으로 들고 있다. */
+export type AdmissionProbabilitySave = {
+  id: string;
+  student_id: string;
+  university: string;
+  department: string | null;
+  admission_type: string | null;
+  input: AdmissionProbabilitySaveInput;
+  prob: number;
+  prob_low: number;
+  prob_high: number;
+  p50_predicted: number;
+  p70_predicted: number;
+  created_by: string;
+  created_at: string;
+};
+
 /** 최근 입결 표의 한 연도 열. 모든 값은 대학마다 표기 형식이 달라 자유 텍스트로 둔다. */
 export type RecentResultYear = {
   year: string;
@@ -328,6 +359,15 @@ export type Database = {
             >
           > & { id?: string };
         Update: Partial<AdmissionOffering>;
+      } & NoRelationships;
+      admission_probability_saves: {
+        Row: AdmissionProbabilitySave;
+        Insert: Pick<
+          AdmissionProbabilitySave,
+          "student_id" | "university" | "input" | "prob" | "prob_low" | "prob_high" | "p50_predicted" | "p70_predicted" | "created_by"
+        > &
+          Partial<Pick<AdmissionProbabilitySave, "id" | "department" | "admission_type" | "created_at">>;
+        Update: Partial<AdmissionProbabilitySave>;
       } & NoRelationships;
     };
     Views: Record<string, never>;

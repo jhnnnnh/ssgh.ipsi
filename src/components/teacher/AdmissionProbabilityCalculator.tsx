@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp } from "lucide-react";
+import { BookmarkPlus, Search, Trash2, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
   prefetchCutoffUniversities,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/admission-probability-estimator";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
 import { CompetitionResultPanel } from "@/components/wonseo/CompetitionResultPanel";
-import type { Roster, WonseoCard } from "@/lib/database.types";
+import type { AdmissionProbabilitySave, AdmissionProbabilitySaveInput, Roster, WonseoCard } from "@/lib/database.types";
 
 /** 교과전형 커널 계산용 데이터(과거 사례 DB + 경쟁률 정규화 구간표)는 모든 컴포넌트
  * 인스턴스가 같은 걸 쓰면 되므로 모듈 스코프에서 한 번만 불러와 재사용한다. */
@@ -135,6 +136,7 @@ export function AdmissionProbabilityCalculator({
   roster?: Pick<Roster, "student_id" | "name">[];
 }) {
   const showToast = useToast();
+  const { profile } = useAuth();
   const [form, setForm] = useState<FormState>(emptyForm());
   const [result, setResult] = useState<EstimatorOutcome | null>(null);
   const [queriedScore, setQueriedScore] = useState(0);
@@ -144,6 +146,10 @@ export function AdmissionProbabilityCalculator({
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
   const [cardPickerOpen, setCardPickerOpen] = useState(false);
+
+  const [saves, setSaves] = useState<AdmissionProbabilitySave[] | null>(null);
+  const [savesLoading, setSavesLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // 대학·학과·전형 선택 팝업이 고르는 학과 자체가 admission_cutoffs에 없을 때(드묾)
   // 이름이 비슷한 다른 학과를 대신 보여준다(카드 만들 때 "비슷한 학과 입결 찾기"와 같은 방식).
@@ -173,6 +179,7 @@ export function AdmissionProbabilityCalculator({
     setTeacherStudentId(id);
     if (!id) {
       setMyCards(null);
+      setSaves(null);
       return;
     }
     const supabase = createClient();
@@ -182,6 +189,114 @@ export function AdmissionProbabilityCalculator({
       .eq("student_id", id)
       .order("sort_order", { ascending: true })
       .then(({ data }) => setMyCards(data ?? []));
+    loadSaves(id);
+  }
+
+  function loadSaves(id: string) {
+    setSavesLoading(true);
+    const supabase = createClient();
+    supabase
+      .from("admission_probability_saves")
+      .select("*")
+      .eq("student_id", id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setSaves((data as AdmissionProbabilitySave[] | null) ?? []);
+        setSavesLoading(false);
+      });
+  }
+
+  /** 지금 나온 결과를 저장 목록에 추가한다. 다시 계산하지 않고도 목록에서 바로 확률을
+   * 보여줄 수 있도록, 계산 시점의 입력값과 결과 요약을 함께 스냅샷으로 저장한다. */
+  async function handleSaveResult() {
+    if (!ok || !profile) return;
+    if (!teacherStudentId) {
+      showToast("먼저 학생을 선택해 주세요.", "error");
+      return;
+    }
+    setSaving(true);
+    const supabase = createClient();
+    const input: AdmissionProbabilitySaveInput = {
+      userScore: form.userScore,
+      targetQuota: form.targetQuota,
+      expectedCompetition: form.expectedCompetition,
+      c50: form.c50,
+      c70: form.c70,
+      quota: form.quota,
+      turnover: form.turnover,
+      applicants: form.applicants,
+    };
+    const { error } = await supabase.from("admission_probability_saves").insert({
+      student_id: teacherStudentId,
+      university: form.university,
+      department: form.department.trim() || null,
+      admission_type: form.admissionType.trim() || null,
+      input,
+      prob: ok.prob,
+      prob_low: ok.probLow,
+      prob_high: ok.probHigh,
+      p50_predicted: ok.p50Predicted,
+      p70_predicted: ok.p70Predicted,
+      created_by: profile.id,
+    });
+    setSaving(false);
+    if (error) {
+      showToast("저장하지 못했어요.", "error");
+      return;
+    }
+    showToast("결과를 저장했어요.", "success");
+    loadSaves(teacherStudentId);
+  }
+
+  /** 저장된 결과를 폼에 다시 채우고, 그래프까지 보여주기 위해 같은 입력으로 한 번 더
+   * 계산한다(목록 요약은 저장된 값을 그대로 쓰고, 다시 계산하지 않는다). */
+  async function handleLoadSave(save: AdmissionProbabilitySave) {
+    const input = save.input;
+    setForm((f) => ({
+      ...f,
+      university: save.university,
+      department: save.department ?? "",
+      admissionType: save.admission_type ?? "",
+      userScore: input.userScore,
+      targetQuota: input.targetQuota,
+      expectedCompetition: input.expectedCompetition,
+      c50: input.c50,
+      c70: input.c70,
+      quota: input.quota,
+      turnover: input.turnover,
+      applicants: input.applicants,
+    }));
+    setDeptCandidates(null);
+    const parsedScore = parseNum(input.userScore);
+    setQueriedScore(parsedScore);
+    setQuerying(true);
+    try {
+      const model = await loadKernelModel();
+      const estimatorInput: EstimatorInput = {
+        userScore: parsedScore,
+        targetQuota: parseIntNum(input.targetQuota),
+        expectedCompetition: parseNum(input.expectedCompetition),
+        c50: input.c50.map(parseNum) as Triple,
+        c70: input.c70.map(parseNum) as Triple,
+        quota: input.quota.map(parseIntNum) as Triple,
+        turnover: input.turnover.map(parseIntNum) as Triple,
+      };
+      setResult(estimateAdmission(estimatorInput, model));
+    } catch {
+      showToast("결과를 다시 계산하지 못했어요.", "error");
+    } finally {
+      setQuerying(false);
+    }
+  }
+
+  async function handleDeleteSave(save: AdmissionProbabilitySave) {
+    const supabase = createClient();
+    const { error } = await supabase.from("admission_probability_saves").delete().eq("id", save.id);
+    if (error) {
+      showToast("삭제하지 못했어요.", "error");
+      return;
+    }
+    setSaves((prev) => prev?.filter((s) => s.id !== save.id) ?? null);
   }
 
   /** 대학·학과·전형 선택 팝업에서 카드를 고른 시점에 호출된다. 대학/학과/전형은 팝업이
@@ -360,6 +475,7 @@ export function AdmissionProbabilityCalculator({
 
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
         {/* 입력 */}
+        <div className="space-y-4">
         <Card className="space-y-4">
           {roster && (
             <select
@@ -529,6 +645,53 @@ export function AdmissionProbabilityCalculator({
           </div>
         </Card>
 
+        {teacherStudentId && (
+          <Card className="space-y-2">
+            <p className="text-xs font-bold text-slate-700">
+              저장된 결과{saves && saves.length > 0 && ` ${saves.length}`}
+            </p>
+            {savesLoading ? (
+              <p className="text-[11px] text-slate-400">불러오는 중...</p>
+            ) : !saves || saves.length === 0 ? (
+              <p className="text-[11px] text-slate-400">아직 저장된 결과가 없어요. 결과를 조회한 뒤 저장해 보세요.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {saves.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadSave(s)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="text-xs font-bold text-slate-800 truncate">
+                        {s.university}
+                        {s.department && ` · ${s.department}`}
+                        {s.admission_type && ` · ${s.admission_type}`}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {s.input.userScore}등급 · {s.prob_low}~{s.prob_high}% ·{" "}
+                        {new Date(s.created_at).toLocaleDateString("ko-KR")}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteSave(s)}
+                      className="shrink-0 w-7 h-7 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
+                      aria-label="저장된 결과 삭제"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+        </div>
+
         {/* 결과 */}
         <div className="space-y-4">
           <Card className="flex items-end justify-between gap-4 flex-wrap">
@@ -537,9 +700,22 @@ export function AdmissionProbabilityCalculator({
               {!result && <p className="text-lg font-bold text-slate-400">분석 대기중</p>}
               {result && "insufficient" in result && <p className="text-lg font-bold text-slate-400">데이터 부족</p>}
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-slate-900">{ok ? `${ok.probLow}~${ok.probHigh}%` : "—"}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">추정 합격 가능성</p>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-3xl font-bold text-slate-900">{ok ? `${ok.probLow}~${ok.probHigh}%` : "—"}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">추정 합격 가능성</p>
+              </div>
+              {ok && (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveResult()}
+                  disabled={saving}
+                  className="shrink-0 flex items-center gap-1 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition"
+                >
+                  <BookmarkPlus className="w-3.5 h-3.5" />
+                  {saving ? "저장 중..." : "저장"}
+                </button>
+              )}
             </div>
           </Card>
 
