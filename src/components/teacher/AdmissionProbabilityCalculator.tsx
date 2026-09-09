@@ -424,9 +424,7 @@ export function AdmissionProbabilityCalculator({
 
           <div className="overflow-x-auto">
             <table className="text-xs border-collapse w-full">
-              <caption className="text-left text-xs font-bold text-slate-700 pb-2">
-                과거 3개년 입결 <span className="font-normal text-slate-400">(없는 연도는 비워두세요)</span>
-              </caption>
+              <caption className="text-left text-xs font-bold text-slate-700 pb-2">과거 3개년 입결</caption>
               <thead>
                 <tr>
                   <th className="p-1.5 bg-slate-50 border border-slate-200" />
