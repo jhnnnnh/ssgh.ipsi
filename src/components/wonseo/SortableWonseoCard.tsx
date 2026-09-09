@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
-import type { WonseoCard } from "@/lib/database.types";
+import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
 
 export function SortableWonseoCard({
   id,
@@ -21,6 +21,8 @@ export function SortableWonseoCard({
   autoAssign,
   rankLabel,
   onRankChange,
+  bodyMode,
+  onSubmittedFieldsCommit,
 }: {
   id: string;
   card: WonseoCard;
@@ -36,6 +38,8 @@ export function SortableWonseoCard({
   autoAssign: boolean;
   rankLabel: string;
   onRankChange: (text: string) => void;
+  bodyMode?: "full" | "submitted";
+  onSubmittedFieldsCommit?: (fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] }) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isSorting } = useSortable({ id });
 
@@ -53,6 +57,8 @@ export function SortableWonseoCard({
       autoAssign={autoAssign}
       rankLabel={rankLabel}
       onRankChange={onRankChange}
+      bodyMode={bodyMode}
+      onSubmittedFieldsCommit={onSubmittedFieldsCommit}
       minHeight={minHeight}
       style={{
         transform: CSS.Transform.toString(transform),

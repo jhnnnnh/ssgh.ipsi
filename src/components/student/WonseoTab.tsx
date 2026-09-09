@@ -28,10 +28,25 @@ import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
 import { SortableWonseoCard } from "@/components/wonseo/SortableWonseoCard";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
 import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
-import { SubmittedApplicationsPanel } from "@/components/wonseo/SubmittedApplicationsPanel";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
 import { cn } from "@/lib/cn";
-import type { WonseoCard } from "@/lib/database.types";
+import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
+
+/** "접수한 원서" 화면에서 드래그로 순서를 바꿀 때, 별표 안 된 카드들은 원래 자리에 그대로
+ * 두고 별표 카드들끼리만 상대 순서를 바꾼다. sort_order는 카드 전체가 공유하는 값이라(전체
+ * 보기에서도 같은 순서를 쓴다), 부분집합만 재배치해도 전체 배열에서 나머지 카드는 그대로여야
+ * "1~6지망" 번호가 접수 전/후 화면에서 서로 다르게 보이지 않는다. */
+function reorderWithinSubset(all: WonseoCard[], subsetIds: string[], oldIndex: number, newIndex: number): WonseoCard[] {
+  const reorderedSubsetIds = arrayMove(subsetIds, oldIndex, newIndex);
+  const byId = new Map(all.map((c) => [c.id, c]));
+  let cursor = 0;
+  return all.map((item) => {
+    if (!subsetIds.includes(item.id)) return item;
+    const id = reorderedSubsetIds[cursor];
+    cursor += 1;
+    return byId.get(id)!;
+  });
+}
 
 export function WonseoTab({ studentId }: { studentId: string }) {
   const showToast = useToast();
@@ -136,6 +151,47 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     }
   }
 
+  async function handleSubmittedDragEnd(event: DragEndEvent, submittedCards: WonseoCard[]) {
+    const { active, over } = event;
+    setActiveId(null);
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = submittedCards.findIndex((c) => c.id === active.id);
+    const newIndex = submittedCards.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = reorderWithinSubset(cards, submittedCards.map((c) => c.id), oldIndex, newIndex).map(
+      (card, index) => ({ ...card, sort_order: index }),
+    );
+    setCards(reordered);
+
+    const results = await Promise.all(
+      reordered.map((card) => supabase.from("wonseo_cards").update({ sort_order: card.sort_order }).eq("id", card.id)),
+    );
+    if (results.some((r) => r.error)) {
+      showToast("순서 저장에 실패했습니다.", "error");
+      reload();
+    }
+  }
+
+  async function handleSubmittedFieldsCommit(
+    card: WonseoCard,
+    fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] },
+  ) {
+    const { error } = await supabase
+      .from("wonseo_cards")
+      .update({
+        application_number: fields.applicationNumber.trim() || null,
+        schedule_events: fields.scheduleEvents,
+      })
+      .eq("id", card.id);
+    if (error) {
+      showToast("저장에 실패했습니다.", "error");
+      return;
+    }
+    reload();
+  }
+
   async function handleRankTextChange(card: WonseoCard, text: string) {
     const value = text.trim() || null;
     if (value === card.rank) return;
@@ -210,45 +266,110 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             접수한 원서{submittedCards.length > 0 && ` ${submittedCards.length}`}
           </button>
         </div>
-        {view === "all" && (
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowRecentResults((v) => !v)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
-                showRecentResults
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                  : "bg-slate-100 hover:bg-slate-200 text-slate-600",
-              )}
-            >
-              {showRecentResults ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>지난 입결</span>
-            </button>
-            <button
-              onClick={handleToggleAutoAssign}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
-                autoAssign
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                  : "bg-slate-100 hover:bg-slate-200 text-slate-600",
-              )}
-            >
-              <Wand2 className="w-3.5 h-3.5" />
-              <span>N지망 정렬</span>
-            </button>
-            <button
-              onClick={openCreate}
-              className="pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>원서 추가</span>
-            </button>
-          </div>
-        )}
+        <div
+          className={cn("flex items-center gap-2 shrink-0", view !== "all" && "invisible pointer-events-none")}
+          aria-hidden={view !== "all"}
+        >
+          <button
+            onClick={() => setShowRecentResults((v) => !v)}
+            tabIndex={view === "all" ? 0 : -1}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              showRecentResults
+                ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-600",
+            )}
+          >
+            {showRecentResults ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span>지난 입결</span>
+          </button>
+          <button
+            onClick={handleToggleAutoAssign}
+            tabIndex={view === "all" ? 0 : -1}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              autoAssign
+                ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-600",
+            )}
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span>N지망 정렬</span>
+          </button>
+          <button
+            onClick={openCreate}
+            tabIndex={view === "all" ? 0 : -1}
+            className="pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>원서 추가</span>
+          </button>
+        </div>
       </div>
 
       {view === "submitted" ? (
-        <SubmittedApplicationsPanel cards={submittedCards} />
+        submittedCards.length > 0 ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(e) => setActiveId(String(e.active.id))}
+            onDragCancel={() => setActiveId(null)}
+            onDragEnd={(e) => handleSubmittedDragEnd(e, submittedCards)}
+          >
+            <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {submittedCards.map((card) => (
+                  <SortableWonseoCard
+                    key={card.id}
+                    id={card.id}
+                    setEqualHeightRef={() => {}}
+                    isDragging={activeId === card.id}
+                    card={card}
+                    autoAssign={autoAssign}
+                    rankLabel={rankLabels[cards.findIndex((c) => c.id === card.id)]}
+                    onRankChange={(text) => handleRankTextChange(card, text)}
+                    showStatus={statusVisible}
+                    showRecentResults={false}
+                    onEdit={() => openEdit(card)}
+                    onDelete={() => handleDelete(card)}
+                    isSubmitted={card.is_submitted}
+                    onToggleSubmitted={() => handleToggleSubmitted(card)}
+                    bodyMode="submitted"
+                    onSubmittedFieldsCommit={(fields) => handleSubmittedFieldsCommit(card, fields)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeCard && (
+                <div className="shadow-2xl shadow-indigo-900/30 rounded-3xl rotate-1 scale-[1.03]">
+                  <WonseoCardView
+                    card={activeCard}
+                    autoAssign={autoAssign}
+                    rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
+                    showStatus={statusVisible}
+                    showRecentResults={false}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    isSubmitted={activeCard.is_submitted}
+                    onToggleSubmitted={() => {}}
+                    bodyMode="submitted"
+                  />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          <div className="bg-white rounded-3xl p-12 text-center border border-amber-200 space-y-3">
+            <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-3xl flex items-center justify-center mx-auto shadow-xs">
+              <Star className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">별표로 표시한 접수 원서가 없습니다.</h4>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+              카드 우측 상단의 별 아이콘을 눌러, 실제로 접수한 원서를 표시해 주세요.
+            </p>
+          </div>
+        )
       ) : cards.length > 0 ? (
         <DndContext
           sensors={sensors}
