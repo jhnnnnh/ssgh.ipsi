@@ -212,6 +212,7 @@ export function CompetitionResultPanel({
   department,
   hintAdmissionType,
   onPickManually,
+  bare = false,
 }: {
   open: boolean;
   university: string;
@@ -221,6 +222,9 @@ export function CompetitionResultPanel({
    * 달라 엉뚱한(혹은 못 찾는) 결과가 나올 수 있다. 있으면 언제든 대학·학과·전형을 직접
    * 골라 다시 검색할 수 있는 버튼을 보여준다. */
   onPickManually?: () => void;
+  /** true면 감싸는 Card와 제목을 그리지 않고 내용만 그린다 — 이미 자체 모달/카드 안에
+   * 넣어 쓸 때(예: 합격 가능성 추정의 "작년 경쟁률" 팝업) 제목이 두 번 나오는 걸 피한다. */
+  bare?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompetitionLookupResult | undefined>(undefined);
@@ -247,20 +251,8 @@ export function CompetitionResultPanel({
 
   if (!open) return null;
 
-  return (
-    <Card className="space-y-4">
-      <div>
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-          <TrendingUp className="w-4 h-4 text-indigo-600" />
-          작년 경쟁률
-        </h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {university}
-          {department && ` · ${department}`}
-          {(chosen?.admissionType || hintAdmissionType) && ` · ${chosen?.admissionType || hintAdmissionType}`}
-        </p>
-      </div>
-
+  const content = (
+    <>
       {loading && <div className="py-16 text-center text-sm text-slate-400">불러오는 중...</div>}
 
       {!loading && result?.kind === "none" && (
@@ -315,6 +307,25 @@ export function CompetitionResultPanel({
         )}
         <p className="text-[11px] text-slate-400">2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.</p>
       </div>
+    </>
+  );
+
+  if (bare) return <div className="space-y-4">{content}</div>;
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+          <TrendingUp className="w-4 h-4 text-indigo-600" />
+          작년 경쟁률
+        </h3>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {university}
+          {department && ` · ${department}`}
+          {(chosen?.admissionType || hintAdmissionType) && ` · ${chosen?.admissionType || hintAdmissionType}`}
+        </p>
+      </div>
+      {content}
     </Card>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
@@ -27,6 +28,7 @@ import {
   type KernelModel,
 } from "@/lib/admission-probability-estimator";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
+import { CompetitionResultPanel } from "@/components/wonseo/CompetitionResultPanel";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
 /** 교과전형 커널 계산용 데이터(과거 사례 DB + 경쟁률 정규화 구간표)는 모든 컴포넌트
@@ -147,6 +149,8 @@ export function AdmissionProbabilityCalculator({
   // 이름이 비슷한 다른 학과를 대신 보여준다(카드 만들 때 "비슷한 학과 입결 찾기"와 같은 방식).
   const [deptCandidates, setDeptCandidates] = useState<CutoffCandidatePreview[] | null>(null);
 
+  const [competitionModalOpen, setCompetitionModalOpen] = useState(false);
+
   useEffect(() => {
     prefetchCutoffUniversities();
     loadKernelModel().catch(() => {});
@@ -266,6 +270,14 @@ export function AdmissionProbabilityCalculator({
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function openCompetitionModal() {
+    if (!form.university.trim() || !form.department.trim()) {
+      showToast("먼저 대학·학과·전형을 선택해 주세요.", "error");
+      return;
+    }
+    setCompetitionModalOpen(true);
   }
   function updateTriple(key: "c50" | "c70" | "quota" | "turnover" | "applicants", idx: number, value: string) {
     setForm((f) => {
@@ -413,13 +425,23 @@ export function AdmissionProbabilityCalculator({
             <label className="block font-bold text-slate-700 mb-1 text-xs">
               올해 예상 경쟁률 <span className="font-normal text-slate-400">(선택)</span>
             </label>
-            <input
-              type="number"
-              step="0.01"
-              value={form.expectedCompetition}
-              onChange={(e) => updateField("expectedCompetition", e.target.value)}
-              className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <div className="flex gap-1.5">
+              <input
+                type="number"
+                step="0.01"
+                value={form.expectedCompetition}
+                onChange={(e) => updateField("expectedCompetition", e.target.value)}
+                className="no-spinner flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={openCompetitionModal}
+                className="shrink-0 flex items-center gap-1 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                작년 경쟁률
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -582,6 +604,27 @@ export function AdmissionProbabilityCalculator({
         cards={myCards ?? []}
         onCardSelected={handleCardSelected}
       />
+
+      <Modal
+        open={competitionModalOpen}
+        onClose={() => setCompetitionModalOpen(false)}
+        title="작년 경쟁률"
+        icon={<TrendingUp className="w-4 h-4 text-indigo-600" />}
+        maxWidth="max-w-xl"
+      >
+        <p className="text-xs text-slate-400 -mt-1">
+          {form.university}
+          {form.department && ` · ${form.department}`}
+          {form.admissionType && ` · ${form.admissionType}`}
+        </p>
+        <CompetitionResultPanel
+          open={competitionModalOpen}
+          university={form.university}
+          department={form.department}
+          hintAdmissionType={form.admissionType}
+          bare
+        />
+      </Modal>
     </div>
   );
 }
