@@ -308,6 +308,13 @@ export function AdmissionProbabilityCalculator({
     }
   }
 
+  function handleReset() {
+    setForm(emptyForm());
+    setResult(null);
+    setQueriedScore(0);
+    setDeptCandidates(null);
+  }
+
   const ok = result && !("insufficient" in result) ? result : null;
   const deptLabel = [form.university, form.department].filter(Boolean).join(" · ");
 
@@ -388,7 +395,7 @@ export function AdmissionProbabilityCalculator({
                 step="0.01"
                 value={form.userScore}
                 onChange={(e) => updateField("userScore", e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -397,7 +404,7 @@ export function AdmissionProbabilityCalculator({
                 type="number"
                 value={form.targetQuota}
                 onChange={(e) => updateField("targetQuota", e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -411,7 +418,7 @@ export function AdmissionProbabilityCalculator({
               step="0.01"
               value={form.expectedCompetition}
               onChange={(e) => updateField("expectedCompetition", e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -451,7 +458,7 @@ export function AdmissionProbabilityCalculator({
                           step="0.01"
                           value={v}
                           onChange={(e) => updateTriple(key, i, e.target.value)}
-                          className="w-full text-center px-1 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:bg-indigo-50"
+                          className="no-spinner w-full text-center px-1 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:bg-indigo-50"
                         />
                       </td>
                     ))}
@@ -461,15 +468,24 @@ export function AdmissionProbabilityCalculator({
             </table>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void handleQuery()}
-            disabled={querying}
-            className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5"
-          >
-            <Search className="w-3.5 h-3.5" />
-            {querying ? "계산 중..." : "조회"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold transition shrink-0"
+            >
+              초기화
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleQuery()}
+              disabled={querying}
+              className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center justify-center gap-1.5"
+            >
+              <Search className="w-3.5 h-3.5" />
+              {querying ? "계산 중..." : "조회"}
+            </button>
+          </div>
         </Card>
 
         {/* 결과 */}
@@ -595,11 +611,11 @@ function StepRow({ n, title, last, children }: { n: number; title: string; last?
 function ProbabilityChart({ result, userScore }: { result: EstimatorResult; userScore: number }) {
   const [hoverX, setHoverX] = useState<number | null>(null);
   const W = 460;
-  const H = 200;
+  const H = 180;
   const marginL = 34;
   const marginR = 14;
   const marginT = 14;
-  const marginB = 26;
+  const marginB = 8;
   const plotW = W - marginL - marginR;
   const plotH = H - marginT - marginB;
 
@@ -702,10 +718,6 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
             <circle cx={X(hoverPoint.grade)} cy={Y(hoverPoint.prob)} r={3.5} fill="#1e293b" />
           </>
         )}
-
-        <text x={marginL + plotW / 2} y={H - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
-          내신 등급 (숫자가 작을수록 좋은 성적)
-        </text>
       </svg>
       <p className="text-[11px] text-center text-slate-500 -mt-1">
         {hoverPoint

@@ -244,3 +244,14 @@ select,
 textarea {
   font-family: inherit;
 }
+
+/* 스핀 버튼(위아래 화살표)이 필요 없는 숫자 입력칸에 붙인다 — 클릭해서 값을 1씩
+   증감시키는 용도가 아니라 그냥 숫자를 타이핑해 넣는 칸이라 화살표가 불필요하다. */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+}
