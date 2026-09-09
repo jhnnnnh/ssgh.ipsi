@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_EVENT_COLOR } from "@/lib/calendar-constants";
 
 export type ScheduleItem = {
-  /** schedule_events 배열 안에서의 위치로 만든 안정적인 키(예: "sched-0"). */
+  /** schedule_events 항목의 고유 id를 그대로 쓴다 — 나중에 다른 항목을 지우거나
+   * 순서를 바꿔도 "이미 캘린더에 추가됨" 표시가 엉키지 않는다. */
   kind: string;
   label: string;
   /** "YYYY-MM-DD" */
@@ -87,12 +88,12 @@ export async function findWonseoScheduleGroups({
   cards.forEach((card) => {
     if (!card.university) return;
     const items: ScheduleItem[] = (card.schedule_events ?? [])
-      .map((s, i) => ({ kind: `sched-${i}`, label: s.label, date: s.date }))
-      .filter((s): s is { kind: string; label: string; date: string } => /^\d{4}-\d{2}-\d{2}$/.test(s.date))
+      .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.date))
       .map((s) => ({
-        ...s,
+        kind: s.id,
         label: s.label || "일정",
-        added: addedSchedule.has(`${card.id}::${s.kind}`),
+        date: s.date,
+        added: addedSchedule.has(`${card.id}::${s.id}`),
       }));
     if (items.length === 0) return;
 

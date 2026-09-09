@@ -234,19 +234,20 @@ export const WonseoCardView = forwardRef<
   }
 
   function addSchedule() {
-    setScheduleEvents((prev) => [...prev, { label: "", date: "" }]);
+    setScheduleEvents((prev) => [...prev, { id: crypto.randomUUID(), label: "", date: "" }]);
   }
-  function removeSchedule(index: number) {
-    const next = scheduleEvents.filter((_, i) => i !== index);
+  function removeSchedule(id: string) {
+    const next = scheduleEvents.filter((s) => s.id !== id);
     setScheduleEvents(next);
     commitSubmittedFields({ scheduleEvents: next });
   }
   /** 값을 바꾸는 즉시(=편집칸에서 blur될 때) 저장까지 한 번에 한다. setScheduleEvents의
    * 함수형 업데이트 콜백 안에서 커밋해야, 같은 렌더에서 아직 안 반영된 이전 state를
-   * 실수로 저장하는 걸 피할 수 있다. */
-  function commitScheduleField(index: number, key: keyof ScheduleEvent, value: string) {
+   * 실수로 저장하는 걸 피할 수 있다. id로 항목을 찾으므로, 다른 항목을 지우거나 순서를
+   * 바꿔도 엉뚱한 항목이 수정되지 않는다. */
+  function commitScheduleField(id: string, key: keyof Omit<ScheduleEvent, "id">, value: string) {
     setScheduleEvents((prev) => {
-      const next = prev.map((s, i) => (i === index ? { ...s, [key]: value } : s));
+      const next = prev.map((s) => (s.id === id ? { ...s, [key]: value } : s));
       commitSubmittedFields({ scheduleEvents: next });
       return next;
     });
@@ -370,24 +371,24 @@ export const WonseoCardView = forwardRef<
             </div>
             {scheduleEvents.length === 0 && <p className="text-[11px] text-slate-400">등록된 일정이 없어요.</p>}
             <div className="space-y-1">
-              {scheduleEvents.map((s, i) => (
-                <div key={i} className="flex items-center gap-1.5">
+              {scheduleEvents.map((s) => (
+                <div key={s.id} className="flex items-center gap-1.5">
                   <InlineEditableText
                     value={s.label}
                     placeholder="논술 등"
-                    onCommit={(text) => commitScheduleField(i, "label", text)}
+                    onCommit={(text) => commitScheduleField(s.id, "label", text)}
                     displayClassName="w-20 shrink-0 truncate font-semibold text-slate-800"
                     inputClassName="w-20 shrink-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
                   />
                   <InlineEditableDate
                     value={s.date}
                     placeholder="날짜"
-                    onCommit={(text) => commitScheduleField(i, "date", text)}
+                    onCommit={(text) => commitScheduleField(s.id, "date", text)}
                     className="text-xs text-slate-500"
                   />
                   <button
                     type="button"
-                    onClick={() => removeSchedule(i)}
+                    onClick={() => removeSchedule(s.id)}
                     className="w-7 h-7 shrink-0 ml-auto rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

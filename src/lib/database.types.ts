@@ -110,8 +110,11 @@ export type WonseoCard = {
   updated_at: string;
 };
 
-/** schedule_events 배열의 한 항목. */
+/** schedule_events 배열의 한 항목. id는 배열 안 위치(순서)가 바뀌거나 다른 항목이
+ * 삭제돼도 이 항목을 계속 같은 것으로 알아볼 수 있게 하는 고정 키다 — 캘린더에
+ * "추가됨" 상태를 이 id로 연결해 두므로, 순서가 밀려도 서로 엉키지 않는다. */
 export type ScheduleEvent = {
+  id: string;
   label: string;
   /** "YYYY-MM-DD" 또는 미정이면 빈 문자열. */
   date: string;
