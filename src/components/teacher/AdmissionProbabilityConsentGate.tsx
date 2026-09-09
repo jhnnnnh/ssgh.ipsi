@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 
 /**
- * "합격 확률 추정" 기능을 처음 쓰기 전에 반드시 통과해야 하는 동의 화면. 유의사항을
- * 끝까지 스크롤해서 읽기 전에는 동의 버튼 자체가 비활성 상태다 — 체크박스만 누르고
- * 넘어가는 걸 막기 위한 최소한의 장치다.
+ * "합격 확률 추정" 기능을 처음 쓰기 전에 반드시 통과해야 하는 동의 화면. 원래는 박스를
+ * 스크롤해서 끝까지 봐야만 동의 버튼이 활성화되는 구조였는데, 기기(터치패드·모바일 등)에
+ * 따라 그 안쪽 스크롤이 먹지 않아 아예 진행이 막히는 문제가 보고돼서, 스크롤 감지 없이
+ * 유의사항 전체를 처음부터 다 펼쳐 보여주는 방식으로 바꿨다.
  *
  * 학생 화면에서는 동의 버튼이 2개다 — 유의사항 자체에 대한 동의와, "결과가 실제와
  * 달라도 담당 교사에게 책임을 묻지 않는다"는 별도 다짐을 분리해 각각 명시적으로
@@ -22,24 +23,7 @@ export function AdmissionProbabilityConsentGate({
   agreeing: boolean;
   audience: "teacher" | "student";
 }) {
-  const [scrolledToEnd, setScrolledToEnd] = useState(false);
   const [mainAgreed, setMainAgreed] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  // 화면이 넓거나 글자 크기 설정에 따라 유의사항이 박스 안에 다 들어가서 애초에 스크롤할
-  // 게 없는 경우가 있다 — 그러면 "끝까지 스크롤"이 영영 발생하지 않아 동의 버튼이 계속
-  // 비활성 상태로 남는다. 그런 경우는 이미 전부 보이는 것이므로 바로 동의 가능 처리한다.
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    if (el.scrollHeight <= el.clientHeight + 8) setScrolledToEnd(true);
-  }, []);
-
-  function handleScroll() {
-    const el = boxRef.current;
-    if (!el) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 8) setScrolledToEnd(true);
-  }
 
   function handleMainAgree() {
     if (audience === "teacher") {
@@ -63,11 +47,7 @@ export function AdmissionProbabilityConsentGate({
         </div>
       </div>
 
-      <div
-        ref={boxRef}
-        onScroll={handleScroll}
-        className="border border-rose-200 bg-rose-50/40 rounded-2xl p-4 max-h-80 overflow-y-auto text-xs leading-relaxed text-slate-700 space-y-3"
-      >
+      <div className="border border-rose-200 bg-rose-50/40 rounded-2xl p-4 text-xs leading-relaxed text-slate-700 space-y-3">
         <p className="font-bold text-rose-700 flex items-center gap-1.5">
           <AlertTriangle className="w-3.5 h-3.5" />
           이 기능이 보여주는 숫자는 &ldquo;합격 확률&rdquo;이 아니라 통계적 추정치입니다.
@@ -108,24 +88,19 @@ export function AdmissionProbabilityConsentGate({
             </li>
           )}
         </ul>
-        <p className="text-slate-400">끝까지 스크롤하면 아래 동의 버튼이 활성화됩니다.</p>
       </div>
 
       <button
         type="button"
-        disabled={!scrolledToEnd || mainAgreed || agreeing}
+        disabled={mainAgreed || agreeing}
         onClick={handleMainAgree}
         className="w-full py-3 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition"
       >
         {mainAgreed
           ? "✓ 동의함"
-          : scrolledToEnd
-            ? audience === "teacher"
-              ? agreeing
-                ? "처리 중..."
-                : "위 유의사항을 모두 읽었으며, 참고용 통계 추정치일 뿐 합격을 보장하지 않는다는 점에 동의합니다"
-              : "위 유의사항을 모두 읽었으며, 참고용 통계 추정치일 뿐 합격을 보장하지 않는다는 점에 동의합니다"
-            : "유의사항을 끝까지 읽어야 동의할 수 있어요"}
+          : audience === "teacher" && agreeing
+            ? "처리 중..."
+            : "위 유의사항을 모두 읽었으며, 참고용 통계 추정치일 뿐 합격을 보장하지 않는다는 점에 동의합니다"}
       </button>
 
       {audience === "student" && (
