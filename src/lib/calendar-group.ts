@@ -3,11 +3,11 @@ import type { ResolvedCalendarEvent } from "@/lib/hooks/useCalendarEvents";
 
 /**
  * 같은 일정을 연속된 날짜에 각각 등록한 경우(예: 원서 접수 기간을 하루씩 나눠 입력) 하나로
- * 묶어서 다루기 위한 그룹 키. 원서 연동 일정(수동 등록/전형데이터 기반 모두)은 항상
- * 하루짜리라 대상에서 제외한다.
+ * 묶어서 다루기 위한 그룹 키. 원서 연동 일정(접수한 원서의 일정)은 항상 하루짜리라 대상에서
+ * 제외한다.
  */
 export function eventGroupKey(ev: ResolvedCalendarEvent | null | undefined): string | null {
-  if (!ev || ev.type === "wonseo_linked" || ev.type === "wonseo_schedule") return null;
+  if (!ev || ev.type === "wonseo_schedule") return null;
   const owner =
     ev.type === "personal"
       ? ev.created_by

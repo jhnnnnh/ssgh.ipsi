@@ -57,13 +57,7 @@ export function TeacherCalendarTab() {
   }
 
   function canManage(event: ResolvedCalendarEvent) {
-    if (
-      event.type === "wonseo_linked" ||
-      event.type === "wonseo_schedule" ||
-      event.type === "class" ||
-      event.type === "personal"
-    )
-      return true;
+    if (event.type === "wonseo_schedule" || event.type === "class" || event.type === "personal") return true;
     if (event.type === "grade") return isAdmin;
     return false;
   }

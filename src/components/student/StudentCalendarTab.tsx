@@ -49,7 +49,7 @@ export function StudentCalendarTab({ studentId }: { studentId: string }) {
   }
 
   function canManage(event: ResolvedCalendarEvent) {
-    return event.type === "wonseo_linked" || event.type === "wonseo_schedule" || event.type === "personal";
+    return event.type === "wonseo_schedule" || event.type === "personal";
   }
 
   if (!profile) return null;

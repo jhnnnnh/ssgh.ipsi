@@ -7,7 +7,6 @@ import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPre
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
 import { RecentResultsSection } from "@/components/wonseo/RecentResultsSection";
 import { LEVEL_EMPHASIS_STYLE, STATUS_BADGE_STYLE, STATUS_OPTIONS } from "@/lib/wonseo-constants";
-import { formatDateLabel } from "@/lib/time";
 import type { ScheduleEvent, WonseoCard, WonseoImage } from "@/lib/database.types";
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -421,12 +420,6 @@ export const WonseoCardView = forwardRef<
                 {card.calculated_grade && <InfoRow label="등급" value={card.calculated_grade} />}
                 {card.min_standard && <InfoRow label="최저" value={card.min_standard} />}
               </div>
-            )}
-            {card.has_exam_date && card.exam_date_at && (
-              <InfoRow
-                label="일정"
-                value={`${card.exam_memo ? `${card.exam_memo} ` : ""}${formatDateLabel(card.exam_date_at)}`}
-              />
             )}
           </div>
 

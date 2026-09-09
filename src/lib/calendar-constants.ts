@@ -1,7 +1,6 @@
 import type { CalendarEventType } from "@/lib/database.types";
 
 export const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
-  wonseo_linked: "원서 일정",
   wonseo_schedule: "원서 일정",
   personal: "개인 일정",
   class: "반 일정",

@@ -245,14 +245,12 @@ export function CalendarGrid({
                     >
                       <Pencil className="w-3 h-3" />
                     </button>
-                    {ev.type !== "wonseo_linked" && (
-                      <button
-                        onClick={() => onDeleteEvent(ev)}
-                        className="w-6 h-6 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => onDeleteEvent(ev)}
+                      className="w-6 h-6 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 )}
               </div>

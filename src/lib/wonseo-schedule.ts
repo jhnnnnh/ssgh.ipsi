@@ -1,13 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_EVENT_COLOR } from "@/lib/calendar-constants";
-import {
-  findOfferingScheduleDates,
-  suggestOfferingAdmissionTypes,
-  trackForOffering,
-} from "@/lib/admission-offering-lookup";
 
 export type ScheduleItem = {
-  /** "원서접수" | "논술" | "면접" | "실기" | "서류제출" | "합격발표" | "직접등록" */
+  /** schedule_events 배열 안에서의 위치로 만든 안정적인 키(예: "sched-0"). */
   kind: string;
   label: string;
   /** "YYYY-MM-DD" */
@@ -25,16 +20,13 @@ export type CardScheduleGroup = {
   department: string | null;
   subCategory: string | null;
   items: ScheduleItem[];
-  /** 세부전형명이 전형데이터와 정확히 일치하지 않을 때, 이름이 비슷한 추천 후보(최대 5개). */
-  suggestions: string[];
 };
 
 /**
- * "내 원서 일정" 팝업의 목록을 만든다. 카드마다 (1) 대학+학과+세부전형명이 전형데이터와
- * 정확히 매칭되면 그 전형의 논술/면접/실기/원서접수/서류제출/합격발표 날짜를, 정확히
- * 안 맞으면 이름이 비슷한 전형 추천 후보를, (2) 카드에 직접 등록해 둔 "일정 등록"
- * (exam_date_at) 한 건을 함께 모아 보여준다. 이미 캘린더에 넣은 항목은 added:true로
- * 표시해 중복 추가를 막는다. 학생 모드는 studentId만, 교사 모드는 classScope만 넘긴다.
+ * "내 원서 일정" 팝업의 목록을 만든다. "접수한 원서"(is_submitted=true)로 표시된 카드의
+ * schedule_events(자유롭게 추가한 일정) 중 날짜가 "YYYY-MM-DD" 형식으로 확정된 항목만 모아
+ * 보여준다. 이미 캘린더에 넣은 항목은 added:true로 표시해 중복 추가를 막는다. 학생 모드는
+ * studentId만, 교사 모드는 classScope만 넘긴다.
  */
 export async function findWonseoScheduleGroups({
   studentId,
@@ -76,64 +68,33 @@ export async function findWonseoScheduleGroups({
 
   const { data: cards } = await supabase
     .from("wonseo_cards")
-    .select("id, student_id, university, department, sub_category, category, has_exam_date, exam_date_at, exam_memo")
+    .select("id, student_id, university, department, sub_category, schedule_events")
     .in("student_id", studentIds)
+    .eq("is_submitted", true)
     .not("university", "is", null);
   if (!cards || cards.length === 0) return [];
 
   const cardIds = cards.map((c) => c.id);
   const { data: existing } = await supabase
     .from("calendar_events")
-    .select("wonseo_card_id, type, kind")
+    .select("wonseo_card_id, kind")
+    .eq("type", "wonseo_schedule")
     .in("wonseo_card_id", cardIds);
 
-  const addedLinked = new Set(
-    (existing ?? []).filter((e) => e.type === "wonseo_linked").map((e) => e.wonseo_card_id as string),
-  );
-  const addedSchedule = new Set(
-    (existing ?? []).filter((e) => e.type === "wonseo_schedule").map((e) => `${e.wonseo_card_id}::${e.kind}`),
-  );
-
-  const offeringResults = await Promise.all(
-    cards.map((card) =>
-      card.department && card.sub_category
-        ? findOfferingScheduleDates(card.university!, card.department, card.sub_category)
-        : Promise.resolve({ matched: true, items: [] }),
-    ),
-  );
-  const suggestionsByCard = await Promise.all(
-    cards.map((card, i) =>
-      !offeringResults[i].matched && card.department && card.sub_category
-        ? suggestOfferingAdmissionTypes(
-            card.university!,
-            card.department,
-            card.sub_category,
-            trackForOffering(card.category),
-          )
-        : Promise.resolve([] as string[]),
-    ),
-  );
+  const addedSchedule = new Set((existing ?? []).map((e) => `${e.wonseo_card_id}::${e.kind}`));
 
   const groups: CardScheduleGroup[] = [];
-  cards.forEach((card, i) => {
+  cards.forEach((card) => {
     if (!card.university) return;
-    const items: ScheduleItem[] = offeringResults[i].items.map((oi) => ({
-      kind: oi.kind,
-      label: oi.label,
-      date: oi.date,
-      added: addedSchedule.has(`${card.id}::${oi.kind}`),
-    }));
-
-    if (card.has_exam_date && card.exam_date_at) {
-      items.push({
-        kind: "직접등록",
-        label: card.exam_memo || "직접 등록한 일정",
-        date: card.exam_date_at,
-        added: addedLinked.has(card.id),
-      });
-    }
-    const suggestions = suggestionsByCard[i];
-    if (items.length === 0 && suggestions.length === 0) return;
+    const items: ScheduleItem[] = (card.schedule_events ?? [])
+      .map((s, i) => ({ kind: `sched-${i}`, label: s.label, date: s.date }))
+      .filter((s): s is { kind: string; label: string; date: string } => /^\d{4}-\d{2}-\d{2}$/.test(s.date))
+      .map((s) => ({
+        ...s,
+        label: s.label || "일정",
+        added: addedSchedule.has(`${card.id}::${s.kind}`),
+      }));
+    if (items.length === 0) return;
 
     const cls = gradeByStudent.get(card.student_id);
     groups.push({
@@ -146,35 +107,10 @@ export async function findWonseoScheduleGroups({
       department: card.department,
       subCategory: card.sub_category,
       items,
-      suggestions,
     });
   });
 
   return groups;
-}
-
-/**
- * 추천 후보 중 하나를 골랐을 때, 그 전형 기준으로 일정을 다시 조회한다(카드의 세부전형명
- * 자체는 건드리지 않는다 — 이 팝업에서 미리보기 용도로만 쓴다).
- */
-export async function getScheduleItemsForAdmissionType(
-  cardId: string,
-  university: string,
-  department: string,
-  admissionType: string,
-): Promise<ScheduleItem[]> {
-  const supabase = createClient();
-  const [result, existingRes] = await Promise.all([
-    findOfferingScheduleDates(university, department, admissionType),
-    supabase.from("calendar_events").select("kind").eq("wonseo_card_id", cardId).eq("type", "wonseo_schedule"),
-  ]);
-  const addedKinds = new Set((existingRes.data ?? []).map((r) => r.kind));
-  return result.items.map((oi) => ({
-    kind: oi.kind,
-    label: oi.label,
-    date: oi.date,
-    added: addedKinds.has(oi.kind),
-  }));
 }
 
 /** 목록의 항목 하나를 실제로 캘린더에 추가한다. */
@@ -200,20 +136,6 @@ export async function addScheduleEvent({
   createdBy: string;
 }): Promise<void> {
   const supabase = createClient();
-
-  if (kind === "직접등록") {
-    const { error } = await supabase.from("calendar_events").insert({
-      type: "wonseo_linked",
-      color: DEFAULT_EVENT_COLOR,
-      student_id: studentId,
-      grade,
-      class_no: classNo,
-      wonseo_card_id: cardId,
-      created_by: createdBy,
-    });
-    if (error) throw error;
-    return;
-  }
 
   const { error } = await supabase.from("calendar_events").insert({
     type: "wonseo_schedule",

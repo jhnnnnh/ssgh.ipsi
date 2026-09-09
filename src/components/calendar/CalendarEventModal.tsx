@@ -41,7 +41,7 @@ export function CalendarEventModal({
   onClose: () => void;
   /** 연속된 날짜에 같은 일정이 이어져 있는지 판단하기 위한 전체 일정 목록. */
   events: ResolvedCalendarEvent[];
-  /** null이면 새 일정 추가, 값이 있으면 그 일정 수정(wonseo_linked면 색상만 수정 가능). */
+  /** null이면 새 일정 추가, 값이 있으면 그 일정 수정(wonseo_schedule이면 색상만 수정 가능). */
   editingEvent: ResolvedCalendarEvent | null;
   allowedTypes: CalendarEventType[];
   defaultDate?: string;
@@ -50,7 +50,7 @@ export function CalendarEventModal({
   onSaved: () => void;
 }) {
   const showToast = useToast();
-  const isWonseoLinked = editingEvent?.type === "wonseo_linked" || editingEvent?.type === "wonseo_schedule";
+  const isWonseoSchedule = editingEvent?.type === "wonseo_schedule";
 
   const [type, setType] = useState<CalendarEventType>(allowedTypes[0] ?? "personal");
   const [title, setTitle] = useState("");
@@ -90,7 +90,7 @@ export function CalendarEventModal({
   /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSave() {
-    if (isWonseoLinked) {
+    if (isWonseoSchedule) {
       // 색상만 수정
       setSaving(true);
       const supabase = createClient();
@@ -215,7 +215,7 @@ export function CalendarEventModal({
         </>
       }
     >
-      {isWonseoLinked ? (
+      {isWonseoSchedule ? (
         <div className="space-y-3">
           <p className="text-[11px] text-slate-400">
             원서 카드에 연결된 일정은 제목·날짜를 여기서 직접 바꿀 수 없어요. 색상만 바꿀 수 있습니다.
@@ -340,7 +340,7 @@ export function CalendarEventModal({
           className="inline-block text-[11px] font-bold text-white px-2.5 py-1 rounded-lg truncate max-w-full"
           style={{ backgroundColor: color }}
         >
-          {isWonseoLinked ? title : title.trim() || "제목 미입력"}
+          {isWonseoSchedule ? title : title.trim() || "제목 미입력"}
         </span>
       </div>
     </Modal>

@@ -61,9 +61,6 @@ interface FormState {
   stage2: string;
   calculatedGrade: string;
   minStandard: string;
-  hasExamDate: boolean;
-  examDateAt: string;
-  examMemo: string;
   memo: string;
   recentResults: RecentResultYear[];
 }
@@ -83,9 +80,6 @@ const EMPTY_FORM: FormState = {
   stage2: "",
   calculatedGrade: "",
   minStandard: "",
-  hasExamDate: false,
-  examDateAt: "",
-  examMemo: "",
   memo: "",
   recentResults: [],
 };
@@ -111,9 +105,6 @@ function cardToForm(card: WonseoCard): FormState {
     stage2: card.stage_2 ?? "",
     calculatedGrade: card.calculated_grade ?? "",
     minStandard: card.min_standard ?? "",
-    hasExamDate: card.has_exam_date,
-    examDateAt: card.exam_date_at ?? "",
-    examMemo: card.exam_memo ?? "",
     memo: card.memo ?? "",
     recentResults: card.recent_results ?? [],
   };
@@ -355,9 +346,6 @@ export function WonseoCardModal({
       stage_2: form.selectionMode === "multi" ? form.stage2.trim() || null : null,
       calculated_grade: form.calculatedGrade.trim() || null,
       min_standard: form.minStandard.trim() || null,
-      has_exam_date: form.hasExamDate,
-      exam_date_at: form.hasExamDate ? form.examDateAt || null : null,
-      exam_memo: form.hasExamDate ? form.examMemo.trim() || null : null,
       memo: form.memo.trim() || null,
       recent_results: form.recentResults,
       updated_at: new Date().toISOString(),
@@ -680,40 +668,6 @@ export function WonseoCardModal({
             className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-      </div>
-
-      <div className="space-y-2 border-t border-slate-100 pt-2">
-        <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
-          <input
-            type="checkbox"
-            checked={form.hasExamDate}
-            onChange={(e) => set("hasExamDate", e.target.checked)}
-            className="rounded text-indigo-600 focus:ring-indigo-500"
-          />
-          <span>일정 등록</span>
-        </label>
-        {form.hasExamDate && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-0.5">날짜</label>
-              <input
-                type="date"
-                value={form.examDateAt}
-                onChange={(e) => set("examDateAt", e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-0.5">메모</label>
-              <input
-                value={form.examMemo}
-                onChange={(e) => set("examMemo", e.target.value)}
-                placeholder="예: 면접, 고사, 실기"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       <RecentResultsEditor
