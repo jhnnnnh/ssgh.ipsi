@@ -109,6 +109,9 @@ export type WonseoCard = {
   application_number: string | null;
   /** "접수한 원서" 화면에서 자유롭게 추가하는 일정(논술/면접/실기, 1차 발표 등). */
   schedule_events: ScheduleEvent[];
+  /** "접수한 원서" 화면 전용 정렬 순서. sort_order(접수 전 화면)와 완전히 분리되어 있어,
+   * 한쪽 화면에서 드래그로 순서를 바꿔도 다른 화면의 카드 순서에 영향을 주지 않는다. */
+  submitted_sort_order: number;
   created_at: string;
   updated_at: string;
 };

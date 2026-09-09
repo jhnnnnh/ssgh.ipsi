@@ -19,22 +19,37 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** "20261111"처럼 구분자 없이 숫자 8자리로 입력해도 "2026-11-11" 형식으로 맞춰 보여준다
+ * (점·슬래시 등 다른 구분자로 입력해도 숫자만 추려 같은 방식으로 맞춘다). 8자리가 아니면
+ * 자유 텍스트를 그대로 둔다 — 날짜가 아직 미정이거나 "추후 공지" 같은 메모여도 막지 않는다. */
+function normalizeDateInput(raw: string): string {
+  const trimmed = raw.trim();
+  const digitsOnly = trimmed.replace(/[^0-9]/g, "");
+  if (digitsOnly.length === 8) {
+    return `${digitsOnly.slice(0, 4)}-${digitsOnly.slice(4, 6)}-${digitsOnly.slice(6, 8)}`;
+  }
+  return trimmed;
+}
+
 /** 클릭하기 전에는 일반 텍스트처럼 보이다가, 클릭하면 그 자리에서 입력칸으로 바뀌는
- * 인라인 편집 텍스트. 지망 순위(수동 입력)·수험번호에 공용으로 쓴다 — 항상 테두리가
- * 보이는 입력칸으로 두면 값이 있을 때도 "빈 칸"처럼 보여서 자연스럽지 않다는 피드백을
- * 반영했다. */
+ * 인라인 편집 텍스트. 지망 순위(수동 입력)·수험번호·일정 라벨에 공용으로 쓴다 — 항상
+ * 테두리가 보이는 입력칸으로 두면 값이 있을 때도 "빈 칸"처럼 보이고, 편집 상태로 바뀔 때
+ * 테두리만큼 박스가 커져 글자가 밀리는 문제가 있어 테두리 없이 배경 필드만 살짝 티나게 한다. */
 function InlineEditableText({
   value,
   placeholder,
   onCommit,
   displayClassName,
   inputClassName,
+  normalize,
 }: {
   value: string;
   placeholder: string;
   onCommit: (value: string) => void;
   displayClassName: string;
   inputClassName: string;
+  /** 값을 커밋하기 전에 형식을 다듬는다(예: 날짜 자동 하이픈 삽입). */
+  normalize?: (raw: string) => string;
 }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
@@ -45,7 +60,7 @@ function InlineEditableText({
         placeholder={placeholder}
         onBlur={(e) => {
           setEditing(false);
-          onCommit(e.target.value);
+          onCommit(normalize ? normalize(e.target.value) : e.target.value);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
@@ -59,58 +74,77 @@ function InlineEditableText({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={`${displayClassName} text-left cursor-text hover:bg-slate-100 rounded px-0.5 -mx-0.5 transition`}
+      className={`${displayClassName} text-left cursor-text hover:bg-slate-100 rounded transition`}
     >
       {value || <span className="text-slate-400 font-normal">{placeholder}</span>}
     </button>
   );
 }
 
-/** 일정 한 건의 날짜 입력칸. 세그먼트를 하나씩 클릭해서 채워야 하는 &lt;input type="date"&gt;
- * 특유의 불편함 때문에, 기본은 자유롭게 타이핑할 수 있는 텍스트 입력으로 두고 달력
- * 아이콘을 누르면 네이티브 날짜 선택기가 뜨도록 했다(선택기로 고르면 텍스트 칸에
- * 그대로 반영된다). */
-function ScheduleDateField({
+/** 일정 한 건의 날짜. 클릭하기 전엔 일반 텍스트로 보이고, 클릭하면 자유 타이핑 입력칸 +
+ * 달력 아이콘(누르면 네이티브 날짜 선택기)이 함께 뜬다. 세그먼트를 하나씩 클릭해서 채워야
+ * 하는 &lt;input type="date"&gt; 특유의 불편함 대신, 숫자만 이어 쳐도(예: 20261111)
+ * blur 시 "2026-11-11" 형식으로 자동 정리된다. */
+function InlineEditableDate({
   value,
-  onChange,
-  onBlur,
+  placeholder,
+  onCommit,
+  className,
 }: {
   value: string;
-  onChange: (value: string) => void;
-  onBlur: () => void;
+  placeholder: string;
+  onCommit: (value: string) => void;
+  className: string;
 }) {
+  const [editing, setEditing] = useState(false);
   const pickerRef = useRef<HTMLInputElement>(null);
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        <input
+          autoFocus
+          defaultValue={value}
+          placeholder={placeholder}
+          onBlur={(e) => {
+            setEditing(false);
+            onCommit(normalizeDateInput(e.target.value));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-[92px] bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => pickerRef.current?.showPicker?.()}
+          className="text-slate-400 hover:text-indigo-500 p-0.5"
+        >
+          <CalendarDays className="w-3.5 h-3.5" />
+        </button>
+        <input
+          ref={pickerRef}
+          type="date"
+          value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""}
+          onChange={(e) => {
+            setEditing(false);
+            onCommit(e.target.value);
+          }}
+          tabIndex={-1}
+          aria-hidden
+          className="sr-only"
+        />
+      </span>
+    );
+  }
+  const displayValue = normalizeDateInput(value);
   return (
-    <div className="relative w-[132px] shrink-0">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder="YYYY-MM-DD"
-        className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-2 pr-7 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={() => pickerRef.current?.showPicker?.()}
-        className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500 p-0.5"
-      >
-        <CalendarDays className="w-3.5 h-3.5" />
-      </button>
-      <input
-        ref={pickerRef}
-        type="date"
-        value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""}
-        onChange={(e) => {
-          onChange(e.target.value);
-          onBlur();
-        }}
-        tabIndex={-1}
-        aria-hidden
-        className="sr-only"
-      />
-    </div>
+    <button type="button" onClick={() => setEditing(true)} className={`${className} text-left cursor-text hover:bg-slate-100 rounded transition`}>
+      {displayValue || <span className="text-slate-400 font-normal">{placeholder}</span>}
+    </button>
   );
 }
 
@@ -211,8 +245,15 @@ export const WonseoCardView = forwardRef<
     setScheduleEvents(next);
     commitSubmittedFields({ scheduleEvents: next });
   }
-  function updateSchedule(index: number, key: keyof ScheduleEvent, value: string) {
-    setScheduleEvents((prev) => prev.map((s, i) => (i === index ? { ...s, [key]: value } : s)));
+  /** 값을 바꾸는 즉시(=편집칸에서 blur될 때) 저장까지 한 번에 한다. setScheduleEvents의
+   * 함수형 업데이트 콜백 안에서 커밋해야, 같은 렌더에서 아직 안 반영된 이전 state를
+   * 실수로 저장하는 걸 피할 수 있다. */
+  function commitScheduleField(index: number, key: keyof ScheduleEvent, value: string) {
+    setScheduleEvents((prev) => {
+      const next = prev.map((s, i) => (i === index ? { ...s, [key]: value } : s));
+      commitSubmittedFields({ scheduleEvents: next });
+      return next;
+    });
   }
 
   return (
@@ -234,7 +275,7 @@ export const WonseoCardView = forwardRef<
               placeholder="미지정"
               onCommit={(text) => onRankChange?.(text)}
               displayClassName="text-[11px] font-bold text-slate-900"
-              inputClassName="text-[11px] font-bold text-slate-900 bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5 w-20 focus:outline-none focus:ring-1 focus:ring-indigo-400 placeholder:font-semibold placeholder:text-slate-400"
+              inputClassName="w-16 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded text-[11px] font-bold text-slate-900 placeholder:font-semibold placeholder:text-slate-400"
             />
           )}
           <span
@@ -315,7 +356,7 @@ export const WonseoCardView = forwardRef<
                 commitSubmittedFields({ applicationNumber: text });
               }}
               displayClassName="font-semibold text-slate-800"
-              inputClassName="flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-[13px] font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              inputClassName="w-28 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-[13px] font-semibold text-slate-800"
             />
           </div>
 
@@ -332,20 +373,21 @@ export const WonseoCardView = forwardRef<
               </button>
             </div>
             {scheduleEvents.length === 0 && <p className="text-[11px] text-slate-400">등록된 일정이 없어요.</p>}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {scheduleEvents.map((s, i) => (
                 <div key={i} className="flex items-center gap-1.5">
-                  <input
+                  <InlineEditableText
                     value={s.label}
-                    onChange={(e) => updateSchedule(i, "label", e.target.value)}
-                    onBlur={() => commitSubmittedFields({})}
                     placeholder="예: 논술, 1차 발표"
-                    className="flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    onCommit={(text) => commitScheduleField(i, "label", text)}
+                    displayClassName="flex-1 min-w-0 font-semibold text-slate-800 truncate"
+                    inputClassName="flex-1 min-w-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-0.5 text-xs font-semibold text-slate-800"
                   />
-                  <ScheduleDateField
+                  <InlineEditableDate
                     value={s.date}
-                    onChange={(v) => updateSchedule(i, "date", v)}
-                    onBlur={() => commitSubmittedFields({})}
+                    placeholder="날짜"
+                    onCommit={(text) => commitScheduleField(i, "date", text)}
+                    className="shrink-0 text-xs text-slate-500"
                   />
                   <button
                     type="button"

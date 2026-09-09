@@ -32,22 +32,6 @@ import { computeAutoRankLabels } from "@/lib/wonseo-rank";
 import { cn } from "@/lib/cn";
 import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
 
-/** "접수한 원서" 화면에서 드래그로 순서를 바꿀 때, 별표 안 된 카드들은 원래 자리에 그대로
- * 두고 별표 카드들끼리만 상대 순서를 바꾼다. sort_order는 카드 전체가 공유하는 값이라(전체
- * 보기에서도 같은 순서를 쓴다), 부분집합만 재배치해도 전체 배열에서 나머지 카드는 그대로여야
- * "1~6지망" 번호가 접수 전/후 화면에서 서로 다르게 보이지 않는다. */
-function reorderWithinSubset(all: WonseoCard[], subsetIds: string[], oldIndex: number, newIndex: number): WonseoCard[] {
-  const reorderedSubsetIds = arrayMove(subsetIds, oldIndex, newIndex);
-  const byId = new Map(all.map((c) => [c.id, c]));
-  let cursor = 0;
-  return all.map((item) => {
-    if (!subsetIds.includes(item.id)) return item;
-    const id = reorderedSubsetIds[cursor];
-    cursor += 1;
-    return byId.get(id)!;
-  });
-}
-
 export function WonseoTab({ studentId }: { studentId: string }) {
   const showToast = useToast();
   const confirm = useConfirm();
@@ -114,10 +98,14 @@ export function WonseoTab({ studentId }: { studentId: string }) {
   }
 
   async function handleToggleSubmitted(card: WonseoCard) {
-    const { error } = await supabase
-      .from("wonseo_cards")
-      .update({ is_submitted: !card.is_submitted })
-      .eq("id", card.id);
+    const turningOn = !card.is_submitted;
+    // 새로 별표 표시하는 카드는 "접수한 원서" 목록 맨 뒤에 붙인다. sort_order(접수 전
+    // 화면 순서)는 절대 건드리지 않는다 — 두 화면의 순서는 완전히 독립적이어야 한다.
+    const patch: { is_submitted: boolean; submitted_sort_order?: number } = { is_submitted: turningOn };
+    if (turningOn) {
+      patch.submitted_sort_order = cards.filter((c) => c.is_submitted).length;
+    }
+    const { error } = await supabase.from("wonseo_cards").update(patch).eq("id", card.id);
     if (error) {
       showToast("저장에 실패했습니다.", "error");
       return;
@@ -151,6 +139,9 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     }
   }
 
+  /** "접수한 원서" 화면의 순서는 submitted_sort_order라는 별도 컬럼을 쓴다 — 접수 전
+   * 화면의 sort_order와 완전히 분리되어 있어, 한쪽에서 드래그해도 다른 쪽 카드 순서·
+   * 지망 번호에는 전혀 영향을 주지 않는다. */
   async function handleSubmittedDragEnd(event: DragEndEvent, submittedCards: WonseoCard[]) {
     const { active, over } = event;
     setActiveId(null);
@@ -160,13 +151,17 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     const newIndex = submittedCards.findIndex((c) => c.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = reorderWithinSubset(cards, submittedCards.map((c) => c.id), oldIndex, newIndex).map(
-      (card, index) => ({ ...card, sort_order: index }),
-    );
-    setCards(reordered);
+    const reorderedSubmitted = arrayMove(submittedCards, oldIndex, newIndex).map((card, index) => ({
+      ...card,
+      submitted_sort_order: index,
+    }));
+    const byId = new Map(reorderedSubmitted.map((c) => [c.id, c]));
+    setCards((prev) => prev.map((c) => byId.get(c.id) ?? c));
 
     const results = await Promise.all(
-      reordered.map((card) => supabase.from("wonseo_cards").update({ sort_order: card.sort_order }).eq("id", card.id)),
+      reorderedSubmitted.map((card) =>
+        supabase.from("wonseo_cards").update({ submitted_sort_order: card.submitted_sort_order }).eq("id", card.id),
+      ),
     );
     if (results.some((r) => r.error)) {
       showToast("순서 저장에 실패했습니다.", "error");
@@ -246,7 +241,10 @@ export function WonseoTab({ studentId }: { studentId: string }) {
 
   const activeCard = cards.find((c) => c.id === activeId) ?? null;
   const rankLabels = computeAutoRankLabels(cards);
-  const submittedCards = cards.filter((c) => c.is_submitted);
+  // "접수한 원서" 화면은 자신만의 순서(submitted_sort_order)와 그 순서 기준의 지망
+  // 라벨을 따로 계산한다 — 접수 전 화면(rankLabels/cards)과는 독립적이다.
+  const submittedCards = cards.filter((c) => c.is_submitted).sort((a, b) => a.submitted_sort_order - b.submitted_sort_order);
+  const submittedRankLabels = computeAutoRankLabels(submittedCards);
 
   return (
     <div className="space-y-6">
@@ -318,7 +316,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           >
             <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {submittedCards.map((card) => (
+                {submittedCards.map((card, index) => (
                   <SortableWonseoCard
                     key={card.id}
                     id={card.id}
@@ -326,7 +324,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
                     isDragging={activeId === card.id}
                     card={card}
                     autoAssign={autoAssign}
-                    rankLabel={rankLabels[cards.findIndex((c) => c.id === card.id)]}
+                    rankLabel={submittedRankLabels[index]}
                     onRankChange={(text) => handleRankTextChange(card, text)}
                     showStatus={statusVisible}
                     showRecentResults={false}
@@ -346,7 +344,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
                   <WonseoCardView
                     card={activeCard}
                     autoAssign={autoAssign}
-                    rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
+                    rankLabel={submittedRankLabels[submittedCards.findIndex((c) => c.id === activeCard.id)]}
                     showStatus={statusVisible}
                     showRecentResults={false}
                     onEdit={() => {}}
