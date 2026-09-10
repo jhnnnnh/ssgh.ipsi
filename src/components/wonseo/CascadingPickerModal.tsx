@@ -154,8 +154,13 @@ export function CascadingPickerModal<
 
   return (
     <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[92] flex items-center justify-center p-4" onClick={onClose}>
+      {/* 높이를 vh(뷰포트 높이) 단위로 주면, 모바일 브라우저가 스크롤하는 동안 주소창을
+          접었다 펼쳤다 하면서 실제 보이는 화면 크기가 바뀌는 것과 별개로 계산되어(이른바
+          "모바일 100vh 문제") 박스 크기가 제멋대로 커지거나 작아지는 것처럼 보일 수 있다.
+          바깥 배경(position:fixed; inset:0)은 항상 실제 보이는 화면 크기를 정확히 따라가므로,
+          그 배경의 실제 높이에 대한 비율(%)로 주면 이 문제 없이 항상 안정적으로 고정된다. */}
       <div
-        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full h-[85%] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -293,9 +298,15 @@ function PickColumn({
               높이가 갑자기 커지는 걸 브라우저의 스크롤 앵커링 기능이 "안정된 화면"으로
               보정하려다 이 칸을 맨 아래로 스크롤시켜 버렸다(그래서 방금 고른 항목이
               아니라 늘 마지막 항목들이 보이는 것처럼 보였다). 이 칸에서는 그 자동 보정이
-              필요 없으므로 꺼둔다. */}
+              필요 없으므로 꺼둔다.
+
+              min-h-[10rem]은 데스크톱(sm: 이상, 3칸 나란히·행 높이가 내용에 따라 정해짐)
+              전용으로만 둔다 — 모바일에서는 auto-rows-fr가 이미 세 칸에 똑같이 나눈 높이를
+              보장하는데, 화면이 작아 그 몫이 10rem보다 작아지면 이 최소 높이가 오히려
+              칸이 배정받은 자리보다 더 크게 부풀어 올라 테두리 밖으로 내용이 삐져나오는
+              문제가 있었다(그래서 목록이 중간에 잘린 것처럼 보였다). */}
           <div
-            className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64"
+            className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 sm:min-h-[10rem] sm:max-h-64"
             style={{ overflowAnchor: "none" }}
           >
             {extraOption && (
