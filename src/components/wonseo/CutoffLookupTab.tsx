@@ -357,7 +357,7 @@ export function CutoffLookupTab({
             href="https://apply.jinhakapply.com/SmartRatio"
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 text-slate-900 hover:opacity-90"
+            className="shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 text-white hover:opacity-90"
             style={{ backgroundColor: "#f9ce2d" }}
           >
             <ExternalLink className="w-3.5 h-3.5" />

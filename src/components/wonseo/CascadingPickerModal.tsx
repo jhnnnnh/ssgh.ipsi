@@ -155,7 +155,7 @@ export function CascadingPickerModal<
   return (
     <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[92] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">

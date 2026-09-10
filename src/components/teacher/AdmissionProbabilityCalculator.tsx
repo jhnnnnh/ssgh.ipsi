@@ -552,15 +552,14 @@ export function AdmissionProbabilityCalculator({
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">
-                예상 경쟁률 <span className="font-normal text-slate-400">(선택)</span>
-              </label>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">예상 경쟁률</label>
               <input
                 type="number"
                 step="0.01"
+                placeholder="선택"
                 value={form.expectedCompetition}
                 onChange={(e) => updateField("expectedCompetition", e.target.value)}
-                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -578,7 +577,7 @@ export function AdmissionProbabilityCalculator({
               href="https://apply.jinhakapply.com/SmartRatio"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition text-slate-900 hover:opacity-90"
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition text-white hover:opacity-90"
               style={{ backgroundColor: "#f9ce2d" }}
             >
               <ExternalLink className="w-3.5 h-3.5" />
