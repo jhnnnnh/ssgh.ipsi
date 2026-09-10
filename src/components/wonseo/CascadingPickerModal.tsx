@@ -179,7 +179,7 @@ export function CascadingPickerModal<
 
         {resolving && <p className="px-5 pt-3 text-[11px] text-slate-400">카드와 가장 비슷한 항목을 찾는 중...</p>}
 
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-y-auto min-h-0 flex-1">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr sm:auto-rows-auto gap-4 overflow-y-auto min-h-0 flex-1">
           <PickColumn
             title="1. 대학"
             query={universityQuery}
@@ -279,12 +279,14 @@ function PickColumn({
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          {/* 모바일(1열 세로 쌓임)에서는 이 칸 안에 별도 스크롤 영역을 두지 않는다 — 안쪽 칸과
-              모달 전체가 동시에 스크롤 가능한 상태에서는 터치가 어느 쪽으로 스크롤될지
-              헷갈리기 쉽고, 목록이 칸 높이에 가려 안 보이는 뒷부분이 생길 수 있었다.
-              내용 그대로 자연스럽게 늘어나게 두고, 모달 전체 스크롤 하나로만 움직이게 한다.
-              데스크톱(3열 나란히)에서는 칸별로 독립적으로 스크롤되는 게 자연스러워 그대로 둔다. */}
-          <div className="flex-1 sm:overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64">
+          {/* 이 칸의 목록은 항상 자기 안에서 스크롤된다(모바일도 마찬가지). 모바일에서는
+              부모 grid에 auto-rows-fr를 줘서 세 칸이 항상 똑같은 높이로 고정되므로(내용
+              유무와 무관하게 박스 크기가 바뀌지 않는다), 이 flex-1은 그 고정된 몫만큼의
+              분명한 높이를 갖게 되고 overflow-y-auto가 그 안에서 정상적으로 스크롤을
+              만든다. min-h-[10rem]만 있고 overflow가 조건부였을 때는, 이 칸이 실제로는
+              내용 높이가 아니라 저 최소값으로 눌린 채 overflow-hidden인 조상에 의해
+              나머지가 통째로 잘려 나가 버려서 스크롤할 방법 자체가 없었다. */}
+          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64">
             {extraOption && (
               <button
                 type="button"
