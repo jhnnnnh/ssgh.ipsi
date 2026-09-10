@@ -468,11 +468,6 @@ export function AdmissionProbabilityCalculator({
 
   return (
     <div className="space-y-6">
-      <Card className="space-y-1">
-        <h3 className="text-sm font-bold text-slate-800">합격 가능성 추정</h3>
-        <p className="text-[11px] text-slate-400">과거 입결 기반 통계적 추정치입니다</p>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
         {/* 입력 */}
         <div className="space-y-4">
@@ -536,7 +531,7 @@ export function AdmissionProbabilityCalculator({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block font-bold text-slate-700 mb-1 text-xs">내신 등급</label>
               <input
@@ -544,59 +539,61 @@ export function AdmissionProbabilityCalculator({
                 step="0.01"
                 value={form.userScore}
                 onChange={(e) => updateField("userScore", e.target.value)}
-                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1 text-xs">올해 모집 정원</label>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">모집 정원</label>
               <input
                 type="number"
                 value={form.targetQuota}
                 onChange={(e) => updateField("targetQuota", e.target.value)}
-                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block font-bold text-slate-700 mb-1 text-xs">
-              올해 예상 경쟁률 <span className="font-normal text-slate-400">(선택)</span>
-            </label>
-            <div className="flex flex-wrap gap-1.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 text-xs">
+                예상 경쟁률 <span className="font-normal text-slate-400">(선택)</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={form.expectedCompetition}
                 onChange={(e) => updateField("expectedCompetition", e.target.value)}
-                className="no-spinner flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="no-spinner w-full bg-slate-50 border border-slate-300 rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <button
-                type="button"
-                onClick={openCompetitionModal}
-                className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
-              >
-                <TrendingUp className="w-3.5 h-3.5" />
-                작년
-              </button>
-              <a
-                href="https://apply.jinhakapply.com/SmartRatio"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                실시간(진)
-              </a>
-              <a
-                href="https://info.uway.com/power/?isApply=1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                실시간(유)
-              </a>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={openCompetitionModal}
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              작년
+            </button>
+            <a
+              href="https://apply.jinhakapply.com/SmartRatio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition text-slate-900 hover:opacity-90"
+              style={{ backgroundColor: "#f9ce2d" }}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              실시간(진)
+            </a>
+            <a
+              href="https://info.uway.com/power/?isApply=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition text-white hover:opacity-90"
+              style={{ backgroundColor: "#e21d55" }}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              실시간(유)
+            </a>
           </div>
 
           <div className="overflow-x-auto">

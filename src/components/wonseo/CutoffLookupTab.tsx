@@ -357,7 +357,8 @@ export function CutoffLookupTab({
             href="https://apply.jinhakapply.com/SmartRatio"
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 whitespace-nowrap px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+            className="shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 text-slate-900 hover:opacity-90"
+            style={{ backgroundColor: "#f9ce2d" }}
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>실시간 경쟁률(진학사)</span>
@@ -366,7 +367,8 @@ export function CutoffLookupTab({
             href="https://info.uway.com/power/?isApply=1"
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 whitespace-nowrap px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+            className="shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 text-white hover:opacity-90"
+            style={{ backgroundColor: "#e21d55" }}
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>실시간 경쟁률(유웨이)</span>
