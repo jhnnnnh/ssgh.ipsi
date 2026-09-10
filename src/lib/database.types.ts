@@ -151,6 +151,18 @@ export type AdmissionProbabilitySave = {
   created_at: string;
 };
 
+/** "대입 정보 > 경쟁률 조회"에서 찾아본 작년 경쟁률 저장 한 건. 계산이 아니라 조회라서
+ * 결과 스냅샷 없이 대학/학과/전형만 들고 있고, 다시 열어 보면 그 값으로 다시 조회한다. */
+export type AdmissionCompetitionSave = {
+  id: string;
+  student_id: string;
+  university: string;
+  department: string | null;
+  admission_type: string | null;
+  created_by: string;
+  created_at: string;
+};
+
 /** 최근 입결 표의 한 연도 열. 모든 값은 대학마다 표기 형식이 달라 자유 텍스트로 둔다. */
 export type RecentResultYear = {
   year: string;
@@ -371,6 +383,12 @@ export type Database = {
         > &
           Partial<Pick<AdmissionProbabilitySave, "id" | "department" | "admission_type" | "created_at">>;
         Update: Partial<AdmissionProbabilitySave>;
+      } & NoRelationships;
+      admission_competition_saves: {
+        Row: AdmissionCompetitionSave;
+        Insert: Pick<AdmissionCompetitionSave, "student_id" | "university" | "created_by"> &
+          Partial<Pick<AdmissionCompetitionSave, "id" | "department" | "admission_type" | "created_at">>;
+        Update: Partial<AdmissionCompetitionSave>;
       } & NoRelationships;
     };
     Views: Record<string, never>;

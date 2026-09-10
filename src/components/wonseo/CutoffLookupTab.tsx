@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp, FileBarChart, ExternalLink } from "lucide-react";
+import { Search, TrendingUp, FileBarChart, ExternalLink, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/providers/ToastProvider";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
   prefetchCutoffUniversities,
@@ -27,7 +28,8 @@ import {
 import { listOfferingCandidates, type MergedOffering } from "@/lib/admission-offering-lookup";
 import { CompetitionResultPanel } from "@/components/wonseo/CompetitionResultPanel";
 import { CascadingPickerModal } from "@/components/wonseo/CascadingPickerModal";
-import type { Roster, WonseoCard } from "@/lib/database.types";
+import type { CompetitionSeries } from "@/lib/admission-competition-lookup";
+import type { AdmissionCompetitionSave, Roster, WonseoCard } from "@/lib/database.types";
 
 const ROWS: { key: "enrollment" | "competition_rate" | "additional_pass" | "grade_50" | "grade_70"; label: string }[] = [
   { key: "enrollment", label: "모집인원" },
@@ -72,6 +74,7 @@ export function CutoffLookupTab({
   roster?: Pick<Roster, "student_id" | "name">[];
 }) {
   const showToast = useToast();
+  const { profile } = useAuth();
   const [university, setUniversity] = useState("");
   const [department, setDepartment] = useState("");
   const [admissionType, setAdmissionType] = useState("");
@@ -93,6 +96,10 @@ export function CutoffLookupTab({
   const [teacherStudentId, setTeacherStudentId] = useState("");
   const [myCards, setMyCards] = useState<MyCard[] | null>(null);
   const effectiveStudentId = studentId ?? teacherStudentId;
+
+  const [competitionSaves, setCompetitionSaves] = useState<AdmissionCompetitionSave[] | null>(null);
+  const [savesLoading, setSavesLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     prefetchCutoffUniversities();
@@ -118,6 +125,77 @@ export function CutoffLookupTab({
       active = false;
     };
   }, [effectiveStudentId]);
+
+  useEffect(() => {
+    if (!effectiveStudentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCompetitionSaves(null);
+      return;
+    }
+    let active = true;
+    loadCompetitionSaves(effectiveStudentId, () => active);
+    return () => {
+      active = false;
+    };
+  }, [effectiveStudentId]);
+
+  function loadCompetitionSaves(id: string, stillActive?: () => boolean) {
+    setSavesLoading(true);
+    const supabase = createClient();
+    supabase
+      .from("admission_competition_saves")
+      .select("*")
+      .eq("student_id", id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (stillActive && !stillActive()) return;
+        setCompetitionSaves((data as AdmissionCompetitionSave[] | null) ?? []);
+        setSavesLoading(false);
+      });
+  }
+
+  /** 조회된(실제로 일치한) 대학·학과·전형을 그대로 저장한다 — 힌트가 아니라 매칭된 값을
+   * 저장해야, 다시 열었을 때도 같은 결과가 곧바로 나온다. */
+  async function handleSaveCompetition(series: CompetitionSeries) {
+    if (!profile) return;
+    if (!effectiveStudentId) {
+      showToast("먼저 학생을 선택해 주세요.", "error");
+      return;
+    }
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.from("admission_competition_saves").insert({
+      student_id: effectiveStudentId,
+      university: series.university,
+      department: series.department,
+      admission_type: series.admissionType,
+      created_by: profile.id,
+    });
+    setSaving(false);
+    if (error) {
+      showToast("저장하지 못했어요.", "error");
+      return;
+    }
+    showToast("경쟁률 조회를 저장했어요.", "success");
+    loadCompetitionSaves(effectiveStudentId);
+  }
+
+  function handleLoadCompetitionSave(save: AdmissionCompetitionSave) {
+    setCaUniversity(save.university);
+    setCaDepartment(save.department ?? "");
+    setCaAdmissionType(save.admission_type ?? "");
+    setCompetitionOpen(true);
+  }
+
+  async function handleDeleteCompetitionSave(save: AdmissionCompetitionSave) {
+    const supabase = createClient();
+    const { error } = await supabase.from("admission_competition_saves").delete().eq("id", save.id);
+    if (error) {
+      showToast("삭제하지 못했어요.", "error");
+      return;
+    }
+    setCompetitionSaves((prev) => prev?.filter((s) => s.id !== save.id) ?? null);
+  }
 
   async function runSearch(uni: string, dept: string, type: string) {
     if (!uni || !dept) {
@@ -374,6 +452,49 @@ export function CutoffLookupTab({
             <span>실시간 경쟁률(유웨이)</span>
           </a>
         </div>
+
+        {effectiveStudentId && (
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <p className="text-xs font-bold text-slate-700">
+              저장된 경쟁률{competitionSaves && competitionSaves.length > 0 && ` ${competitionSaves.length}`}
+            </p>
+            {savesLoading ? (
+              <p className="text-[11px] text-slate-400">불러오는 중...</p>
+            ) : !competitionSaves || competitionSaves.length === 0 ? (
+              <p className="text-[11px] text-slate-400">아직 저장된 경쟁률이 없어요. 작년 경쟁률을 조회한 뒤 저장해 보세요.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {competitionSaves.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleLoadCompetitionSave(s)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="text-xs font-bold text-slate-800 truncate">
+                        {s.university}
+                        {s.department && ` · ${s.department}`}
+                        {s.admission_type && ` · ${s.admission_type}`}
+                      </p>
+                      <p className="text-[11px] text-slate-400">{new Date(s.created_at).toLocaleDateString("ko-KR")}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteCompetitionSave(s)}
+                      className="shrink-0 w-7 h-7 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
+                      aria-label="저장된 경쟁률 삭제"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       <CompetitionResultPanel
@@ -382,6 +503,8 @@ export function CutoffLookupTab({
         department={caDepartment.trim()}
         hintAdmissionType={caAdmissionType.trim()}
         onPickManually={() => setCompetitionPickerOpen(true)}
+        onSave={(series) => void handleSaveCompetition(series)}
+        saving={saving}
       />
 
       <CascadingPickerModal

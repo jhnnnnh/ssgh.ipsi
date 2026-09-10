@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { BookmarkPlus, TrendingUp } from "lucide-react";
 import { WEEKDAY_KR } from "@/lib/time";
 import { Card } from "@/components/ui/Card";
 import {
@@ -213,6 +213,8 @@ export function CompetitionResultPanel({
   hintAdmissionType,
   onPickManually,
   bare = false,
+  onSave,
+  saving = false,
 }: {
   open: boolean;
   university: string;
@@ -225,6 +227,9 @@ export function CompetitionResultPanel({
   /** true면 감싸는 Card와 제목을 그리지 않고 내용만 그린다 — 이미 자체 모달/카드 안에
    * 넣어 쓸 때(예: 합격 가능성 추정의 "작년 경쟁률" 팝업) 제목이 두 번 나오는 걸 피한다. */
   bare?: boolean;
+  /** 있으면 조회된 경쟁률(실제로 일치한 대학·학과·전형) 아래에 저장 버튼을 보여준다. */
+  onSave?: (series: CompetitionSeries) => void;
+  saving?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompetitionLookupResult | undefined>(undefined);
@@ -292,6 +297,17 @@ export function CompetitionResultPanel({
             </p>
           )}
           <CompetitionChart series={chosen} />
+          {onSave && (
+            <button
+              type="button"
+              onClick={() => onSave(chosen)}
+              disabled={saving}
+              className="flex items-center gap-1 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" />
+              {saving ? "저장 중..." : "저장"}
+            </button>
+          )}
         </div>
       )}
 
