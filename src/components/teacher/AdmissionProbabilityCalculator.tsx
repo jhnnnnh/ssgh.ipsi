@@ -22,6 +22,11 @@ import {
 } from "@/lib/admission-cutoff-lookup";
 import { listOfferingCandidates } from "@/lib/admission-offering-lookup";
 import {
+  fetchCompetitionUniversityOptions,
+  fetchCompetitionDepartmentOptions,
+  fetchCompetitionAdmissionTypeOptions,
+} from "@/lib/admission-competition-lookup";
+import {
   estimateAdmission,
   type EstimatorInput,
   type EstimatorOutcome,
@@ -156,6 +161,14 @@ export function AdmissionProbabilityCalculator({
   const [deptCandidates, setDeptCandidates] = useState<CutoffCandidatePreview[] | null>(null);
 
   const [competitionModalOpen, setCompetitionModalOpen] = useState(false);
+  // 합격 가능성 추정 폼의 대학·학과·전형(입결/모집정보 표기 기준)과 경쟁률 아카이브의
+  // 표기가 달라 자동 매칭에 실패하는 경우가 있어(예: "교과(교과성적)" vs "학생부교과전형"),
+  // 경쟁률 팝업 안에서만 별도로 대학·학과·전형을 다시 고를 수 있게 한다. 폼 값을 덮어쓰지
+  // 않도록 완전히 분리된 상태로 둔다.
+  const [caUniversity, setCaUniversity] = useState("");
+  const [caDepartment, setCaDepartment] = useState("");
+  const [caAdmissionType, setCaAdmissionType] = useState("");
+  const [competitionPickerOpen, setCompetitionPickerOpen] = useState(false);
 
   // "대학·학과·전형 선택"에서 카드를 골라 handleCardSelected가 먼저 값을 채운 뒤, 이어서
   // handlePicked가 실행되는 순서다(사용자가 팝업에서 "검색"을 눌러야 onComplete가 불림).
@@ -413,7 +426,16 @@ export function AdmissionProbabilityCalculator({
       showToast("먼저 대학·학과·전형을 선택해 주세요.", "error");
       return;
     }
+    setCaUniversity(form.university);
+    setCaDepartment(form.department);
+    setCaAdmissionType(form.admissionType);
     setCompetitionModalOpen(true);
+  }
+
+  function handleCompetitionPicked(uni: string, dept: string | null, type: string) {
+    setCaUniversity(uni);
+    setCaDepartment(dept ?? "");
+    setCaAdmissionType(type);
   }
   function updateTriple(key: "c50" | "c70" | "quota" | "turnover" | "applicants", idx: number, value: string) {
     setForm((f) => {
@@ -868,18 +890,32 @@ export function AdmissionProbabilityCalculator({
         maxWidth="max-w-xl"
       >
         <p className="text-xs text-slate-400 -mt-1">
-          {form.university}
-          {form.department && ` · ${form.department}`}
-          {form.admissionType && ` · ${form.admissionType}`}
+          {caUniversity}
+          {caDepartment && ` · ${caDepartment}`}
+          {caAdmissionType && ` · ${caAdmissionType}`}
         </p>
         <CompetitionResultPanel
           open={competitionModalOpen}
-          university={form.university}
-          department={form.department}
-          hintAdmissionType={form.admissionType}
+          university={caUniversity}
+          department={caDepartment}
+          hintAdmissionType={caAdmissionType}
+          onPickManually={() => setCompetitionPickerOpen(true)}
           bare
         />
       </Modal>
+
+      <CascadingPickerModal
+        open={competitionPickerOpen}
+        onClose={() => setCompetitionPickerOpen(false)}
+        onComplete={handleCompetitionPicked}
+        fetchUniversities={() => fetchCompetitionUniversityOptions("")}
+        fetchDepartments={async (u) => {
+          const { departments, hasSummary } = await fetchCompetitionDepartmentOptions(u);
+          return { list: departments, hasSummary };
+        }}
+        fetchAdmissionTypes={fetchCompetitionAdmissionTypeOptions}
+        cards={myCards ?? []}
+      />
     </div>
   );
 }
