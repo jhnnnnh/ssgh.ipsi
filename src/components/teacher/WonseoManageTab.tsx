@@ -269,7 +269,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     }
   }
 
-  async function handleExportExcel() {
+  async function handleExportExcel(variant: "all" | "submitted" = "all") {
     setExporting(true);
     const { data, error } = await supabase.from("wonseo_cards").select("*");
     if (error || !data) {
@@ -277,12 +277,13 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
       setExporting(false);
       return;
     }
-    if (data.length === 0) {
-      showToast("등록된 원서 카드가 없습니다.", "error");
+    const relevant = variant === "submitted" ? data.filter((c) => c.is_submitted) : data;
+    if (relevant.length === 0) {
+      showToast(variant === "submitted" ? "접수 표시된 원서가 없습니다." : "등록된 원서 카드가 없습니다.", "error");
       setExporting(false);
       return;
     }
-    await exportWonseoExcel(roster, data);
+    await exportWonseoExcel(roster, data, variant);
     setExporting(false);
   }
 
@@ -569,7 +570,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           <div className="space-y-3">
             <div className="flex justify-end">
               <button
-                onClick={handleExportExcel}
+                onClick={() => handleExportExcel("all")}
                 disabled={exporting}
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-1.5 disabled:opacity-60"
               >
@@ -580,7 +581,19 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
             <WonseoTableView roster={roster} cards={allCards} />
           </div>
         ) : (
-          <WonseoTableView roster={roster} cards={allCards} variant="submitted" />
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <button
+                onClick={() => handleExportExcel("submitted")}
+                disabled={exporting}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>{exporting ? "생성 중..." : "엑셀 일괄 다운로드"}</span>
+              </button>
+            </div>
+            <WonseoTableView roster={roster} cards={allCards} variant="submitted" />
+          </div>
         )}
       </Card>
 

@@ -1,7 +1,10 @@
 import type { Roster, SupportLevel, WonseoCard } from "@/lib/database.types";
 import {
+  WONSEO_SUBMITTED_TABLE_ROW_LABELS,
   WONSEO_TABLE_ROW_LABELS,
+  buildSubmittedWonseoTableData,
   buildWonseoTableData,
+  wonseoSubmittedTableCellValue,
   wonseoTableCellValue,
 } from "@/lib/wonseo-table-data";
 
@@ -16,9 +19,24 @@ const HEADER_BG = "FF1E293B";
 const ID_NAME_BG = "FFEEF2FF";
 const BORDER = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
 
-export async function exportWonseoExcel(roster: Roster[], cards: WonseoCard[]) {
+/**
+ * variant가 "submitted"면 "접수한 원서 보기" 화면과 같은 데이터(접수 표시된 카드만,
+ * submitted_sort_order 순)와 행 구성(수험번호·날짜 포함)으로 내보낸다 — 화면의
+ * WonseoTableView와 동일한 구분이다.
+ */
+export async function exportWonseoExcel(
+  roster: Roster[],
+  cards: WonseoCard[],
+  variant: "all" | "submitted" = "all",
+) {
   const ExcelJS = (await import("exceljs")).default;
-  const { maxChoices, students } = buildWonseoTableData(roster, cards);
+  const rowLabels: readonly string[] = variant === "submitted" ? WONSEO_SUBMITTED_TABLE_ROW_LABELS : WONSEO_TABLE_ROW_LABELS;
+  const cellValue: (card: WonseoCard | undefined, label: string) => string =
+    variant === "submitted"
+      ? (card, label) => wonseoSubmittedTableCellValue(card, label as (typeof WONSEO_SUBMITTED_TABLE_ROW_LABELS)[number])
+      : (card, label) => wonseoTableCellValue(card, label as (typeof WONSEO_TABLE_ROW_LABELS)[number]);
+  const { maxChoices, students } =
+    variant === "submitted" ? buildSubmittedWonseoTableData(roster, cards) : buildWonseoTableData(roster, cards);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("수시 원서 현황");
@@ -41,12 +59,12 @@ export async function exportWonseoExcel(roster: Roster[], cards: WonseoCard[]) {
   for (const student of students) {
     const startRow = sheet.rowCount + 1;
 
-    for (const label of WONSEO_TABLE_ROW_LABELS) {
+    for (const label of rowLabels) {
       const rowValues = [
         "",
         "",
         label,
-        ...Array.from({ length: maxChoices }, (_, i) => wonseoTableCellValue(student.cards[i], label)),
+        ...Array.from({ length: maxChoices }, (_, i) => cellValue(student.cards[i], label)),
       ];
       const row = sheet.addRow(rowValues);
       row.getCell(3).font = { bold: true };
@@ -93,7 +111,8 @@ export async function exportWonseoExcel(roster: Roster[], cards: WonseoCard[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `수시원서현황_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const fileNamePrefix = variant === "submitted" ? "접수한원서현황" : "수시원서현황";
+  a.download = `${fileNamePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
