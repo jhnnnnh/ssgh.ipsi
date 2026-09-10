@@ -285,8 +285,19 @@ function PickColumn({
               분명한 높이를 갖게 되고 overflow-y-auto가 그 안에서 정상적으로 스크롤을
               만든다. min-h-[10rem]만 있고 overflow가 조건부였을 때는, 이 칸이 실제로는
               내용 높이가 아니라 저 최소값으로 눌린 채 overflow-hidden인 조상에 의해
-              나머지가 통째로 잘려 나가 버려서 스크롤할 방법 자체가 없었다. */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64">
+              나머지가 통째로 잘려 나가 버려서 스크롤할 방법 자체가 없었다.
+
+              overflow-anchor:none은 별개의 버그를 막는다 — 학과·전형 칸은 대학/학과를
+              고르는 순간 "먼저 선택하세요" 상태에서 곧바로(아직 목록이 도착하기 전) 짧은
+              "일치하는 항목이 없어요" 상태를 거쳐 실제 목록으로 바뀌는데, 그 사이 내용
+              높이가 갑자기 커지는 걸 브라우저의 스크롤 앵커링 기능이 "안정된 화면"으로
+              보정하려다 이 칸을 맨 아래로 스크롤시켜 버렸다(그래서 방금 고른 항목이
+              아니라 늘 마지막 항목들이 보이는 것처럼 보였다). 이 칸에서는 그 자동 보정이
+              필요 없으므로 꺼둔다. */}
+          <div
+            className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64"
+            style={{ overflowAnchor: "none" }}
+          >
             {extraOption && (
               <button
                 type="button"
