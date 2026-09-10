@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, TrendingUp, FileBarChart } from "lucide-react";
+import { Search, TrendingUp, FileBarChart, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/providers/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -340,18 +340,38 @@ export function CutoffLookupTab({
         <div>
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
             <FileBarChart className="w-4 h-4 text-indigo-600" />
-            작년 경쟁률 조회
+            경쟁률 조회
           </h3>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setCompetitionPickerOpen(true)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
-        >
-          <TrendingUp className="w-3.5 h-3.5" />
-          <span>작년 경쟁률 보기</span>
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCompetitionPickerOpen(true)}
+            className="shrink-0 whitespace-nowrap px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>작년 경쟁률</span>
+          </button>
+          <a
+            href="https://apply.jinhakapply.com/SmartRatio"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 whitespace-nowrap px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>실시간 경쟁률(진학사)</span>
+          </a>
+          <a
+            href="https://info.uway.com/power/?isApply=1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 whitespace-nowrap px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>실시간 경쟁률(유웨이)</span>
+          </a>
+        </div>
       </Card>
 
       <CompetitionResultPanel

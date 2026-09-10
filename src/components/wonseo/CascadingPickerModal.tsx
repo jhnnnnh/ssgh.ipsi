@@ -279,7 +279,12 @@ function PickColumn({
               className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] max-h-64">
+          {/* 모바일(1열 세로 쌓임)에서는 이 칸 안에 별도 스크롤 영역을 두지 않는다 — 안쪽 칸과
+              모달 전체가 동시에 스크롤 가능한 상태에서는 터치가 어느 쪽으로 스크롤될지
+              헷갈리기 쉽고, 목록이 칸 높이에 가려 안 보이는 뒷부분이 생길 수 있었다.
+              내용 그대로 자연스럽게 늘어나게 두고, 모달 전체 스크롤 하나로만 움직이게 한다.
+              데스크톱(3열 나란히)에서는 칸별로 독립적으로 스크롤되는 게 자연스러워 그대로 둔다. */}
+          <div className="flex-1 sm:overflow-y-auto px-2 pb-2 space-y-1 min-h-[10rem] sm:max-h-64">
             {extraOption && (
               <button
                 type="button"

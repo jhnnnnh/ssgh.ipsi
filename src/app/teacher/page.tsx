@@ -92,12 +92,12 @@ function TeacherDashboard() {
   const showToast = useToast();
 
   const tabs = [
-    { key: "status", label: "상담 신청 현황", icon: <ListChecks className="w-4 h-4" /> },
-    { key: "wonseo", label: "수시 원서 관리", icon: <GraduationCap className="w-4 h-4" /> },
-    { key: "cutoffLookup", label: "대입 정보 조회", icon: <Search className="w-4 h-4" /> },
-    { key: "admissionProbability", label: "합격 가능성 추정", icon: <Percent className="w-4 h-4" /> },
-    { key: "calendar", label: "입시 일정", icon: <CalendarDays className="w-4 h-4" /> },
-    { key: "roster", label: "학생 명단 관리", icon: <UsersRound className="w-4 h-4" /> },
+    { key: "status", label: "상담관리", icon: <ListChecks className="w-4 h-4" /> },
+    { key: "wonseo", label: "수시원서", icon: <GraduationCap className="w-4 h-4" /> },
+    { key: "cutoffLookup", label: "대입정보", icon: <Search className="w-4 h-4" /> },
+    { key: "admissionProbability", label: "합격률계산기", icon: <Percent className="w-4 h-4" /> },
+    { key: "calendar", label: "입시일정", icon: <CalendarDays className="w-4 h-4" /> },
+    { key: "roster", label: "학생명단", icon: <UsersRound className="w-4 h-4" /> },
     ...(isAdmin
       ? [
           { key: "teachers", label: "교사 계정 관리", icon: <UserCog className="w-4 h-4" /> },

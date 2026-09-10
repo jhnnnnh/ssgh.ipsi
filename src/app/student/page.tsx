@@ -66,11 +66,11 @@ export default function StudentPage() {
 
       <Tabs
         items={[
-          { key: "consulting", label: "상담 신청", icon: <MessageCircle className="w-4 h-4" /> },
-          { key: "wonseo", label: "수시 원서", icon: <FileSignature className="w-4 h-4" /> },
-          { key: "cutoffs", label: "대입 정보 조회", icon: <Search className="w-4 h-4" /> },
-          { key: "probability", label: "합격 가능성 추정", icon: <Percent className="w-4 h-4" /> },
-          { key: "calendar", label: "입시 일정", icon: <CalendarDays className="w-4 h-4" /> },
+          { key: "consulting", label: "상담신청", icon: <MessageCircle className="w-4 h-4" /> },
+          { key: "wonseo", label: "수시원서", icon: <FileSignature className="w-4 h-4" /> },
+          { key: "cutoffs", label: "대입정보", icon: <Search className="w-4 h-4" /> },
+          { key: "probability", label: "합격률계산기", icon: <Percent className="w-4 h-4" /> },
+          { key: "calendar", label: "입시일정", icon: <CalendarDays className="w-4 h-4" /> },
         ]}
         active={tab}
         onChange={(k) => setTab(k as StudentTab)}
