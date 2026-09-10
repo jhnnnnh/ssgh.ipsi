@@ -182,6 +182,12 @@ export function admissionTypeSimilarity(a: string, b: string): number {
   const pa = parseTrackAndCore(a);
   const pb = parseTrackAndCore(b);
   if (pa.track && pb.track && pa.track !== pb.track) return 0;
+  // 이름 전체가 트랙 단어 + "전형"뿐이면(예: "논술전형") core가 빈 문자열이 되는데,
+  // nameSimilarity는 빈 문자열을 무효로 보고 0을 돌려준다 — 그러면 "논술전형"과 "논술
+  // 전형"처럼 실제로는 완전히 같은 전형인데도(트랙만 있고 구분할 다른 이름이 없는 경우)
+  // 다르다고 오판한다. 트랙이 같고 양쪽 다 core가 비어 있으면(=이름 전체가 트랙뿐이면)
+  // 완전히 같은 전형으로 본다.
+  if (pa.track && pa.track === pb.track && !pa.core && !pb.core) return 2;
   return nameSimilarity(pa.core, pb.core);
 }
 

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { nameSimilarity, pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
+import { admissionTypeSimilarity, pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
 export { pickBestFuzzyOption } from "@/lib/admission-cutoff-lookup";
 
 export type CompetitionPoint = {
@@ -75,26 +75,19 @@ function pickBestFuzzyDepartment(rows: Row[], hintDepartment: string): string | 
   return pickBestFuzzyOption(uniqueDepts, hintDepartment);
 }
 
-/**
- * admission-cutoff-lookup.ts의 normalize()는 "교과"/"종합"/"전형"까지 지워버리는데,
- * 거기서는 대학어디가 쪽과 이투스 쪽이 그 수식어를 서로 다른 위치에 붙이는 문제를 풀기
- * 위해서였다. 여기서는 hint 자체가 "학생부교과전형"처럼 트랙 이름 하나뿐인 경우가 흔한데,
- * "교과"/"종합"을 지워버리면 "학생부"만 남아 사실상 아무 전형이나 다 걸려버린다(대부분의
- * 전형명이 "학생부"로 시작한다). 공백/괄호만 지우고 트랙 단어는 남겨서, 학생부교과와
- * 학생부종합처럼 실제로 다른 전형끼리 서로 매치되지 않게 한다.
- */
-function normalizeLoose(s: string): string {
-  return s.replace(/\s+/g, "").replace(/[()]/g, "").trim();
-}
-
 /** 힌트와 이름이 비슷한 행을 점수 높은 순으로 모두 돌려준다(0점 제외). 힌트가 없으면
  * 걸러내지 않고 전부(원본 순서 그대로) 돌려준다 — 그래야 세부전형명 없이 검색했을 때도
- * 그 학과/대학의 전형을 전부 골라볼 수 있다. */
+ * 그 학과/대학의 전형을 전부 골라볼 수 있다.
+ *
+ * admissionTypeSimilarity를 쓴다(admission_offerings/admission_cutoffs 쪽 매칭과 동일한
+ * 함수) — 이 아카이브의 전형명 표기가 입결·모집정보 쪽과 또 다르게 갈려서(예: "교과
+ * (교과성적)" vs "교과성적우수인재전형") 단순 부분 문자열 비교로는 놓치는 경우가 있는데,
+ * admissionTypeSimilarity는 트랙(교과/종합)과 핵심 이름을 분리해서 비교하므로 표기 순서가
+ * 달라도 같은 전형을 더 잘 알아본다. */
 function matchRows(rows: Row[], hint: string): Row[] {
-  const normalizedHint = normalizeLoose(hint);
-  if (!normalizedHint) return rows;
+  if (!hint.trim()) return rows;
   return rows
-    .map((row) => ({ row, score: nameSimilarity(normalizeLoose(row.admission_type), normalizedHint) }))
+    .map((row) => ({ row, score: admissionTypeSimilarity(row.admission_type, hint) }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((x) => x.row);
