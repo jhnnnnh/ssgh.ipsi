@@ -118,6 +118,44 @@ function groupByAdmissionType(rows: OfferingRow[]): MergedOffering[] {
   return result;
 }
 
+/** 일부 국립대(부경대·순천대·창원대·목포대·한국해양대 등)는 대학명 자동완성이 가져오는
+ * "대학어디가"(admission_cutoffs) 쪽 표기에는 "국립"이 붙어 있는데(예: "국립부경대"), 이
+ * 전형데이터(admission_offerings)는 원본 엑셀 시트 표기 그대로("부경대") 저장돼 있어
+ * 정확히 일치하는 이름이 아예 없다. "국립" 접두어를 붙이거나 뗀 이름으로도 한 번 더
+ * 시도한다(admission-competition-lookup.ts의 fetchRows와 같은 패턴). */
+function altUniversity(university: string): string {
+  return university.startsWith("국립") ? university.slice(2) : `국립${university}`;
+}
+
+async function fetchOfferingRowsExact(
+  university: string,
+  department: string,
+  admissionType?: string,
+  track?: string,
+): Promise<OfferingRow[]> {
+  const supabase = createClient();
+  let query = supabase
+    .from("admission_offerings")
+    .select(OFFERING_COLUMNS)
+    .eq("university", university)
+    .eq("department", department);
+  if (admissionType != null) query = query.eq("admission_type", admissionType);
+  if (track) query = query.eq("track", track);
+  const { data } = await query;
+  return data ?? [];
+}
+
+async function fetchOfferingRows(
+  university: string,
+  department: string,
+  admissionType?: string,
+  track?: string,
+): Promise<OfferingRow[]> {
+  const exact = await fetchOfferingRowsExact(university, department, admissionType, track);
+  if (exact.length > 0) return exact;
+  return fetchOfferingRowsExact(altUniversity(university), department, admissionType, track);
+}
+
 /**
  * 대학+모집단위+세부전형명이 정확히 일치하는 이투스 전형데이터를 찾는다. 원본 데이터는
  * 1행이 아니라 "1개 전형 = 일괄합산 1행 또는 1단계+2단계 각 1행"이라, 먼저 그 모양대로
@@ -129,14 +167,7 @@ export async function findOfferingMatch(
   department: string,
   admissionType: string,
 ): Promise<OfferingLookupResult> {
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("admission_offerings")
-    .select(OFFERING_COLUMNS)
-    .eq("university", university)
-    .eq("department", department)
-    .eq("admission_type", admissionType);
-  const rows = data ?? [];
+  const rows = await fetchOfferingRows(university, department, admissionType);
   if (rows.length === 0) return { kind: "none" };
 
   const merged = toMerged(rows);
@@ -155,15 +186,7 @@ export async function listOfferingCandidates(
   department: string,
   track?: string,
 ): Promise<MergedOffering[]> {
-  const supabase = createClient();
-  let query = supabase
-    .from("admission_offerings")
-    .select(OFFERING_COLUMNS)
-    .eq("university", university)
-    .eq("department", department);
-  if (track) query = query.eq("track", track);
-  const { data } = await query;
-  const rows = data ?? [];
+  const rows = await fetchOfferingRows(university, department, undefined, track);
   if (rows.length === 0) return [];
 
   return groupByAdmissionType(rows);
