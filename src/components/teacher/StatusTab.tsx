@@ -44,8 +44,6 @@ const COMPACT_FIELD_CLASS =
 const COMPACT_BUTTON_CLASS =
   "px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1.5";
 
-const RESERVE_LABELS = ["예비1", "예비2", "예비3"] as const;
-
 function findOverlap(existing: CounselingSlot[], date: string, start: string, end: string) {
   return existing.find(
     (s) =>
@@ -74,6 +72,7 @@ export function StatusTab() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [endTouched, setEndTouched] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
   const [favoriteOverride, setFavoriteOverride] = useState<"weekday" | "weekend" | null>(null);
 
   const allDates = useMemo(
@@ -212,9 +211,14 @@ export function StatusTab() {
     showToast("상담 슬롯이 추가되었습니다.", "success");
   }
 
-  /** 정해진 시각 없이 "예비1/예비2/예비3"처럼 이름만 있는 슬롯을 추가한다 — 정규 시간
+  /** 정해진 시각 없이 "예비1"처럼 직접 입력한 이름만 있는 슬롯을 추가한다 — 정규 시간
    * 슬롯이 다 찬 뒤에도 순번만 정해 두고 나중에 시간을 조율할 때 쓴다. */
-  async function createLabelSlot(label: string) {
+  async function createLabelSlot() {
+    const label = labelInput.trim();
+    if (!label) {
+      showToast("슬롯 이름을 입력해 주세요.", "error");
+      return;
+    }
     if (grade == null || classNo == null) {
       showToast("반 정보를 확인할 수 없습니다.", "error");
       return;
@@ -224,7 +228,7 @@ export function StatusTab() {
       return;
     }
     if (daySlots.some((s) => s.label === label)) {
-      showToast(`이미 ${label} 슬롯이 있습니다.`, "error");
+      showToast(`이미 "${label}" 슬롯이 있습니다.`, "error");
       return;
     }
     const supabase = createClient();
@@ -235,7 +239,8 @@ export function StatusTab() {
       showToast("슬롯 생성에 실패했습니다.", "error");
       return;
     }
-    showToast(`${label} 슬롯이 추가되었습니다.`, "success");
+    showToast(`"${label}" 슬롯이 추가되었습니다.`, "success");
+    setLabelInput("");
   }
 
   function toggleCheck(id: string) {
@@ -359,19 +364,17 @@ export function StatusTab() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-indigo-700 shrink-0">예비 슬롯</span>
-            {RESERVE_LABELS.map((label) => {
-              const exists = daySlots.some((s) => s.label === label);
-              return (
-                <button
-                  key={label}
-                  onClick={() => createLabelSlot(label)}
-                  disabled={exists}
-                  className="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition whitespace-nowrap bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white"
-                >
-                  {label}
-                </button>
-              );
-            })}
+            <input
+              value={labelInput}
+              onChange={(e) => setLabelInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createLabelSlot()}
+              placeholder="예비1"
+              className="w-28 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button onClick={createLabelSlot} className={COMPACT_BUTTON_CLASS}>
+              <SquarePlus className="w-3.5 h-3.5" />
+              <span>추가</span>
+            </button>
           </div>
 
           <div className="border-t border-dashed border-indigo-200" />
