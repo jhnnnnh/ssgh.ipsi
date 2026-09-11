@@ -30,8 +30,8 @@ export function EditSlotModal({
   useEffect(() => {
     if (slot) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStart(slot.start_time.slice(0, 5));
-      setEnd(slot.end_time.slice(0, 5));
+      setStart(slot.start_time ? slot.start_time.slice(0, 5) : "");
+      setEnd(slot.end_time ? slot.end_time.slice(0, 5) : "");
       setStudentId(slot.student_id ?? "");
       setStudentName(slot.student_name ?? "");
       setMemo(slot.memo ?? "");
@@ -39,9 +39,10 @@ export function EditSlotModal({
   }, [slot]);
 
   if (!slot) return null;
+  const isLabelSlot = slot.label != null;
 
   async function saveSlot(studentIdValue: string, studentNameValue: string) {
-    if (!isValidTime(start) || !isValidTime(end) || start >= end) {
+    if (!isLabelSlot && (!isValidTime(start) || !isValidTime(end) || start >= end)) {
       showToast("올바른 시간 형식(HH:MM), 종료 > 시작을 확인해 주세요.", "error");
       return false;
     }
@@ -53,8 +54,7 @@ export function EditSlotModal({
     const { error } = await supabase
       .from("counseling_slots")
       .update({
-        start_time: start,
-        end_time: end,
+        ...(isLabelSlot ? {} : { start_time: start, end_time: end }),
         is_booked: willBeBooked,
         student_id: willBeBooked ? trimmedId : null,
         student_name: willBeBooked ? trimmedName : null,
@@ -118,24 +118,34 @@ export function EditSlotModal({
         </>
       }
     >
-      <div className="grid grid-cols-2 gap-2">
+      {isLabelSlot ? (
         <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">시작 시간</label>
-          <input
-            value={start}
-            onChange={(e) => setStart(autoFormatTime(e.target.value))}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800"
-          />
+          <label className="block text-xs font-bold text-slate-600 mb-1">이름</label>
+          <p className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800">
+            {slot.label}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1">정해진 시각이 없는 예비 슬롯이라 이름은 바꿀 수 없어요.</p>
         </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">종료 시간</label>
-          <input
-            value={end}
-            onChange={(e) => setEnd(autoFormatTime(e.target.value))}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800"
-          />
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">시작 시간</label>
+            <input
+              value={start}
+              onChange={(e) => setStart(autoFormatTime(e.target.value))}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">종료 시간</label>
+            <input
+              value={end}
+              onChange={(e) => setEnd(autoFormatTime(e.target.value))}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="border-t border-slate-100 pt-3">
         <div className="flex items-center justify-between mb-2">

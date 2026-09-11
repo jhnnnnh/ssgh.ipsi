@@ -55,8 +55,11 @@ export type Profile = {
 export type CounselingSlot = {
   id: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  /** 시간 슬롯이면 둘 다 값이 있고, "예비" 라벨 슬롯이면 둘 다 null(대신 label 사용). */
+  start_time: string | null;
+  end_time: string | null;
+  /** 정해진 시각이 없는 슬롯의 이름(예: "예비1"). 시간 슬롯이면 null. */
+  label: string | null;
   is_booked: boolean;
   student_id: string | null;
   student_name: string | null;
@@ -311,11 +314,14 @@ export type Database = {
       } & NoRelationships;
       counseling_slots: {
         Row: CounselingSlot;
-        Insert: Pick<CounselingSlot, "date" | "start_time" | "end_time" | "grade" | "class_no"> &
+        Insert: Pick<CounselingSlot, "date" | "grade" | "class_no"> &
           Partial<
             Pick<
               CounselingSlot,
               | "id"
+              | "start_time"
+              | "end_time"
+              | "label"
               | "is_booked"
               | "student_id"
               | "student_name"

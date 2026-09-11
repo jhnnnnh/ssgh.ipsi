@@ -29,6 +29,8 @@ import { downloadCsv } from "@/lib/csv";
 import {
   autoFormatTime,
   addMinutesToTime,
+  compareSlotsForDisplay,
+  formatSlotDisplay,
   formatTime,
   isValidTime,
   isWeekendDate,
@@ -42,9 +44,15 @@ const COMPACT_FIELD_CLASS =
 const COMPACT_BUTTON_CLASS =
   "px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1.5";
 
+const RESERVE_LABELS = ["예비1", "예비2", "예비3"] as const;
+
 function findOverlap(existing: CounselingSlot[], date: string, start: string, end: string) {
   return existing.find(
-    (s) => s.date === date && timeRangesOverlap(start, end, formatTime(s.start_time), formatTime(s.end_time)),
+    (s) =>
+      s.date === date &&
+      s.start_time != null &&
+      s.end_time != null &&
+      timeRangesOverlap(start, end, formatTime(s.start_time), formatTime(s.end_time)),
   );
 }
 
@@ -95,7 +103,7 @@ export function StatusTab() {
     () =>
       slots
         .filter((s) => s.date === activeDate)
-        .sort((a, b) => a.start_time.localeCompare(b.start_time)),
+        .sort(compareSlotsForDisplay),
     [slots, activeDate],
   );
 
@@ -155,7 +163,7 @@ export function StatusTab() {
     const conflict = findOverlap(slots, activeDate, start, end);
     if (conflict) {
       showToast(
-        `이미 ${formatTime(conflict.start_time)}~${formatTime(conflict.end_time)} 슬롯과 시간이 겹쳐서 추가할 수 없습니다.`,
+        `이미 ${formatTime(conflict.start_time!)}~${formatTime(conflict.end_time!)} 슬롯과 시간이 겹쳐서 추가할 수 없습니다.`,
         "error",
       );
       return;
@@ -188,7 +196,7 @@ export function StatusTab() {
     const conflict = findOverlap(slots, activeDate, start_time, end_time);
     if (conflict) {
       showToast(
-        `이미 ${formatTime(conflict.start_time)}~${formatTime(conflict.end_time)} 슬롯과 시간이 겹쳐서 추가할 수 없습니다.`,
+        `이미 ${formatTime(conflict.start_time!)}~${formatTime(conflict.end_time!)} 슬롯과 시간이 겹쳐서 추가할 수 없습니다.`,
         "error",
       );
       return;
@@ -202,6 +210,32 @@ export function StatusTab() {
       return;
     }
     showToast("상담 슬롯이 추가되었습니다.", "success");
+  }
+
+  /** 정해진 시각 없이 "예비1/예비2/예비3"처럼 이름만 있는 슬롯을 추가한다 — 정규 시간
+   * 슬롯이 다 찬 뒤에도 순번만 정해 두고 나중에 시간을 조율할 때 쓴다. */
+  async function createLabelSlot(label: string) {
+    if (grade == null || classNo == null) {
+      showToast("반 정보를 확인할 수 없습니다.", "error");
+      return;
+    }
+    if (!activeDate) {
+      showToast("먼저 날짜를 선택하거나 추가해 주세요.", "error");
+      return;
+    }
+    if (daySlots.some((s) => s.label === label)) {
+      showToast(`이미 ${label} 슬롯이 있습니다.`, "error");
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("counseling_slots")
+      .insert({ date: activeDate, label, grade, class_no: classNo });
+    if (error) {
+      showToast("슬롯 생성에 실패했습니다.", "error");
+      return;
+    }
+    showToast(`${label} 슬롯이 추가되었습니다.`, "success");
   }
 
   function toggleCheck(id: string) {
@@ -253,13 +287,13 @@ export function StatusTab() {
   }
 
   function exportCsv() {
-    const sorted = [...slots].sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
+    const sorted = [...slots].sort((a, b) => (a.date === b.date ? compareSlotsForDisplay(a, b) : a.date.localeCompare(b.date)));
     const rows: (string | number)[][] = [
       ["날짜", "시작", "종료", "상태", "학번", "이름", "신청일시", "메모"],
       ...sorted.map((s) => [
         s.date,
-        formatTime(s.start_time),
-        formatTime(s.end_time),
+        s.label ?? formatTime(s.start_time!),
+        s.label ? "" : formatTime(s.end_time!),
         s.is_booked ? "예약됨" : "가능",
         s.student_id ?? "",
         s.student_name ?? "",
@@ -321,6 +355,23 @@ export function StatusTab() {
               <SquarePlus className="w-3.5 h-3.5" />
               <span>직접 추가</span>
             </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-indigo-700 shrink-0">예비 슬롯</span>
+            {RESERVE_LABELS.map((label) => {
+              const exists = daySlots.some((s) => s.label === label);
+              return (
+                <button
+                  key={label}
+                  onClick={() => createLabelSlot(label)}
+                  disabled={exists}
+                  className="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border transition whitespace-nowrap bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white"
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="border-t border-dashed border-indigo-200" />
@@ -429,9 +480,7 @@ export function StatusTab() {
                       onChange={() => toggleCheck(s.id)}
                       className="rounded text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-lg font-bold text-slate-900">
-                      {formatTime(s.start_time)} ~ {formatTime(s.end_time)}
-                    </span>
+                    <span className="text-lg font-bold text-slate-900">{formatSlotDisplay(s)}</span>
                     {s.is_booked && (
                       <span className="whitespace-nowrap text-[11px] font-bold emphasis-title bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                         {s.student_id} {s.student_name}

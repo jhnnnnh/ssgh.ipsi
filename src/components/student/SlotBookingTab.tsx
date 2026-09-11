@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { DateTabs } from "@/components/ui/DateTabs";
-import { formatDateFull, formatTime, todayDateString } from "@/lib/time";
+import { compareSlotsForDisplay, formatDateFull, formatSlotDisplay, todayDateString } from "@/lib/time";
 import { cn } from "@/lib/cn";
 
 export function SlotBookingTab({ studentId }: { studentId: string }) {
@@ -31,10 +31,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
   const isPastDate = activeDate != null && activeDate < today;
 
   const daySlots = useMemo(
-    () =>
-      slots
-        .filter((s) => s.date === activeDate)
-        .sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    () => slots.filter((s) => s.date === activeDate).sort(compareSlotsForDisplay),
     [slots, activeDate],
   );
 
@@ -42,7 +39,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
     () =>
       slots
         .filter((s) => s.is_booked && s.student_id === studentId)
-        .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time)),
+        .sort((a, b) => (a.date === b.date ? compareSlotsForDisplay(a, b) : a.date.localeCompare(b.date))),
     [slots, studentId],
   );
 
@@ -91,7 +88,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
                 className="flex items-center justify-between bg-indigo-50/60 border border-indigo-100 rounded-2xl px-4 py-3"
               >
                 <div className="text-xs font-bold text-indigo-900">
-                  {formatDateFull(r.date)} · {formatTime(r.start_time)}~{formatTime(r.end_time)}
+                  {formatDateFull(r.date)} · {formatSlotDisplay(r)}
                 </div>
                 <button
                   onClick={() => handleCancel(r.id)}
@@ -157,7 +154,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
                       isTaken ? "text-slate-400" : "text-slate-900",
                     )}
                   >
-                    {formatTime(slot.start_time)} ~ {formatTime(slot.end_time)}
+                    {formatSlotDisplay(slot)}
                   </div>
 
                   {isMine &&

@@ -52,6 +52,30 @@ export function timeRangesOverlap(startA: string, endA: string, startB: string, 
   return startA < endB && startB < endA;
 }
 
+type TimeOrLabelSlot = { label: string | null; start_time: string | null; end_time: string | null };
+
+/** 상담 슬롯 한 칸의 표시 문구. 시간 슬롯이면 "13:00 ~ 13:30", 정해진 시각이 없는 "예비"
+ * 슬롯이면 그 이름(label, 예: "예비1")을 그대로 보여준다. */
+export function formatSlotDisplay(slot: TimeOrLabelSlot) {
+  if (slot.label) return slot.label;
+  if (slot.start_time && slot.end_time) return `${formatTime(slot.start_time)} ~ ${formatTime(slot.end_time)}`;
+  return "";
+}
+
+/** 슬롯 목록을 표시 순서로 정렬하는 비교 함수. 시간 슬롯은 시각순으로 먼저 오고, 시각이
+ * 없는 "예비" 슬롯은 항상 그 뒤에 이름순으로 온다. (참고: "~예비1"처럼 특수문자를 붙인
+ * 문자열을 localeCompare로 비교하는 방식은 브라우저 로케일에 따라 기호와 숫자의 사전식
+ * 순서가 달라져 예비 슬롯이 시간 슬롯보다 앞에 오는 경우가 있어, null 여부를 직접
+ * 분기하는 방식으로 바꿨다.) */
+export function compareSlotsForDisplay(a: TimeOrLabelSlot, b: TimeOrLabelSlot): number {
+  if (a.start_time != null && b.start_time != null) {
+    return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0;
+  }
+  if (a.start_time != null) return -1;
+  if (b.start_time != null) return 1;
+  return (a.label ?? "").localeCompare(b.label ?? "");
+}
+
 /** "20261111"처럼 구분자 없이 숫자 8자리로 입력해도 "2026-11-11" 형식으로 맞춰 보여준다
  * (점·슬래시 등 다른 구분자로 입력해도 숫자만 추려 같은 방식으로 맞춘다). 8자리가 아니면
  * 자유 텍스트를 그대로 둔다 — 날짜가 아직 미정이거나 "추후 공지" 같은 메모여도 막지 않는다. */
