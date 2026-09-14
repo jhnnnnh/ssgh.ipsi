@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  type DragEndEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -14,7 +13,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
@@ -26,6 +24,7 @@ import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
 import { useEqualHeights } from "@/lib/hooks/useEqualHeights";
 import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
+import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { useActiveClass } from "@/components/providers/ActiveClassProvider";
 import { Card } from "@/components/ui/Card";
 import { SortableWonseoCard } from "@/components/wonseo/SortableWonseoCard";
@@ -34,7 +33,7 @@ import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
 import { WonseoTableView } from "@/components/teacher/WonseoTableView";
 import { exportWonseoExcel } from "@/lib/wonseo-excel";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
-import type { Roster, ScheduleEvent, WonseoCard } from "@/lib/database.types";
+import type { Roster, WonseoCard } from "@/lib/database.types";
 
 type ViewMode = "cards" | "table" | "submittedTable";
 
@@ -47,7 +46,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const { autoAssign, setAutoAssign } = useRankAutoAssign(selectedStudentId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
-  const [cards, setCards] = useState<WonseoCard[]>([]);
   const [allCards, setAllCards] = useState<WonseoCard[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WonseoCard | null>(null);
@@ -57,6 +55,24 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const [studentView, setStudentView] = useState<"all" | "submitted">("all");
 
   const supabase = useMemo(() => createClient(), []);
+  const {
+    cards,
+    reloadCards,
+    deleteCard,
+    toggleSubmitted,
+    reorderCards,
+    reorderSubmittedCards,
+    saveSubmittedFields,
+    saveRank,
+    toggleAutoAssign,
+  } = useWonseoCards({
+    studentId: selectedStudentId,
+    autoAssign,
+    setAutoAssign,
+    confirm,
+    onError: (message) => showToast(message, "error"),
+    onSuccess: (message) => showToast(message, "success"),
+  });
   const { setRef, maxHeight } = useEqualHeights(
     cards.map((c) => c.id).join("|"),
     cards.length,
@@ -68,20 +84,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const reload = async (studentId: string) => {
-    if (!studentId) {
-      setCards([]);
-      return;
-    }
-    const { data } = await supabase
-      .from("wonseo_cards")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
-    setCards(data ?? []);
-  };
-
   const reloadAll = async () => {
     const { data } = await supabase.from("wonseo_cards").select("*");
     setAllCards(data ?? []);
@@ -89,9 +91,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    reload(selectedStudentId);
     setStudentView("all");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStudentId]);
 
   useEffect(() => {
@@ -109,164 +109,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   function openEdit(card: WonseoCard) {
     setEditingCard(card);
     setModalOpen(true);
-  }
-
-  async function handleDelete(card: WonseoCard) {
-    const ok = await confirm({
-      message: `${card.university || "해당"} 원서 카드를 삭제하시겠습니까?`,
-      confirmLabel: "삭제",
-      danger: true,
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("wonseo_cards").delete().eq("id", card.id);
-    if (error) {
-      showToast("삭제에 실패했습니다.", "error");
-      return;
-    }
-    showToast("삭제되었습니다.", "success");
-    reload(selectedStudentId);
-  }
-
-  async function handleToggleSubmitted(card: WonseoCard) {
-    const turningOn = !card.is_submitted;
-    // 새로 별표 표시하는 카드는 "접수한 원서" 목록 맨 뒤에 붙인다. sort_order(접수 전
-    // 화면 순서)는 절대 건드리지 않는다 — 두 화면의 순서는 완전히 독립적이어야 한다.
-    const patch: { is_submitted: boolean; submitted_sort_order?: number } = { is_submitted: turningOn };
-    if (turningOn) {
-      patch.submitted_sort_order = cards.filter((c) => c.is_submitted).length;
-    }
-    const { error } = await supabase.from("wonseo_cards").update(patch).eq("id", card.id);
-    if (error) {
-      showToast("저장에 실패했습니다.", "error");
-      return;
-    }
-    reload(selectedStudentId);
-  }
-
-  /** "접수한 원서" 화면의 순서는 submitted_sort_order라는 별도 컬럼을 쓴다 — 접수 전
-   * 화면의 sort_order와 완전히 분리되어 있어, 한쪽에서 드래그해도 다른 쪽 카드 순서·
-   * 지망 번호에는 전혀 영향을 주지 않는다. */
-  async function handleSubmittedDragEnd(event: DragEndEvent, submittedCards: WonseoCard[]) {
-    const { active, over } = event;
-    setActiveId(null);
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = submittedCards.findIndex((c) => c.id === active.id);
-    const newIndex = submittedCards.findIndex((c) => c.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reorderedSubmitted = arrayMove(submittedCards, oldIndex, newIndex).map((card, index) => ({
-      ...card,
-      submitted_sort_order: index,
-    }));
-    const byId = new Map(reorderedSubmitted.map((c) => [c.id, c]));
-    setCards((prev) => prev.map((c) => byId.get(c.id) ?? c));
-
-    const results = await Promise.all(
-      reorderedSubmitted.map((card) =>
-        supabase.from("wonseo_cards").update({ submitted_sort_order: card.submitted_sort_order }).eq("id", card.id),
-      ),
-    );
-    if (results.some((r) => r.error)) {
-      showToast("순서 저장에 실패했습니다.", "error");
-      reload(selectedStudentId);
-    }
-  }
-
-  async function handleSubmittedFieldsCommit(
-    card: WonseoCard,
-    fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] },
-  ) {
-    const { error } = await supabase
-      .from("wonseo_cards")
-      .update({
-        application_number: fields.applicationNumber.trim() || null,
-        schedule_events: fields.scheduleEvents,
-      })
-      .eq("id", card.id);
-    if (error) {
-      showToast("저장에 실패했습니다.", "error");
-      return;
-    }
-    reload(selectedStudentId);
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    setActiveId(null);
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = cards.findIndex((c) => c.id === active.id);
-    const newIndex = cards.findIndex((c) => c.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reordered = arrayMove(cards, oldIndex, newIndex).map((card, index) => ({
-      ...card,
-      sort_order: index,
-    }));
-    setCards(reordered);
-
-    const results = await Promise.all(
-      reordered.map((card) =>
-        supabase.from("wonseo_cards").update({ sort_order: card.sort_order }).eq("id", card.id),
-      ),
-    );
-    if (results.some((r) => r.error)) {
-      showToast("순서 저장에 실패했습니다.", "error");
-      reload(selectedStudentId);
-    }
-  }
-
-  async function handleRankTextChange(card: WonseoCard, text: string) {
-    const value = text.trim() || null;
-    if (value === card.rank) return;
-    const { error } = await supabase.from("wonseo_cards").update({ rank: value }).eq("id", card.id);
-    if (error) {
-      showToast("지망 순위 저장에 실패했습니다.", "error");
-      return;
-    }
-    reload(selectedStudentId);
-  }
-
-  async function handleToggleAutoAssign() {
-    if (autoAssign) {
-      const labels = computeAutoRankLabels(cards);
-      const results = await Promise.all(
-        cards.map((card, i) =>
-          supabase.from("wonseo_cards").update({ rank: labels[i] }).eq("id", card.id),
-        ),
-      );
-      if (results.some((r) => r.error)) {
-        showToast("전환에 실패했습니다.", "error");
-        return;
-      }
-      const { error } = await supabase
-        .from("roster")
-        .update({ rank_auto_assign: false })
-        .eq("student_id", selectedStudentId);
-      if (error) {
-        showToast("전환에 실패했습니다.", "error");
-        return;
-      }
-      setAutoAssign(false);
-      reload(selectedStudentId);
-    } else {
-      const ok = await confirm({
-        message: "자동 배정으로 전환하면 직접 입력한 지망 값이 초기화됩니다. 계속할까요?",
-        confirmLabel: "전환",
-        danger: true,
-      });
-      if (!ok) return;
-      const { error } = await supabase
-        .from("roster")
-        .update({ rank_auto_assign: true })
-        .eq("student_id", selectedStudentId);
-      if (error) {
-        showToast("전환에 실패했습니다.", "error");
-        return;
-      }
-      setAutoAssign(true);
-    }
   }
 
   async function handleExportExcel(variant: "all" | "submitted" = "all") {
@@ -415,7 +257,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                     <span>지난 입결</span>
                   </button>
                   <button
-                    onClick={handleToggleAutoAssign}
+                    onClick={() => void toggleAutoAssign()}
                     tabIndex={studentView === "all" ? 0 : -1}
                     className={cn(
                       "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
@@ -447,7 +289,10 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                     collisionDetection={closestCenter}
                     onDragStart={(e) => setActiveId(String(e.active.id))}
                     onDragCancel={() => setActiveId(null)}
-                    onDragEnd={(e) => handleSubmittedDragEnd(e, submittedCards)}
+                    onDragEnd={(e) => {
+                      setActiveId(null);
+                      void reorderSubmittedCards(e, submittedCards);
+                    }}
                   >
                     <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
@@ -460,15 +305,15 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                             card={card}
                             autoAssign={autoAssign}
                             rankLabel={submittedRankLabels[index]}
-                            onRankChange={(text) => handleRankTextChange(card, text)}
+                            onRankChange={(text) => void saveRank(card, text)}
                             showStatus={statusVisible}
                             showRecentResults={false}
                             onEdit={() => openEdit(card)}
-                            onDelete={() => handleDelete(card)}
+                            onDelete={() => void deleteCard(card)}
                             isSubmitted={card.is_submitted}
-                            onToggleSubmitted={() => handleToggleSubmitted(card)}
+                            onToggleSubmitted={() => void toggleSubmitted(card)}
                             bodyMode="submitted"
-                            onSubmittedFieldsCommit={(fields) => handleSubmittedFieldsCommit(card, fields)}
+                            onSubmittedFieldsCommit={(fields) => void saveSubmittedFields(card, fields)}
                           />
                         ))}
                       </div>
@@ -505,7 +350,10 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   collisionDetection={closestCenter}
                   onDragStart={(e) => setActiveId(String(e.active.id))}
                   onDragCancel={() => setActiveId(null)}
-                  onDragEnd={handleDragEnd}
+                  onDragEnd={(e) => {
+                    setActiveId(null);
+                    void reorderCards(e);
+                  }}
                 >
                   <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
@@ -519,13 +367,13 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                           card={card}
                           autoAssign={autoAssign}
                           rankLabel={rankLabels[index]}
-                          onRankChange={(text) => handleRankTextChange(card, text)}
+                          onRankChange={(text) => void saveRank(card, text)}
                           showStatus={statusVisible}
                           showRecentResults={showRecentResults}
                           onEdit={() => openEdit(card)}
-                          onDelete={() => handleDelete(card)}
+                          onDelete={() => void deleteCard(card)}
                           isSubmitted={card.is_submitted}
-                          onToggleSubmitted={() => handleToggleSubmitted(card)}
+                          onToggleSubmitted={() => void toggleSubmitted(card)}
                         />
                       ))}
                     </div>
@@ -605,7 +453,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           editingCard={editingCard}
           canEditStatus={isAdmin || statusVisible}
           nextSortOrder={cards.length}
-          onSaved={() => reload(selectedStudentId)}
+          onSaved={reloadCards}
         />
       )}
     </div>
