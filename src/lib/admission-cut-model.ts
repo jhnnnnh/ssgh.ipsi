@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildLevelBinTable, type KernelDatabaseRow, type LevelBin } from "@/lib/admission-cut-kernel-predictor";
+import {
+  buildCompetitionCorrection,
+  buildLevelBinTable,
+  type CompetitionCorrection,
+  type KernelDatabaseRow,
+  type LevelBin,
+} from "@/lib/admission-cut-kernel-predictor";
 import type { Database } from "@/lib/database.types";
 
 export type CutoffModelSourceRow = {
@@ -16,6 +22,7 @@ export type CutoffModelSourceRow = {
 export type AdmissionCutModel = {
   database: KernelDatabaseRow[];
   bins: LevelBin[];
+  competitionCorrection: CompetitionCorrection;
 };
 
 const SELECT_COLUMNS = "id, university, department, admission_type, year, grade_50, grade_70, enrollment, competition_rate";
@@ -152,5 +159,6 @@ export function buildAdmissionCutModel(sourceRows: CutoffModelSourceRow[]): Admi
     });
   }
 
-  return { database, bins: buildLevelBinTable(database) };
+  const bins = buildLevelBinTable(database);
+  return { database, bins, competitionCorrection: buildCompetitionCorrection(database, bins) };
 }

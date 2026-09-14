@@ -99,6 +99,7 @@ export async function POST(request: Request) {
         id: "current",
         database: model.database,
         bins: model.bins,
+        competition_correction: model.competitionCorrection,
         source_row_count: sourceRows.length,
         source_years: sourceYears,
         built_at: new Date().toISOString(),

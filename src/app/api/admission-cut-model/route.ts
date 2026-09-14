@@ -19,7 +19,7 @@ export async function GET() {
   const adminClient = createAdminClient();
   const { data: model, error } = await adminClient
     .from("admission_cut_models")
-    .select("database, bins")
+    .select("database, bins, competition_correction")
     .eq("id", "current")
     .maybeSingle();
   if (error) {
@@ -31,7 +31,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { database: model.database, bins: model.bins },
+    { database: model.database, bins: model.bins, competitionCorrection: model.competition_correction },
     { headers: { "Cache-Control": "private, max-age=600" } },
   );
 }

@@ -19,6 +19,16 @@ export type KernelDatabaseRow = {
 
 export type LevelBin = { lo: number; hi: number; mu: number; sigma: number };
 
+/** 유사 사례가 적을 때, 전체 자료에서 확인한 경쟁률의 평균적인 컷 변화만 따로 반영하기 위한
+ * 보정표 한 점. competitionLocal은 같은 성적대 안에서 평균 경쟁률보다 얼마나 높은지를 뜻한다. */
+export type CompetitionCorrectionPoint = {
+  competitionLocal: number;
+  shift50: number;
+  shift70: number;
+};
+
+export type CompetitionCorrection = CompetitionCorrectionPoint[];
+
 const BIN_COUNT = 8;
 
 /** level50 기준 분위수 등분(qcut)으로 8구간을 나누고, 구간별 경쟁률(compRaw)의 평균·표준편차를 구한다. */
@@ -47,6 +57,11 @@ function lookupBin(level: number, bins: LevelBin[]): { mu: number; sigma: number
   // 범위 밖(가장 상위/하위보다 더 극단)이면 외삽하지 않고 가장 가까운 구간을 그대로 쓴다.
   if (bins.length === 0) return { mu: 0, sigma: 1 };
   return level < bins[0].lo ? bins[0] : bins[bins.length - 1];
+}
+
+function competitionLocalValue(level: number, competition: number, bins: LevelBin[]): number {
+  const bin = lookupBin(level, bins);
+  return (competition - bin.mu) / bin.sigma;
 }
 
 /**
@@ -113,6 +128,120 @@ export function computeKernelWeights(target: TargetVector, database: KernelDatab
   const weights = rawWeights.map((w) => w / total);
   const effectiveN = 1 / weights.reduce((a, w) => a + w * w, 0);
   return { weights, effectiveN };
+}
+
+/** 값이 커질수록 더 쉬운 등급(숫자가 큰 컷)이 되는 것을 막기 위해, 경쟁률 축에서만
+ * 비증가 형태로 정리한다. 경쟁률이 높아질수록 컷은 같거나 더 낮아져야 한다. */
+function makeNonIncreasing(values: number[], weights: number[]): number[] {
+  const blocks: { sum: number; weight: number; start: number; end: number }[] = [];
+  for (let index = 0; index < values.length; index++) {
+    blocks.push({ sum: values[index] * weights[index], weight: weights[index], start: index, end: index });
+    while (blocks.length >= 2) {
+      const right = blocks[blocks.length - 1];
+      const left = blocks[blocks.length - 2];
+      if (left.sum / left.weight >= right.sum / right.weight) break;
+      blocks.splice(blocks.length - 2, 2, {
+        sum: left.sum + right.sum,
+        weight: left.weight + right.weight,
+        start: left.start,
+        end: right.end,
+      });
+    }
+  }
+  const result = new Array<number>(values.length);
+  for (const block of blocks) {
+    const value = block.sum / block.weight;
+    for (let index = block.start; index <= block.end; index++) result[index] = value;
+  }
+  return result;
+}
+
+/**
+ * 유사 사례가 부족할 때만 사용할 경쟁률 보정표를 만든다. 각 과거 사례는 자신과 같은
+ * 교차검증 묶음을 제외한 나머지 사례로 먼저 4차원(컷 수준·추세·정원 변화) 기본값을
+ * 구하고, 실제 컷과의 차이를 경쟁률별로 모은다. 따라서 경쟁률 이외의 조건 때문에 생긴
+ * 차이를 가능한 한 먼저 걷어낸 뒤, 경쟁률의 평균적인 영향만 남긴다.
+ */
+export function buildCompetitionCorrection(database: KernelDatabaseRow[], bins: LevelBin[]): CompetitionCorrection {
+  if (database.length < 10 || bins.length === 0) return [];
+
+  const FOLD_COUNT = 5;
+  const residuals: { competitionLocal: number; shift50: number; shift70: number }[] = [];
+  const y50 = database.map((row) => row.y50);
+  const y70 = database.map((row) => row.y70);
+
+  for (let index = 0; index < database.length; index++) {
+    const row = database[index];
+    const { weights } = computeKernelWeights(
+      { level50: row.level50, level70: row.level70, trend70: row.trend70, capChange: row.capChange },
+      database,
+      bins,
+    );
+    let total = 0;
+    let base50 = 0;
+    let base70 = 0;
+    const excludedFold = index % FOLD_COUNT;
+    for (let other = 0; other < database.length; other++) {
+      if (other % FOLD_COUNT === excludedFold) continue;
+      const weight = weights[other];
+      total += weight;
+      base50 += weight * y50[other];
+      base70 += weight * y70[other];
+    }
+    if (total <= 0) continue;
+    residuals.push({
+      competitionLocal: competitionLocalValue(row.level50, row.compRaw, bins),
+      shift50: row.y50 - base50 / total,
+      shift70: row.y70 - base70 / total,
+    });
+  }
+
+  const sorted = residuals.sort((a, b) => a.competitionLocal - b.competitionLocal);
+  const POINTS = 12;
+  const points: CompetitionCorrectionPoint[] = [];
+  const counts: number[] = [];
+  for (let point = 0; point < POINTS; point++) {
+    const start = Math.floor((sorted.length * point) / POINTS);
+    const end = Math.floor((sorted.length * (point + 1)) / POINTS);
+    const slice = sorted.slice(start, end);
+    if (slice.length === 0) continue;
+    const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    points.push({
+      competitionLocal: average(slice.map((row) => row.competitionLocal)),
+      shift50: average(slice.map((row) => row.shift50)),
+      shift70: average(slice.map((row) => row.shift70)),
+    });
+    counts.push(slice.length);
+  }
+  const shift50 = makeNonIncreasing(points.map((point) => point.shift50), counts);
+  const shift70 = makeNonIncreasing(points.map((point) => point.shift70), counts);
+  return points.map((point, index) => ({ ...point, shift50: shift50[index], shift70: shift70[index] }));
+}
+
+/** 보정표의 두 점 사이에서는 부드럽게 보간하고, 과거 범위를 벗어나면 마지막 확인값을
+ * 유지한다. 과거에 없던 극단 경쟁률을 임의로 외삽해 과장하지 않기 위함이다. */
+export function lookupCompetitionCorrection(
+  correction: CompetitionCorrection,
+  level50: number,
+  competition: number,
+  bins: LevelBin[],
+): { shift50: number; shift70: number } {
+  if (correction.length === 0 || bins.length === 0) return { shift50: 0, shift70: 0 };
+  const local = competitionLocalValue(level50, competition, bins);
+  if (local <= correction[0].competitionLocal) return correction[0];
+  const last = correction[correction.length - 1];
+  if (local >= last.competitionLocal) return last;
+  for (let index = 0; index < correction.length - 1; index++) {
+    const left = correction[index];
+    const right = correction[index + 1];
+    if (local < left.competitionLocal || local > right.competitionLocal) continue;
+    const ratio = (local - left.competitionLocal) / (right.competitionLocal - left.competitionLocal);
+    return {
+      shift50: left.shift50 + ratio * (right.shift50 - left.shift50),
+      shift70: left.shift70 + ratio * (right.shift70 - left.shift70),
+    };
+  }
+  return last;
 }
 
 /** 가중분위수(선형보간). 문서 4절 의사코드 그대로 — 누적가중치를 "각 지점의 중심"으로

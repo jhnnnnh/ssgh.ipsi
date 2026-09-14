@@ -334,6 +334,7 @@ export function AdmissionProbabilityCalculator({
         c70: input.c70.map(parseNum) as Triple,
         quota: input.quota.map(parseIntNum) as Triple,
         turnover: input.turnover.map(parseIntNum) as Triple,
+        applicants: input.applicants.map(parseNum) as Triple,
       };
       setResult(estimateAdmission(estimatorInput, model));
     } catch (error) {
@@ -509,6 +510,7 @@ export function AdmissionProbabilityCalculator({
         c70: form.c70.map(parseNum) as Triple,
         quota: form.quota.map(parseIntNum) as Triple,
         turnover: form.turnover.map(parseIntNum) as Triple,
+        applicants: form.applicants.map(parseNum) as Triple,
       };
       setQueriedScore(parsedScore);
       setResult(estimateAdmission(input, model));
@@ -799,6 +801,14 @@ export function AdmissionProbabilityCalculator({
           {result && "insufficient" in result && (
             <Card>
               <p className="text-xs text-slate-500">{result.reason}</p>
+            </Card>
+          )}
+
+          {ok?.reliabilityMessage && (
+            <Card className={ok.reliability === "approximate" ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}>
+              <p className={ok.reliability === "approximate" ? "text-xs leading-relaxed text-amber-800" : "text-xs leading-relaxed text-slate-600"}>
+                {ok.reliability === "approximate" ? "근사 추정 · " : "참고 · "}{ok.reliabilityMessage}
+              </p>
             </Card>
           )}
 

@@ -228,8 +228,9 @@ export type AdmissionCutoff = {
 };
 
 /** 합격 가능성 계산기가 빠르게 읽는 사전 계산 자료. 원본 입결의 필요한 숫자만 담는다. */
-export type AdmissionCutModelRow = AdmissionCutModel & {
+export type AdmissionCutModelRow = Omit<AdmissionCutModel, "competitionCorrection"> & {
   id: "current";
+  competition_correction: AdmissionCutModel["competitionCorrection"];
   source_row_count: number;
   source_years: number[];
   built_at: string;

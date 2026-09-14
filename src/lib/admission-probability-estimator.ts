@@ -22,11 +22,13 @@ import {
   computeKernelWeights,
   weightedMedian,
   computeAdmitRatio,
+  lookupCompetitionCorrection,
   simulateMarginoseon,
   admissionProbabilityFromSimulation,
   RATIO_STD,
   type KernelDatabaseRow,
   type LevelBin,
+  type CompetitionCorrection,
 } from "@/lib/admission-cut-kernel-predictor";
 
 export type EstimatorInput = {
@@ -38,12 +40,17 @@ export type EstimatorInput = {
   c70: [number, number, number];
   quota: [number, number, number];
   turnover: [number, number, number];
+  /** [2026, 2025, 2024] 순서의 해당 학과 과거 경쟁률. 비어 있으면 0. */
+  applicants?: [number, number, number];
 };
 
 export type KernelModel = {
   database: KernelDatabaseRow[];
   bins: LevelBin[];
+  competitionCorrection: CompetitionCorrection;
 };
+
+export type EstimationReliability = "standard" | "limited" | "approximate";
 
 export type ProbCurvePoint = { grade: number; prob: number };
 
@@ -57,6 +64,9 @@ export type EstimatorResult = {
   probHigh: number;
   /** [B]단계 유효표본수. 범위 폭 계산에 쓰이며, 화면에 구체적인 숫자로 노출하지는 않는다. */
   effectiveN: number;
+  /** 유사 사례 수를 실제 검증 결과에 따라 세 단계로 나눈 표시 상태. */
+  reliability: EstimationReliability;
+  reliabilityMessage: string | null;
   /** 성적(등급)에 따른 합격확률 곡선 — 결과를 시각화할 때 쓴다. */
   curve: ProbCurvePoint[];
 };
@@ -82,7 +92,7 @@ function estimateProbabilityMargin(probFraction: number, effectiveN: number): nu
 }
 
 export function estimateAdmission(input: EstimatorInput, model: KernelModel): EstimatorOutcome {
-  const { c50, c70, quota, turnover, targetQuota, expectedCompetition, userScore } = input;
+  const { c50, c70, quota, turnover, targetQuota, expectedCompetition, userScore, applicants } = input;
 
   if (!isTripleComplete(c50) || !isTripleComplete(c70)) {
     return { insufficient: true, reason: "과거 3개년 50%·70%컷이 모두 있어야 계산할 수 있어요." };
@@ -111,14 +121,38 @@ export function estimateAdmission(input: EstimatorInput, model: KernelModel): Es
   const y50List = model.database.map((r) => r.y50);
   const y70List = model.database.map((r) => r.y70);
 
-  const p50Predicted = weightedMedian(y50List, weights);
-  const p70Predicted = weightedMedian(y70List, weights);
+  const reliability: EstimationReliability = effectiveN < 8 ? "approximate" : effectiveN < 30 ? "limited" : "standard";
+  const historicalCompetition = applicants?.filter((value) => value > 0) ?? [];
+  const isAboveOwnHistory = expectedCompetition > 0 && historicalCompetition.length > 0 && expectedCompetition > Math.max(...historicalCompetition);
+  let selectedY50 = y50List;
+  let selectedY70 = y70List;
+  let selectedWeights = weights;
+
+  if (reliability === "approximate") {
+    // 직접 비슷한 사례를 찾기 어려우면 경쟁률을 매칭 조건에서 빼고(더 넓은 사례를 참고),
+    // 전체 자료에서 검증한 경쟁률 변화 경향만 별도로 반영한다. 보정표는 비증가 형태라
+    // 같은 조건에서 예상 경쟁률을 높였는데 결과가 더 유리해지는 역전을 만들지 않는다.
+    const baseTarget = { ...target };
+    delete baseTarget.compRaw;
+    const base = computeKernelWeights(baseTarget, model.database, model.bins);
+    selectedWeights = base.weights;
+    if (expectedCompetition > 0) {
+      const correction = lookupCompetitionCorrection(model.competitionCorrection, level50, expectedCompetition, model.bins);
+      selectedY50 = y50List.map((value) => value + correction.shift50);
+      selectedY70 = y70List.map((value) => value + correction.shift70);
+    }
+  }
+
+  const p50Predicted = weightedMedian(selectedY50, selectedWeights);
+  const p70Predicted = weightedMedian(selectedY70, selectedWeights);
 
   const ratioPoint = computeAdmitRatio(quota[0], Math.max(turnover[0], 0));
-  const { simulated } = simulateMarginoseon(y50List, y70List, weights, ratioPoint, RATIO_STD);
+  const { simulated } = simulateMarginoseon(selectedY50, selectedY70, selectedWeights, ratioPoint, RATIO_STD);
   const probFraction = admissionProbabilityFromSimulation(simulated, userScore);
   const prob = probFraction * 100;
 
+  // 근사 추정은 넓은 사례를 참고하더라도 원래 직접 매칭이 부족했다는 사실은 남는다. 따라서
+  // 신뢰구간 폭은 직접 매칭의 유효표본수를 기준으로 보수적으로 유지한다.
   const margin = estimateProbabilityMargin(probFraction, effectiveN);
   const probLow = Math.max(0, Math.round(prob - margin));
   let probHigh = Math.min(100, Math.round(prob + margin));
@@ -126,7 +160,15 @@ export function estimateAdmission(input: EstimatorInput, model: KernelModel): Es
 
   const curve = buildProbabilityCurve(simulated, { p50Predicted, p70Predicted, userScore });
 
-  return { p50Predicted, p70Predicted, prob, probLow, probHigh, effectiveN, curve };
+  const reliabilityMessage = reliability === "approximate"
+    ? isAboveOwnHistory
+      ? "비슷한 사례가 8개 미만이고 예상 경쟁률도 지난 3개년보다 높아, 전체 자료의 경쟁률 변화 경향을 반영한 근사 추정입니다."
+      : "비슷한 사례가 8개 미만이라, 더 넓은 과거 자료와 경쟁률 변화 경향을 반영한 근사 추정입니다."
+    : reliability === "limited"
+      ? "참고한 유사 사례가 30개 미만이라 결과 범위를 넓게 해석해 주세요."
+      : null;
+
+  return { p50Predicted, p70Predicted, prob, probLow, probHigh, effectiveN, reliability, reliabilityMessage, curve };
 }
 
 /** 결과 시각화용 곡선 — 성적(등급) 값을 촘촘히 훑으며 시뮬레이션된 마지노선 분포에서
