@@ -42,10 +42,17 @@ import type { AdmissionProbabilitySave, AdmissionProbabilitySaveInput, Roster, W
 let kernelModelPromise: Promise<KernelModel> | null = null;
 function loadKernelModel(): Promise<KernelModel> {
   if (!kernelModelPromise) {
-    kernelModelPromise = fetch("/api/admission-cut-model").then((res) => {
-      if (!res.ok) throw new Error("failed to load kernel model");
-      return res.json();
-    });
+    kernelModelPromise = fetch("/api/admission-cut-model")
+      .then(async (res) => {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        if (!res.ok) throw new Error(body?.error ?? "계산 자료를 불러오지 못했습니다.");
+        return body as KernelModel;
+      })
+      .catch((error: unknown) => {
+        // 업로드가 끝나기 전 요청이 실패해도, 다음 요청에서는 새로 준비된 자료를 다시 읽는다.
+        kernelModelPromise = null;
+        throw error;
+      });
   }
   return kernelModelPromise;
 }
@@ -329,8 +336,8 @@ export function AdmissionProbabilityCalculator({
         turnover: input.turnover.map(parseIntNum) as Triple,
       };
       setResult(estimateAdmission(estimatorInput, model));
-    } catch {
-      showToast("결과를 다시 계산하지 못했어요.", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "결과를 다시 계산하지 못했어요.", "error");
     } finally {
       setQuerying(false);
     }
@@ -505,8 +512,8 @@ export function AdmissionProbabilityCalculator({
       };
       setQueriedScore(parsedScore);
       setResult(estimateAdmission(input, model));
-    } catch {
-      showToast("과거 사례 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "과거 사례 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "error");
     } finally {
       setQuerying(false);
     }

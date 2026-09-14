@@ -45,7 +45,7 @@ async function uploadRows(
     const res = await fetch("/api/admin/upload-admission-cutoffs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows: chunk, isFirst: i === 0 }),
+      body: JSON.stringify({ rows: chunk, isFirst: i === 0, isLast: i + CHUNK_SIZE >= rows.length }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "업로드에 실패했습니다.");

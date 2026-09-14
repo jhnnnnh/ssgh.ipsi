@@ -1,3 +1,5 @@
+import type { AdmissionCutModel } from "@/lib/admission-cut-model";
+
 export type UserRole = "student" | "teacher";
 
 export type TeacherRole = "homeroom" | "admin";
@@ -225,6 +227,14 @@ export type AdmissionCutoff = {
   created_at: string;
 };
 
+/** 합격 가능성 계산기가 빠르게 읽는 사전 계산 자료. 원본 입결의 필요한 숫자만 담는다. */
+export type AdmissionCutModelRow = AdmissionCutModel & {
+  id: "current";
+  source_row_count: number;
+  source_years: number[];
+  built_at: string;
+};
+
 /**
  * 이투스 "OOOO학년도 수시전형모음" 엑셀의 "전형데이터" 시트(93열)를 저장한 전형정보.
  * 매년 전체관리자가 새 파일을 올리면 식별 CODE 기준으로 안전하게 교체된다. 실제로
@@ -366,6 +376,11 @@ export type Database = {
         Insert: Pick<AdmissionCutoff, "university" | "year" | "department"> &
           Partial<Omit<AdmissionCutoff, "university" | "year" | "department" | "id">> & { id?: string };
         Update: Partial<AdmissionCutoff>;
+      } & NoRelationships;
+      admission_cut_models: {
+        Row: AdmissionCutModelRow;
+        Insert: AdmissionCutModelRow;
+        Update: Partial<AdmissionCutModelRow>;
       } & NoRelationships;
       admission_offerings: {
         Row: AdmissionOffering;
