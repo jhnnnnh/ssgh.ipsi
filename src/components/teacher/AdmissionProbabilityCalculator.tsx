@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BookmarkPlus, ExternalLink, Search, Trash2, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -62,6 +62,30 @@ type MyCard = Pick<
   | "level"
   | "calculated_grade"
 >;
+
+async function fetchStudentCalculatorData(studentId: string): Promise<{
+  cards: MyCard[];
+  saves: AdmissionProbabilitySave[];
+}> {
+  const supabase = createClient();
+  const [cardsResult, savesResult] = await Promise.all([
+    supabase
+      .from("wonseo_cards")
+      .select("id, university, department, category, sub_category, enrollment, recent_results, level, calculated_grade")
+      .eq("student_id", studentId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("admission_probability_saves")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    cards: cardsResult.data ?? [],
+    saves: (savesResult.data as AdmissionProbabilitySave[] | null) ?? [],
+  };
+}
 type Triple = [number, number, number];
 
 const YEAR_COLS = ["2026", "2025", "2024"] as const;
@@ -177,35 +201,7 @@ export function AdmissionProbabilityCalculator({
   // 이전에 다른 학과를 조회하며 남은 값을 먼저 비우고 새로 채운다.
   const [cardFillPending, setCardFillPending] = useState(false);
 
-  useEffect(() => {
-    prefetchCutoffUniversities();
-    loadKernelModel().catch(() => {});
-  }, []);
-
-  // 학생 화면에서는 교사 화면의 학생 선택 <select>가 없으니, 자기 자신의 studentId로
-  // 카드를 곧바로 불러온다(교사 화면은 select의 onChange가 loadCards를 직접 부른다).
-  useEffect(() => {
-    if (studentId) loadCards(studentId);
-  }, [studentId]);
-
-  function loadCards(id: string) {
-    setTeacherStudentId(id);
-    if (!id) {
-      setMyCards(null);
-      setSaves(null);
-      return;
-    }
-    const supabase = createClient();
-    supabase
-      .from("wonseo_cards")
-      .select("id, university, department, category, sub_category, enrollment, recent_results, level, calculated_grade")
-      .eq("student_id", id)
-      .order("sort_order", { ascending: true })
-      .then(({ data }) => setMyCards(data ?? []));
-    loadSaves(id);
-  }
-
-  function loadSaves(id: string) {
+  const loadSaves = useCallback((id: string) => {
     setSavesLoading(true);
     const supabase = createClient();
     supabase
@@ -217,7 +213,45 @@ export function AdmissionProbabilityCalculator({
         setSaves((data as AdmissionProbabilitySave[] | null) ?? []);
         setSavesLoading(false);
       });
-  }
+  }, []);
+
+  const loadCards = useCallback((id: string) => {
+    setTeacherStudentId(id);
+    if (!id) {
+      setMyCards(null);
+      setSaves(null);
+      return;
+    }
+    setMyCards(null);
+    setSaves(null);
+    setSavesLoading(true);
+    void fetchStudentCalculatorData(id).then(({ cards, saves: nextSaves }) => {
+      setMyCards(cards);
+      setSaves(nextSaves);
+      setSavesLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    prefetchCutoffUniversities();
+    loadKernelModel().catch(() => {});
+  }, []);
+
+  // 학생 화면에서는 교사 화면의 학생 선택 <select>가 없으니, 자기 자신의 studentId로
+  // 카드를 곧바로 불러온다(교사 화면은 select의 onChange가 loadCards를 직접 부른다).
+  useEffect(() => {
+    if (!studentId) return;
+    let cancelled = false;
+    void fetchStudentCalculatorData(studentId).then(({ cards, saves: nextSaves }) => {
+      if (cancelled) return;
+      setTeacherStudentId(studentId);
+      setMyCards(cards);
+      setSaves(nextSaves);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId]);
 
   /** 지금 나온 결과를 저장 목록에 추가한다. 다시 계산하지 않고도 목록에서 바로 확률을
    * 보여줄 수 있도록, 계산 시점의 입력값과 결과 요약을 함께 스냅샷으로 저장한다. */
