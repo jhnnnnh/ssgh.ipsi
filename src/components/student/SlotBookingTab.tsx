@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarX, CircleCheck, Clock, History, X } from "lucide-react";
+import { AlertCircle, CalendarX, CircleCheck, Clock, History, RefreshCw, X } from "lucide-react";
 import { useCounselingSlots } from "@/lib/hooks/useCounselingSlots";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -9,9 +9,10 @@ import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { DateTabs } from "@/components/ui/DateTabs";
 import { compareSlotsForDisplay, formatDateFull, formatSlotDisplay, todayDateString } from "@/lib/time";
 import { cn } from "@/lib/cn";
+import { Card } from "@/components/ui/Card";
 
 export function SlotBookingTab({ studentId }: { studentId: string }) {
-  const { slots, loading } = useCounselingSlots();
+  const { slots, loading, error, reload } = useCounselingSlots();
   const showToast = useToast();
   const confirm = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -71,6 +72,31 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
       return;
     }
     showToast("상담 신청이 취소되었습니다.", "success");
+  }
+
+  if (loading) {
+    return (
+      <Card className="text-center py-12">
+        <p className="text-sm text-slate-400">상담 슬롯을 불러오는 중...</p>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="text-center py-12 space-y-3">
+        <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
+        <p className="text-sm font-bold text-slate-600">{error}</p>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          다시 불러오기
+        </button>
+      </Card>
+    );
   }
 
   return (
@@ -133,7 +159,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
           </button>
         </div>
 
-        {!loading && daySlots.length > 0 && (
+        {daySlots.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-2">
             {daySlots.map((slot) => {
               const isMine = slot.is_booked && slot.student_id === studentId;
@@ -196,7 +222,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
           </div>
         )}
 
-        {!loading && daySlots.length === 0 && (
+        {daySlots.length === 0 && (
           <div className="text-center py-12">
             <div className="w-12 h-12 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-2">
               <CalendarX className="w-5 h-5" />

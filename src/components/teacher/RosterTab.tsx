@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Trash2, UserPlus, X } from "lucide-react";
+import { AlertCircle, KeyRound, RefreshCw, Trash2, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
@@ -14,7 +14,7 @@ import { parseStudentId, parseRosterLine, formatClassLabel } from "@/lib/student
 export function RosterTab() {
   const showToast = useToast();
   const confirm = useConfirm();
-  const { roster, passwordSetIds, reload } = useRoster();
+  const { roster, passwordSetIds, loading, error, reload } = useRoster();
   const { grade, classNo, isAdmin } = useActiveClass();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -178,6 +178,31 @@ export function RosterTab() {
   }
 
   const allSelected = roster.length > 0 && selectedIds.size === roster.length;
+
+  if (loading) {
+    return (
+      <Card className="text-center py-12">
+        <p className="text-sm text-slate-400">학생 명단을 불러오는 중...</p>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="text-center py-12 space-y-3">
+        <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
+        <p className="text-sm font-bold text-slate-600">{error}</p>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          다시 불러오기
+        </button>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -43,19 +43,24 @@ export async function findWonseoScheduleGroups({
   let nameByStudent = new Map<string, string>();
 
   if (studentId) {
-    const [{ data: grade }, { data: classNo }] = await Promise.all([
+    const [gradeResult, classNoResult] = await Promise.all([
       supabase.rpc("current_student_grade"),
       supabase.rpc("current_student_class_no"),
     ]);
+    if (gradeResult.error) throw gradeResult.error;
+    if (classNoResult.error) throw classNoResult.error;
+    const grade = gradeResult.data;
+    const classNo = classNoResult.data;
     if (grade == null || classNo == null) return [];
     studentIds = [studentId];
     gradeByStudent = new Map([[studentId, { grade, classNo }]]);
   } else if (classScope) {
-    const { data: rosterRows } = await supabase
+    const { data: rosterRows, error: rosterError } = await supabase
       .from("roster")
       .select("student_id, name, grade, class_no")
       .eq("grade", classScope.grade)
       .eq("class_no", classScope.classNo);
+    if (rosterError) throw rosterError;
     studentIds = (rosterRows ?? []).map((r) => r.student_id);
     gradeByStudent = new Map(
       (rosterRows ?? []).map((r) => [r.student_id, { grade: r.grade!, classNo: r.class_no! }]),
@@ -67,20 +72,22 @@ export async function findWonseoScheduleGroups({
 
   if (studentIds.length === 0) return [];
 
-  const { data: cards } = await supabase
+  const { data: cards, error: cardsError } = await supabase
     .from("wonseo_cards")
     .select("id, student_id, university, department, sub_category, schedule_events")
     .in("student_id", studentIds)
     .eq("is_submitted", true)
     .not("university", "is", null);
+  if (cardsError) throw cardsError;
   if (!cards || cards.length === 0) return [];
 
   const cardIds = cards.map((c) => c.id);
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("calendar_events")
     .select("wonseo_card_id, kind")
     .eq("type", "wonseo_schedule")
     .in("wonseo_card_id", cardIds);
+  if (existingError) throw existingError;
 
   const addedSchedule = new Set((existing ?? []).map((e) => `${e.wonseo_card_id}::${e.kind}`));
 

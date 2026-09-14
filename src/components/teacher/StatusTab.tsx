@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   CalendarPlus,
   CalendarX,
   FileDown,
@@ -11,6 +12,7 @@ import {
   SquarePlus,
   Star,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useCounselingSlots } from "@/lib/hooks/useCounselingSlots";
@@ -56,10 +58,15 @@ function findOverlap(existing: CounselingSlot[], date: string, start: string, en
 
 export function StatusTab() {
   const { grade, classNo } = useActiveClass();
-  const { slots, reload } = useCounselingSlots(
+  const { slots, loading: slotsLoading, error: slotsError, reload } = useCounselingSlots(
     grade != null && classNo != null ? { grade, classNo } : null,
   );
-  const { favorites, reload: reloadFavorites } = useFavorites();
+  const {
+    favorites,
+    loading: favoritesLoading,
+    error: favoritesError,
+    reload: reloadFavorites,
+  } = useFavorites();
   const showToast = useToast();
   const confirm = useConfirm();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -311,6 +318,31 @@ export function StatusTab() {
 
   const allChecked = daySlots.length > 0 && daySlots.every((s) => checked.has(s.id));
 
+  if (slotsLoading) {
+    return (
+      <Card className="text-center py-12">
+        <p className="text-sm text-slate-400">상담 슬롯을 불러오는 중...</p>
+      </Card>
+    );
+  }
+
+  if (slotsError) {
+    return (
+      <Card className="text-center py-12 space-y-3">
+        <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
+        <p className="text-sm font-bold text-slate-600">{slotsError}</p>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          다시 불러오기
+        </button>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card className="space-y-4">
@@ -417,12 +449,26 @@ export function StatusTab() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {visibleFavorites.length === 0 && (
+              {favoritesLoading ? (
+                <p className="text-[11px] text-slate-400">즐겨찾기 시간을 불러오는 중...</p>
+              ) : favoritesError ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[11px] font-semibold text-rose-600">{favoritesError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void reloadFavorites()}
+                    className="px-2 py-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    다시 불러오기
+                  </button>
+                </div>
+              ) : visibleFavorites.length === 0 ? (
                 <p className="text-[11px] text-slate-400">
                   등록된 즐겨찾기가 없습니다. &ldquo;설정&rdquo;에서 추가해 보세요.
                 </p>
-              )}
-              {visibleFavorites.map((f) => (
+              ) : (
+                visibleFavorites.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => addSingleFavorite(f)}
@@ -431,7 +477,8 @@ export function StatusTab() {
                 >
                   {formatTime(f.start_time)}~{formatTime(f.end_time)}
                 </button>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

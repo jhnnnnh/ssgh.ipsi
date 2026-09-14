@@ -18,7 +18,7 @@ export function TeacherCalendarTab() {
   const { grade, classNo, isAdmin } = useActiveClass();
   const showToast = useToast();
   const confirm = useConfirm();
-  const { events, reload } = useCalendarEvents();
+  const { events, loading, error, reload } = useCalendarEvents();
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ResolvedCalendarEvent | null>(null);
@@ -80,6 +80,9 @@ export function TeacherCalendarTab() {
         onDeleteEvent={handleDelete}
         canManageEvent={canManage}
         showStudentName
+        loading={loading}
+        error={error}
+        onRetry={() => void reload()}
       />
       <CalendarEventModal
         open={modalOpen}

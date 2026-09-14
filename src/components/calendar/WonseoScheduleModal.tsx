@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { AlertCircle, Check, Plus, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/providers/ToastProvider";
 import { findWonseoScheduleGroups, addScheduleEvent, type CardScheduleGroup } from "@/lib/wonseo-schedule";
@@ -25,24 +25,35 @@ export function WonseoScheduleModal({
 }) {
   const showToast = useToast();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<CardScheduleGroup[]>([]);
   const [addingKey, setAddingKey] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    findWonseoScheduleGroups(scope).then((result) => {
-      if (cancelled) return;
-      setGroups(result);
-      setLoading(false);
-    });
+    setError(null);
+    void findWonseoScheduleGroups(scope)
+      .then((result) => {
+        if (cancelled) return;
+        setGroups(result);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGroups([]);
+        setError("원서 일정을 불러오지 못했습니다. 다시 시도해 주세요.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, scope.studentId, scope.classScope?.grade, scope.classScope?.classNo]);
+  }, [open, reloadKey, scope.studentId, scope.classScope?.grade, scope.classScope?.classNo]);
 
   async function handleAdd(group: CardScheduleGroup, item: CardScheduleGroup["items"][number]) {
     const key = `${group.cardId}::${item.kind}`;
@@ -78,6 +89,19 @@ export function WonseoScheduleModal({
     <Modal open={open} onClose={onClose} title="내 원서 일정" maxWidth="max-w-md">
       {loading ? (
         <p className="text-[11px] text-slate-400 text-center py-6">불러오는 중...</p>
+      ) : error ? (
+        <div className="text-center py-6 space-y-3">
+          <AlertCircle className="w-5 h-5 mx-auto text-rose-500" />
+          <p className="text-[11px] font-semibold text-slate-500">{error}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((key) => key + 1)}
+            className="mx-auto px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3 h-3" />
+            다시 불러오기
+          </button>
+        </div>
       ) : groups.length === 0 ? (
         <p className="text-[11px] text-slate-400 text-center py-6">
           추가할 수 있는 일정이 없어요. &ldquo;접수한 원서&rdquo;로 표시한 카드에 날짜가 정해진 일정을

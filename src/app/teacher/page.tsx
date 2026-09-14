@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   CalendarDays,
   CircleHelp,
   Contact,
@@ -16,6 +17,7 @@ import {
   ShieldUser,
   UsersRound,
   UserCog,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ActiveClassProvider, useActiveClass } from "@/components/providers/ActiveClassProvider";
@@ -84,7 +86,12 @@ function TeacherDashboard() {
   const { profile, refreshProfile, signOut } = useAuth();
   const { grade, classNo, isAdmin, canSwitchClass, classOptions, setActiveClass, loading } =
     useActiveClass();
-  const { roster } = useRoster();
+  const {
+    roster,
+    loading: rosterLoading,
+    error: rosterError,
+    reload: reloadRoster,
+  } = useRoster();
   const [tab, setTab] = useState<TeacherTab>("status");
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -105,6 +112,7 @@ function TeacherDashboard() {
         ]
       : []),
   ];
+  const needsRoster = tab === "wonseo" || tab === "cutoffLookup" || tab === "admissionProbability";
 
   async function handleToggleAdminMode() {
     if (!profile) return;
@@ -222,14 +230,33 @@ function TeacherDashboard() {
           )}
         </Card>
       ) : (
-        <>
-          {tab === "status" && <StatusTab />}
-          {tab === "wonseo" && <WonseoManageTab roster={roster} />}
-          {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
-          {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
-          {tab === "roster" && <RosterTab />}
-          {tab === "calendar" && <TeacherCalendarTab />}
-        </>
+        needsRoster && rosterLoading ? (
+          <Card padded={false} className="p-12 text-center">
+            <p className="text-sm text-slate-400">학생 명단을 불러오는 중...</p>
+          </Card>
+        ) : needsRoster && rosterError ? (
+          <Card padded={false} className="p-12 text-center space-y-3">
+            <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
+            <p className="text-sm font-bold text-slate-600">{rosterError}</p>
+            <button
+              type="button"
+              onClick={() => void reloadRoster()}
+              className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              다시 불러오기
+            </button>
+          </Card>
+        ) : (
+          <>
+            {tab === "status" && <StatusTab />}
+            {tab === "wonseo" && <WonseoManageTab roster={roster} />}
+            {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
+            {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
+            {tab === "roster" && <RosterTab />}
+            {tab === "calendar" && <TeacherCalendarTab />}
+          </>
+        )
       )}
       {tab === "teachers" && isAdmin && <TeacherManageTab />}
       {tab === "cutoffs" && isAdmin && (

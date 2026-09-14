@@ -14,7 +14,7 @@ export function StudentCalendarTab({ studentId }: { studentId: string }) {
   const { profile } = useAuth();
   const showToast = useToast();
   const confirm = useConfirm();
-  const { events, reload } = useCalendarEvents();
+  const { events, loading, error, reload } = useCalendarEvents();
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ResolvedCalendarEvent | null>(null);
@@ -63,6 +63,9 @@ export function StudentCalendarTab({ studentId }: { studentId: string }) {
         onEditEvent={handleEdit}
         onDeleteEvent={handleDelete}
         canManageEvent={canManage}
+        loading={loading}
+        error={error}
+        onRetry={() => void reload()}
       />
       <CalendarEventModal
         open={modalOpen}

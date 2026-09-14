@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 import {
+  AlertCircle,
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
   Download,
   Pencil,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -27,6 +29,9 @@ export function CalendarGrid({
   onDeleteEvent,
   canManageEvent,
   showStudentName,
+  loading = false,
+  error,
+  onRetry,
 }: {
   events: ResolvedCalendarEvent[];
   onOpenSchedule: () => void;
@@ -36,6 +41,9 @@ export function CalendarGrid({
   canManageEvent: (event: ResolvedCalendarEvent) => boolean;
   /** 교사 화면처럼 "(학생이름) (제목)" 형태로 표시할지 여부. */
   showStudentName?: boolean;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -77,6 +85,33 @@ export function CalendarGrid({
 
   function displayTitle(ev: ResolvedCalendarEvent) {
     return showStudentName && ev.studentName ? `${ev.studentName} ${ev.resolvedTitle}` : ev.resolvedTitle;
+  }
+
+  if (loading) {
+    return (
+      <Card className="text-center py-12">
+        <p className="text-sm text-slate-400">입시 일정을 불러오는 중...</p>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="text-center py-12 space-y-3">
+        <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
+        <p className="text-sm font-bold text-slate-600">{error}</p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            다시 불러오기
+          </button>
+        )}
+      </Card>
+    );
   }
 
   return (

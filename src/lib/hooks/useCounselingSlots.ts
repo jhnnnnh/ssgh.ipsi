@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { CounselingSlot } from "@/lib/database.types";
 
@@ -18,46 +18,58 @@ export function useCounselingSlots(
   const supabase = useMemo(() => createClient(), []);
   const [slots, setSlots] = useState<CounselingSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const filterPending = classFilter === null;
+  const filterGrade = classFilter?.grade;
+  const filterClassNo = classFilter?.classNo;
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     if (filterPending) {
       setSlots([]);
+      setError(null);
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setError(null);
     let query = supabase
       .from("counseling_slots")
       .select("*")
       .order("date", { ascending: true })
       .order("start_time", { ascending: true });
-    if (classFilter) {
-      query = query.eq("grade", classFilter.grade).eq("class_no", classFilter.classNo);
+    if (filterGrade != null && filterClassNo != null) {
+      query = query.eq("grade", filterGrade).eq("class_no", filterClassNo);
     }
-    const { data } = await query;
-    setSlots(data ?? []);
-    setLoading(false);
-  };
+    try {
+      const { data, error: queryError } = await query;
+      if (queryError) throw queryError;
+      setSlots(data ?? []);
+    } catch {
+      setSlots([]);
+      setError("상담 슬롯을 불러오지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filterClassNo, filterGrade, filterPending, supabase]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    reload();
+    void reload();
 
     const channel = supabase
       .channel("counseling_slots_changes")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "counseling_slots" },
-        () => reload(),
+        () => void reload(),
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classFilter?.grade, classFilter?.classNo, filterPending]);
+  }, [reload, supabase]);
 
-  return { slots, loading, reload };
+  return { slots, loading, error, reload };
 }
