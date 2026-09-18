@@ -384,7 +384,7 @@ export const WonseoCardView = forwardRef<
                     value={s.date}
                     placeholder="날짜"
                     onCommit={(text) => commitScheduleField(s.id, "date", text)}
-                    className="text-xs text-slate-500"
+                    className="text-xs font-semibold text-slate-800"
                   />
                   <button
                     type="button"
