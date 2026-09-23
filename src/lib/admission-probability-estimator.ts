@@ -1,17 +1,17 @@
 /**
  * 학생부 교과 합격 가능성 추정 엔진 v3. `합격가능성_계산구조_v3_최종.md` 스펙을 그대로
- * 옮긴 것으로, 계수를 임의로 바꾸지 않는다.
+ * 옮긴 것을 바탕으로, 표본이 적을 때 발생하는 확률 계단 현상을 연속형 추정으로 보완한다.
  *
  * 이전 버전(50컷 예측식 → 70컷 예측식 → 마지노선 확장 회귀식 → 로지스틱 확률 변환식을
  * 순서대로 이어붙이던 방식)은 폐기했다. 새 구조는 "비슷한 과거 사례를 찾아 그 실제
- * 결과를 몬테카를로로 세어 확률을 구하는" 하나의 통합 파이프라인이다:
+ * 결과를 몬테카를로 분포로 만들고 연속 확률을 구하는" 하나의 통합 파이프라인이다:
  *
- *  [B] 5차원(수준50/수준70/추세70/정원변화/국소경쟁률) 커널로 비슷한 과거 사례에 가중치를 매김
+ *  [B] 컷 수준·추세·정원 변화로 과거 사례를 고르고, 경쟁률 효과는 별도로 반영
  *  [C] 그 가중치의 가중중앙값으로 50%컷·70%컷을 화면에 표시
  *  [D] 이 학과 "자신의" 가장 최근해 합격자수(모집인원+충원인원)만으로 마지노선 배수(ratio)를 구함
  *  [E] [B]의 가중치로 과거 (50컷,70컷)을 복원추출 + ratio를 정규분포로 흔들어 마지노선을
  *      몬테카를로 시뮬레이션
- *  [F] 시뮬레이션된 마지노선 중 사용자 성적 이상인 비율 = 합격확률(추가 보정 없음)
+ *  [F] 시뮬레이션된 마지노선 분포를 유효표본수에 맞는 폭으로 연속화해 합격확률을 구함
  *
  * 비교 대상 DB(model.database)는 학생부 교과전형 데이터로만 만들어져 있다 — 종합전형
  * 학과를 입력해도 계산 자체는 막지 않지만(표에 입력한 값만으로 결과를 낸다), 그 경우
@@ -24,7 +24,8 @@ import {
   computeAdmitRatio,
   lookupCompetitionCorrection,
   simulateMarginoseon,
-  admissionProbabilityFromSimulation,
+  admissionProbabilityFromSmoothedSimulation,
+  probabilitySmoothingBandwidth,
   RATIO_STD,
   type KernelDatabaseRow,
   type LevelBin,
@@ -53,6 +54,10 @@ export type KernelModel = {
 export type EstimationReliability = "standard" | "limited" | "approximate";
 
 export type ProbCurvePoint = { grade: number; prob: number };
+
+/** 유사한 과거 사례가 충분하지 않을 때는 원인과 관계없이 같은 주의 문구로 안내한다.
+ * 세부 계산 방식보다 결과의 불확실성을 먼저 이해할 수 있게 하기 위함이다. */
+const SPARSE_SAMPLE_MESSAGE = "비슷한 표본이 부족하여 오차가 클 수 있습니다.";
 
 export type EstimatorResult = {
   p50Predicted: number;
@@ -83,16 +88,27 @@ function isTripleComplete(t: [number, number, number]): boolean {
  * effectiveN)로 근사한다: SE ≈ √(p(1-p) / 유효표본수). 참고할 수 있는 비슷한 사례가
  * 많을수록(유효표본수가 클수록) 범위는 좁아지고, 적을수록 넓어진다. 다만 이 폭이 너무 좁으면
  * (과도한 확신) 실제보다 정밀해 보이고, 너무 넓으면(수치 자체가 무의미) 정보로서 가치가
- * 없어지므로 3~20%p 사이로 제한한다.
+ * 없어지므로 3~7%p 사이로 제한한다. 이는 계산 결과의 표시 폭이지 검증된 신뢰구간은 아니다.
  */
 function estimateProbabilityMargin(probFraction: number, effectiveN: number): number {
   const se = effectiveN > 0 ? Math.sqrt((probFraction * (1 - probFraction)) / effectiveN) : 0.2;
   const marginPct = se * 100;
-  return Math.max(3, Math.min(20, marginPct));
+  return Math.max(3, Math.min(7, marginPct));
+}
+
+/** 같은 입력에서 같은 표본을 뽑아 경쟁률만 바꾸었을 때 난수 오차로 확률이 역전되지 않게 한다. */
+function stableRandom(): () => number {
+  let state = 0x72af3e91;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), 1 | state);
+    value ^= value + Math.imul(value ^ (value >>> 7), 61 | value);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 export function estimateAdmission(input: EstimatorInput, model: KernelModel): EstimatorOutcome {
-  const { c50, c70, quota, turnover, targetQuota, expectedCompetition, userScore, applicants } = input;
+  const { c50, c70, quota, turnover, targetQuota, expectedCompetition, userScore } = input;
 
   if (!isTripleComplete(c50) || !isTripleComplete(c70)) {
     return { insufficient: true, reason: "과거 3개년 50%·70%컷이 모두 있어야 계산할 수 있어요." };
@@ -109,74 +125,53 @@ export function estimateAdmission(input: EstimatorInput, model: KernelModel): Es
   const level70 = (c70[2] + c70[1] + c70[0]) / 3;
   const trend70 = c70[0] - c70[1];
 
-  const target: { level50: number; level70: number; trend70: number; capChange?: number; compRaw?: number } = {
+  const target: { level50: number; level70: number; trend70: number; capChange?: number } = {
     level50,
     level70,
     trend70,
   };
   if (targetQuota > 0 && quota[0] > 0) target.capChange = Math.log(targetQuota) - Math.log(quota[0]);
-  if (expectedCompetition > 0) target.compRaw = expectedCompetition;
-
   const { weights, effectiveN } = computeKernelWeights(target, model.database, model.bins);
   const y50List = model.database.map((r) => r.y50);
   const y70List = model.database.map((r) => r.y70);
 
   const reliability: EstimationReliability = effectiveN < 8 ? "approximate" : effectiveN < 30 ? "limited" : "standard";
-  const historicalCompetition = applicants?.filter((value) => value > 0) ?? [];
-  const isAboveOwnHistory = expectedCompetition > 0 && historicalCompetition.length > 0 && expectedCompetition > Math.max(...historicalCompetition);
-  let selectedY50 = y50List;
-  let selectedY70 = y70List;
-  let selectedWeights = weights;
-
-  if (reliability === "approximate") {
-    // 직접 비슷한 사례를 찾기 어려우면 경쟁률을 매칭 조건에서 빼고(더 넓은 사례를 참고),
-    // 전체 자료에서 검증한 경쟁률 변화 경향만 별도로 반영한다. 보정표는 비증가 형태라
-    // 같은 조건에서 예상 경쟁률을 높였는데 결과가 더 유리해지는 역전을 만들지 않는다.
-    const baseTarget = { ...target };
-    delete baseTarget.compRaw;
-    const base = computeKernelWeights(baseTarget, model.database, model.bins);
-    selectedWeights = base.weights;
-    if (expectedCompetition > 0) {
-      const correction = lookupCompetitionCorrection(model.competitionCorrection, level50, expectedCompetition, model.bins);
-      selectedY50 = y50List.map((value) => value + correction.shift50);
-      selectedY70 = y70List.map((value) => value + correction.shift70);
-    }
-  }
-
-  const p50Predicted = weightedMedian(selectedY50, selectedWeights);
-  const p70Predicted = weightedMedian(selectedY70, selectedWeights);
+  // 경쟁률을 사례 선택 조건으로 사용하면 극단값에서 유사 표본이 갑자기 바뀌어
+  // 경쟁률 상승 시 확률이 오르는 역전이 생긴다. 교차검증에서 선택한 0.5 배율의
+  // 단조 보정값을 두 컷에 동일하게 적용해 컷 간 간격과 시뮬레이션 분포를 보존한다.
+  const correction = expectedCompetition > 0
+    ? lookupCompetitionCorrection(model.competitionCorrection, level50, expectedCompetition, model.bins)
+    : { shift50: 0, shift70: 0 };
+  const competitionShift = 0.25 * (correction.shift50 + correction.shift70);
+  const p50Predicted = weightedMedian(y50List, weights) + competitionShift;
+  const p70Predicted = weightedMedian(y70List, weights) + competitionShift;
 
   const ratioPoint = computeAdmitRatio(quota[0], Math.max(turnover[0], 0));
-  const { simulated } = simulateMarginoseon(selectedY50, selectedY70, selectedWeights, ratioPoint, RATIO_STD);
-  const probFraction = admissionProbabilityFromSimulation(simulated, userScore);
+  const baseSimulation = simulateMarginoseon(y50List, y70List, weights, ratioPoint, RATIO_STD, 10000, stableRandom());
+  const simulated = baseSimulation.simulated.map((value) => value + competitionShift);
+  const smoothingBandwidth = probabilitySmoothingBandwidth(simulated, effectiveN);
+  const probFraction = admissionProbabilityFromSmoothedSimulation(simulated, userScore, smoothingBandwidth);
   const prob = probFraction * 100;
 
-  // 근사 추정은 넓은 사례를 참고하더라도 원래 직접 매칭이 부족했다는 사실은 남는다. 따라서
-  // 신뢰구간 폭은 직접 매칭의 유효표본수를 기준으로 보수적으로 유지한다.
+  // 표시 범위는 유사한 기본 사례의 유효표본수로 정한다.
   const margin = estimateProbabilityMargin(probFraction, effectiveN);
   const probLow = Math.max(0, Math.round(prob - margin));
   let probHigh = Math.min(100, Math.round(prob + margin));
   if (probHigh <= probLow) probHigh = Math.min(100, probLow + 2);
 
-  const curve = buildProbabilityCurve(simulated, { p50Predicted, p70Predicted, userScore });
+  const curve = buildProbabilityCurve(simulated, smoothingBandwidth, { p50Predicted, p70Predicted, userScore });
 
-  const reliabilityMessage = reliability === "approximate"
-    ? isAboveOwnHistory
-      ? "비슷한 사례가 8개 미만이고 예상 경쟁률도 지난 3개년보다 높아, 전체 자료의 경쟁률 변화 경향을 반영한 근사 추정입니다."
-      : "비슷한 사례가 8개 미만이라, 더 넓은 과거 자료와 경쟁률 변화 경향을 반영한 근사 추정입니다."
-    : reliability === "limited"
-      ? "참고한 유사 사례가 30개 미만이라 결과 범위를 넓게 해석해 주세요."
-      : null;
+  const reliabilityMessage = reliability === "standard" ? null : SPARSE_SAMPLE_MESSAGE;
 
   return { p50Predicted, p70Predicted, prob, probLow, probHigh, effectiveN, reliability, reliabilityMessage, curve };
 }
 
-/** 결과 시각화용 곡선 — 성적(등급) 값을 촘촘히 훑으며 시뮬레이션된 마지노선 분포에서
- * 그 성적으로 합격했다고 볼 수 있는 비율을 그대로 계산한다(로지스틱 근사가 아니라 [F]단계와
- * 같은 방식의 실측 곡선). 표시 범위는 시뮬레이션 분포의 2~98 분위수를 기본으로, 50%컷·
+/** 결과 시각화용 곡선 — 성적(등급) 값을 촘촘히 훑으며 [F]단계의 연속형 확률을 계산한다.
+ * 표시 범위는 시뮬레이션 분포의 2~98 분위수를 기본으로, 50%컷·
  * 70%컷·사용자 성적이 항상 보이도록 여유를 둔다. */
 function buildProbabilityCurve(
   simulated: number[],
+  smoothingBandwidth: number,
   bounds: { p50Predicted: number; p70Predicted: number; userScore: number },
 ): ProbCurvePoint[] {
   const sorted = [...simulated].sort((a, b) => a - b);
@@ -191,7 +186,7 @@ function buildProbabilityCurve(
   const curve: ProbCurvePoint[] = [];
   for (let i = 0; i < POINTS; i++) {
     const grade = lo + ((hi - lo) * i) / (POINTS - 1);
-    curve.push({ grade, prob: admissionProbabilityFromSimulation(simulated, grade) * 100 });
+    curve.push({ grade, prob: admissionProbabilityFromSmoothedSimulation(simulated, grade, smoothingBandwidth) * 100 });
   }
   return curve;
 }

@@ -2,7 +2,8 @@
  * 교과전형 3개년 입결 → 다음 해 컷·합격확률 예측 — 통합 파이프라인(v3).
  * `합격가능성_계산구조_v3_최종.md` 스펙을 그대로 구현한다. "50컷 예측식 → 70컷 예측식 →
  * 마지노선 확장식 → 확률 변환식"처럼 개별 공식을 이어붙이지 않고, 비슷한 과거 사례를
- * 찾아 그 실제 결과를 몬테카를로로 세어 확률을 구하는 하나의 파이프라인으로 계산한다.
+ * 찾아 그 실제 결과를 몬테카를로 분포로 만들고, 표본이 적을 때의 계단 현상은 연속 확률로
+ * 완화하는 하나의 파이프라인으로 계산한다.
  */
 
 export type KernelDatabaseRow = {
@@ -107,7 +108,7 @@ export function computeKernelWeights(target: TargetVector, database: KernelDatab
   const targetBin = lookupBin(target.level50, bins);
   const targetCompLocal = target.compRaw != null ? (target.compRaw - targetBin.mu) / targetBin.sigma : null;
 
-  const rawWeights = database.map((row) => {
+  const logWeights = database.map((row) => {
     let dist2 =
       ((row.level50 - target.level50) / BANDWIDTH.level50) ** 2 +
       ((row.level70 - target.level70) / BANDWIDTH.level70) ** 2 +
@@ -120,9 +121,14 @@ export function computeKernelWeights(target: TargetVector, database: KernelDatab
       const rowCompLocal = (row.compRaw - rowBin.mu) / rowBin.sigma;
       dist2 += ((rowCompLocal - targetCompLocal) / BANDWIDTH.compLocal) ** 2;
     }
-    return Math.exp(-0.5 * dist2);
+    return -0.5 * dist2;
   });
 
+  // 성적이 자료 범위 밖이어도 모든 지수값이 0으로 언더플로하지 않도록
+  // 가장 큰 로그 가중치를 뺀 다음 정규화한다(일반 입력의 상대 가중치는 동일).
+  const maxLogWeight = Math.max(...logWeights);
+  if (!Number.isFinite(maxLogWeight)) return { weights: logWeights.map(() => 0), effectiveN: 0 };
+  const rawWeights = logWeights.map((logWeight) => Math.exp(logWeight - maxLogWeight));
   const total = rawWeights.reduce((a, w) => a + w, 0);
   if (total <= 0) return { weights: rawWeights, effectiveN: 0 };
   const weights = rawWeights.map((w) => w / total);
@@ -218,8 +224,8 @@ export function buildCompetitionCorrection(database: KernelDatabaseRow[], bins: 
   return points.map((point, index) => ({ ...point, shift50: shift50[index], shift70: shift70[index] }));
 }
 
-/** 보정표의 두 점 사이에서는 부드럽게 보간하고, 과거 범위를 벗어나면 마지막 확인값을
- * 유지한다. 과거에 없던 극단 경쟁률을 임의로 외삽해 과장하지 않기 위함이다. */
+/** 보정표 안에서는 선형 보간한다. 상단 밖은 마지막 세 점의 평균 기울기를
+ * log1p로 완만히 연장해, 극단값에서도 역전이나 과도한 선형 외삽을 막는다. */
 export function lookupCompetitionCorrection(
   correction: CompetitionCorrection,
   level50: number,
@@ -230,7 +236,15 @@ export function lookupCompetitionCorrection(
   const local = competitionLocalValue(level50, competition, bins);
   if (local <= correction[0].competitionLocal) return correction[0];
   const last = correction[correction.length - 1];
-  if (local >= last.competitionLocal) return last;
+  if (local >= last.competitionLocal) {
+    const earlier = correction[Math.max(0, correction.length - 3)];
+    const interval = last.competitionLocal - earlier.competitionLocal;
+    if (interval <= 0) return last;
+    const slope50 = Math.min(0, (last.shift50 - earlier.shift50) / interval);
+    const slope70 = Math.min(0, (last.shift70 - earlier.shift70) / interval);
+    const distance = Math.log1p(local - last.competitionLocal);
+    return { shift50: last.shift50 + slope50 * distance, shift70: last.shift70 + slope70 * distance };
+  }
   for (let index = 0; index < correction.length - 1; index++) {
     const left = correction[index];
     const right = correction[index + 1];
@@ -277,7 +291,7 @@ export function weightedMedian(values: number[], weights: number[]): number {
 }
 
 /** 가중치를 확률로 쓰는 복원추출(weighted sampling with replacement). 누적분포 이진탐색. */
-function weightedRandomIndices(weights: number[], n: number): number[] {
+function weightedRandomIndices(weights: number[], n: number, random: () => number): number[] {
   const total = weights.reduce((a, w) => a + w, 0);
   const result: number[] = new Array(n).fill(0);
   if (total <= 0 || weights.length === 0) return result;
@@ -288,7 +302,7 @@ function weightedRandomIndices(weights: number[], n: number): number[] {
     cum.push(running / total);
   }
   for (let i = 0; i < n; i++) {
-    const r = Math.random();
+    const r = random();
     let lo = 0;
     let hi = cum.length - 1;
     while (lo < hi) {
@@ -302,9 +316,9 @@ function weightedRandomIndices(weights: number[], n: number): number[] {
 }
 
 /** Box-Muller 변환으로 정규분포 난수를 뽑는다. */
-function normalRandom(mean: number, std: number): number {
-  const u1 = Math.random() || Number.EPSILON;
-  const u2 = Math.random();
+function normalRandom(mean: number, std: number, random: () => number): number {
+  const u1 = random() || Number.EPSILON;
+  const u2 = random();
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
   return mean + z * std;
 }
@@ -351,23 +365,22 @@ export function simulateMarginoseon(
   ratioPoint: number,
   ratioStd: number,
   n = 10000,
+  random: () => number = Math.random,
 ): MonteCarloResult {
-  const drawn = weightedRandomIndices(weights, n);
+  const drawn = weightedRandomIndices(weights, n, random);
   const simulated = new Array<number>(n);
   for (let i = 0; i < n; i++) {
     const idx = drawn[i];
     const sim50 = y50[idx];
     const sim70 = y70[idx];
     const spread = Math.max(sim70 - sim50, 0.01);
-    const ratio = Math.max(normalRandom(ratioPoint, ratioStd), 0.1);
+    const ratio = Math.max(normalRandom(ratioPoint, ratioStd, random), 0.1);
     simulated[i] = sim50 + ratio * spread;
   }
   return { simulated };
 }
 
-/** [F]단계 — 시뮬레이션된 마지노선 분포에서 "사용자 성적 이상"인 비율을 그대로 센다.
- * 로지스틱 함수도, 임의의 기울기 상수도, 베이지안 축소도 없다 — 불확실성은 이미 [E]단계
- * (컷의 표본 흩어짐 + ratio의 추정 오차)에 반영되어 있으므로 있는 그대로 센다.
+/** [F]단계의 원래 방식 — 시뮬레이션된 마지노선 분포에서 "사용자 성적 이상"인 비율을 그대로 센다.
  * 등급은 숫자가 작을수록 좋으므로, 마지노선(등록 가능한 최저 성적)이 사용자 성적보다
  * 크거나 같으면(=사용자 성적이 마지노선 안쪽이면) 합격으로 센다. */
 export function admissionProbabilityFromSimulation(simulated: number[], userScore: number): number {
@@ -375,4 +388,50 @@ export function admissionProbabilityFromSimulation(simulated: number[], userScor
   let count = 0;
   for (const v of simulated) if (v >= userScore) count++;
   return count / simulated.length;
+}
+
+function normalCdf(value: number): number {
+  // Abramowitz-Stegun 근사식. 브라우저마다 지원 여부가 다른 Math.erf 없이 표준정규 누적확률을 계산한다.
+  const sign = value < 0 ? -1 : 1;
+  const x = Math.abs(value) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t) * Math.exp(-x * x);
+  return 0.5 * (1 + sign * erf);
+}
+
+/**
+ * 표본이 적을 때 계단처럼 흔들리는 확률을 완만한 연속 확률로 바꾼다.
+ *
+ * 각 시뮬레이션 마지노선을 "이 지점에서만 0%→100%로 바뀌는 선"이 아니라, 아주 작은
+ * 성적 폭 안에서 점진적으로 바뀌는 분포로 본다. 폭은 마지노선의 실제 흩어짐과 유효표본수로
+ * 자동 결정한다. 유사 사례가 적을수록 폭이 넓어져 우연한 한 사례의 꺾임을 덜 따른다.
+ */
+export function probabilitySmoothingBandwidth(simulated: number[], effectiveN: number): number {
+  if (simulated.length < 2) return 0.05;
+  const sorted = [...simulated].sort((a, b) => a - b);
+  const percentile = (p: number) => sorted[Math.round((sorted.length - 1) * p)];
+  const mean = simulated.reduce((sum, value) => sum + value, 0) / simulated.length;
+  const standardDeviation = Math.sqrt(simulated.reduce((sum, value) => sum + (value - mean) ** 2, 0) / simulated.length);
+  const robustDeviation = (percentile(0.75) - percentile(0.25)) / 1.349;
+  const scale = Math.max(0.08, Math.min(standardDeviation, robustDeviation || standardDeviation));
+
+  // Silverman 계열의 대역폭을 사용하되, 여기서의 n은 반복 횟수(10,000회)가 아니라 실제로
+  // 참고한 유효표본수다. 그래야 시뮬레이션을 많이 돌렸다고 부족한 과거 사례가 과신되지 않는다.
+  const evidenceCount = Math.max(2, effectiveN);
+  const bandwidth = 0.72 * scale * evidenceCount ** -0.2;
+  return Math.max(0.05, Math.min(0.22, bandwidth));
+}
+
+/** [F]단계의 연속형 확률. 원래의 몬테카를로 분포를 그대로 쓰되, 각 마지노선 주변에
+ * probabilitySmoothingBandwidth만큼의 작은 완충 폭을 둔다. 따라서 결과는 항상 성적이
+ * 나빠질수록 같거나 낮아지며, 소수 사례가 만든 인위적인 계단을 완화한다. */
+export function admissionProbabilityFromSmoothedSimulation(
+  simulated: number[],
+  userScore: number,
+  bandwidth: number,
+): number {
+  if (simulated.length === 0) return 0;
+  if (bandwidth <= 0) return admissionProbabilityFromSimulation(simulated, userScore);
+  const total = simulated.reduce((sum, marginoseon) => sum + normalCdf((marginoseon - userScore) / bandwidth), 0);
+  return total / simulated.length;
 }

@@ -807,7 +807,7 @@ export function AdmissionProbabilityCalculator({
           {ok?.reliabilityMessage && (
             <Card className={ok.reliability === "approximate" ? "bg-amber-50 border-amber-200" : "bg-slate-50 border-slate-200"}>
               <p className={ok.reliability === "approximate" ? "text-xs leading-relaxed text-amber-800" : "text-xs leading-relaxed text-slate-600"}>
-                {ok.reliability === "approximate" ? "근사 추정 · " : "참고 · "}{ok.reliabilityMessage}
+                {ok.reliabilityMessage}
               </p>
             </Card>
           )}
@@ -866,7 +866,7 @@ export function AdmissionProbabilityCalculator({
                       <div>
                         <p className="font-bold text-slate-800 text-xs mb-1">① 국소가중회귀(커널 기반 유사도)</p>
                         <p>
-                          학과를 몇 가지 수치(컷의 평균 수준, 최근 추세, 정원 증감, 정규화한 경쟁률)로
+                          학과를 몇 가지 수치(컷의 평균 수준, 최근 추세, 정원 증감)로
                           이루어진 벡터로 표현하고, 목표 학과와의 거리가 가까울수록 큰 가중치를 부여하는
                           가우시안 커널 함수를 사용해요. 통계학에서 국소가중회귀(local weighted
                           regression) 또는 Nadaraya–Watson 커널 회귀라 불리는 방식으로, 전체 평균을 내는
@@ -899,17 +899,17 @@ export function AdmissionProbabilityCalculator({
                           구한 가중치를 확률처럼 사용해 과거 실제 컷 값들을 반복 복원추출(bootstrap
                           resampling)하고, 여기에 로그선형회귀가 갖는 추정 오차를 정규분포 형태의
                           노이즈로 더해, 수천 번의 가상 시나리오를 만들어요. 최종 합격확률은 그
-                          시나리오들 중 실제로 합격 조건을 만족하는 비율을 그대로 세어서 구해요 —
-                          로지스틱 함수 같은 별도의 확률 변환식을 쓰지 않아요.
+                          시나리오들에서 합격 조건을 만족하는 정도를 계산해요. 사례가 적어 생기는
+                          확률의 급격한 변화를 줄이기 위해 각 결과 주변을 조금씩 완만하게 반영해요.
                         </p>
                       </div>
                       <div>
-                        <p className="font-bold text-slate-800 text-xs mb-1">⑤ 유효표본수 기반 신뢰구간</p>
+                        <p className="font-bold text-slate-800 text-xs mb-1">⑤ 유효표본수 기반 표시 범위</p>
                         <p>
                           확률을 하나의 숫자 대신 범위로 보여주는 이유는, 가중치를 사용한 추정값의
-                          불확실성을 통계학의 유효표본수(effective sample size, Kish&apos;s
-                          approximation) 개념으로 정량화했기 때문이에요. 참고할 수 있는 비슷한 사례가
-                          많을수록(유효표본수가 클수록) 범위가 좁아지고, 적을수록 넓어져요.
+                          참고한 비슷한 사례의 양을 유효표본수(effective sample size)로 계산해
+                          표시 폭에 반영하기 때문이에요. 사례가 많을수록 범위가 좁아지고,
+                          적을수록 넓어지되 지나치게 넓어지지 않도록 제한해요.
                         </p>
                       </div>
                     </div>
@@ -988,6 +988,65 @@ function StepRow({ n, title, last, children }: { n: number; title: string; last?
   );
 }
 
+/**
+ * 단조 3차 곡선으로 SVG 경로를 만든다. 단순한 베지에 곡선은 중간에 확률이 다시 올라가거나
+ * 실제 점을 지나치게 벗어날 수 있어, 각 구간에서 원래의 감소 방향을 지키는 보간법을 쓴다.
+ * 계산값 자체는 바꾸지 않고, 점과 점 사이를 자연스럽게 연결하는 표시 전용 함수다.
+ */
+function buildMonotoneCurvePath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+
+  const widths = points.slice(0, -1).map((point, index) => points[index + 1].x - point.x);
+  const slopes = points.slice(0, -1).map((point, index) => (points[index + 1].y - point.y) / widths[index]);
+  const tangents = new Array<number>(points.length);
+  tangents[0] = slopes[0];
+  tangents[tangents.length - 1] = slopes[slopes.length - 1];
+
+  for (let index = 1; index < tangents.length - 1; index += 1) {
+    const previous = slopes[index - 1];
+    const next = slopes[index];
+    if (previous === 0 || next === 0 || previous * next < 0) {
+      tangents[index] = 0;
+      continue;
+    }
+    const previousWidth = widths[index - 1];
+    const nextWidth = widths[index];
+    const leftWeight = 2 * nextWidth + previousWidth;
+    const rightWeight = nextWidth + 2 * previousWidth;
+    tangents[index] = (leftWeight + rightWeight) / (leftWeight / previous + rightWeight / next);
+  }
+
+  // 각 구간에서 기울기를 제한해 곡선이 원래 점들 사이에서 위·아래로 튀지 않게 한다.
+  for (let index = 0; index < slopes.length; index += 1) {
+    const slope = slopes[index];
+    if (slope === 0) {
+      tangents[index] = 0;
+      tangents[index + 1] = 0;
+      continue;
+    }
+    const left = tangents[index] / slope;
+    const right = tangents[index + 1] / slope;
+    const squaredLength = left * left + right * right;
+    if (squaredLength > 9) {
+      const scale = 3 / Math.sqrt(squaredLength);
+      tangents[index] = scale * left * slope;
+      tangents[index + 1] = scale * right * slope;
+    }
+  }
+
+  let path = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const width = widths[index];
+    path += ` C${(start.x + width / 3).toFixed(1)},${(start.y + (tangents[index] * width) / 3).toFixed(1)}`;
+    path += ` ${(end.x - width / 3).toFixed(1)},${(end.y - (tangents[index + 1] * width) / 3).toFixed(1)}`;
+    path += ` ${end.x.toFixed(1)},${end.y.toFixed(1)}`;
+  }
+  return path;
+}
+
 /** 성적(등급)별 합격확률 곡선. 등급은 숫자가 작을수록 좋은 성적이라, x축 왼쪽일수록 좋은
  * 성적 · 오른쪽일수록 낮은 성적이다. 사용자 성적 위치에 확률 범위(±)를 세로 막대로 함께
  * 보여주고, 마우스를 올리면 그 지점의 등급·확률을 십자선과 말풍선으로 보여준다. */
@@ -1011,10 +1070,7 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
   const Y = (p: number) => marginT + plotH - (p / 100) * plotH;
   const gradeAtX = (px: number) => gMin + ((px - marginL) / plotW) * gRange;
 
-  let pathD = "";
-  curve.forEach((pt, i) => {
-    pathD += `${i === 0 ? "M" : "L"}${X(pt.grade).toFixed(1)},${Y(pt.prob).toFixed(1)} `;
-  });
+  const pathD = buildMonotoneCurvePath(curve.map((point) => ({ x: X(point.grade), y: Y(point.prob) })));
 
   function nearestPoint(grade: number) {
     let best = curve[0];
