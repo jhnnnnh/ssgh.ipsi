@@ -82,18 +82,20 @@ function isTripleComplete(t: [number, number, number]): boolean {
   return t.every((v) => v > 0);
 }
 
-/**
- * 확률을 단일 수치 대신 범위로 보여주기 위한 폭(±%p) 계산. 가중치를 쓴 추정값의 표준오차는
- * 통계학에서 흔히 "유효표본수"(Kish's effective sample size — 이미 [B]단계에서 계산해 둔
- * effectiveN)로 근사한다: SE ≈ √(p(1-p) / 유효표본수). 참고할 수 있는 비슷한 사례가
- * 많을수록(유효표본수가 클수록) 범위는 좁아지고, 적을수록 넓어진다. 다만 이 폭이 너무 좁으면
- * (과도한 확신) 실제보다 정밀해 보이고, 너무 넓으면(수치 자체가 무의미) 정보로서 가치가
- * 없어지므로 3~7%p 사이로 제한한다. 이는 계산 결과의 표시 폭이지 검증된 신뢰구간은 아니다.
- */
-function estimateProbabilityMargin(probFraction: number, effectiveN: number): number {
-  const se = effectiveN > 0 ? Math.sqrt((probFraction * (1 - probFraction)) / effectiveN) : 0.2;
-  const marginPct = se * 100;
-  return Math.max(3, Math.min(7, marginPct));
+/** 유효표본수로 계산한 Wilson 점수 구간(±1 표준오차). 고정된 폭 상한·하한을 두지 않는다.
+ * 커널 가중 표본수는 정수가 아닐 수 있어 effectiveN을 그대로 사용한다. */
+function estimateProbabilityRange(probFraction: number, effectiveN: number): { low: number; high: number } {
+  const p = Math.max(0, Math.min(1, probFraction));
+  const n = Math.max(1, effectiveN);
+  const z = 1;
+  const z2 = z * z;
+  const denominator = 1 + z2 / n;
+  const center = (p + z2 / (2 * n)) / denominator;
+  const halfWidth = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denominator;
+  return {
+    low: Math.floor(100 * Math.max(0, center - halfWidth)),
+    high: Math.ceil(100 * Math.min(1, center + halfWidth)),
+  };
 }
 
 /** 같은 입력에서 같은 표본을 뽑아 경쟁률만 바꾸었을 때 난수 오차로 확률이 역전되지 않게 한다. */
@@ -153,11 +155,10 @@ export function estimateAdmission(input: EstimatorInput, model: KernelModel): Es
   const probFraction = admissionProbabilityFromSmoothedSimulation(simulated, userScore, smoothingBandwidth);
   const prob = probFraction * 100;
 
-  // 표시 범위는 유사한 기본 사례의 유효표본수로 정한다.
-  const margin = estimateProbabilityMargin(probFraction, effectiveN);
-  const probLow = Math.max(0, Math.round(prob - margin));
-  let probHigh = Math.min(100, Math.round(prob + margin));
-  if (probHigh <= probLow) probHigh = Math.min(100, probLow + 2);
+  // 유효표본수로 직접 계산한 Wilson 범위이며, 표시를 좁히기 위한 임의의 폭 제한은 두지 않는다.
+  const probabilityRange = estimateProbabilityRange(probFraction, effectiveN);
+  const probLow = probabilityRange.low;
+  const probHigh = probabilityRange.high;
 
   const curve = buildProbabilityCurve(simulated, smoothingBandwidth, { p50Predicted, p70Predicted, userScore });
 
