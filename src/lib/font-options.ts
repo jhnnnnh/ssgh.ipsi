@@ -39,7 +39,7 @@ export const FONT_OPTIONS: FontOption[] = [
   },
   {
     key: "nanum-square",
-    label: "나눔스퀘어 네오 (NanumSquare Neo)",
+    label: "나눔스퀘어 네오",
     cssFamily: "'NanumSquareNeo', 'Pretendard', sans-serif",
     sizeAdjust: 0.954,
     boldWeights: [500, 700, 900],
@@ -67,7 +67,7 @@ export const FONT_OPTIONS: FontOption[] = [
   },
   {
     key: "joseon-gungseo",
-    label: "조선궁서체 (Joseon Gungseo)",
+    label: "조선 궁서체",
     cssFamily: "'JoseonGungseo', 'Pretendard', sans-serif",
     sizeAdjust: 0.923,
     boldWeights: [700, 700, 700],
