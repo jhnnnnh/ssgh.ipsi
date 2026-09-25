@@ -1,9 +1,8 @@
 /**
- * 학생이 고를 수 있는 웹폰트 14종. 화면 표시 순서와 동일한 순서로 정의한다(임의 정렬 금지).
+ * 학생·교사가 고를 수 있는 웹폰트 8종. 화면 표시 순서와 동일한 순서로 정의한다.
  * `key`는 DB(profiles.font_family)에 저장되는 값이고, `cssFamily`는 실제
  * font-family CSS 값(항상 "해당 폰트 → Pretendard → sans-serif" 순 폴백)이다.
- * 폰트 파일 자체는 Noto Sans KR/Hahmlet만 next/font/google(layout.tsx)로 로드하고,
- * 나머지는 모두 자체 호스팅(globals.css의 @font-face, /public/fonts/*)이다.
+ * 폰트 파일은 모두 자체 호스팅(globals.css의 @font-face, /public/fonts/*)이다.
  */
 export type FontOption = {
   key: string;
@@ -20,8 +19,8 @@ export type FontOption = {
   sizeAdjust: number;
   /**
    * "글자 굵기" 3단계([얇게, 보통, 굵게])에서 .font-bold에 실제로 적용할 font-weight.
-   * 그 폰트가 실제로 로드한 굵기 파일 중에서만 골랐다 — 없는 굵기를 요청하면 브라우저가
-   * 가짜 굵게(synthetic bold)를 만들어 한글이 뭉개져 보일 수 있어서다. 그래서 굵기가
+   * 정적 폰트는 실제로 로드한 굵기 파일만 사용하고, 가변 폰트는 지원 범위 안에서 고른다.
+   * 지원하지 않는 굵기를 요청하면 브라우저가 synthetic bold를 만들 수 있어서다. 굵기가
    * 1~2종류뿐인 폰트는 단계 몇 개가 같은 값으로 겹친다(그만큼은 조절해도 그대로 보임).
    * [1]번째 값(보통)은 이 기능이 생기기 전 기본 동작과 항상 같다.
    */
@@ -39,59 +38,17 @@ export const FONT_OPTIONS: FontOption[] = [
     boldWeights: [700, 800, 900],
   },
   {
-    key: "noto-sans-kr",
-    label: "Noto Sans KR",
-    cssFamily: "var(--font-noto-sans-kr), 'Pretendard', sans-serif",
-    sizeAdjust: 0.976,
-    boldWeights: [700, 700, 900],
-  },
-  {
-    key: "scdream",
-    label: "에스코어 드림 (SCDream)",
-    cssFamily: "'SCDream', 'Pretendard', sans-serif",
-    sizeAdjust: 0.916,
-    boldWeights: [800, 800, 800],
-  },
-  {
     key: "nanum-square",
-    label: "나눔스퀘어 (NanumSquare)",
-    cssFamily: "'NanumSquare', 'Pretendard', sans-serif",
+    label: "나눔스퀘어 네오 (NanumSquare Neo)",
+    cssFamily: "'NanumSquareNeo', 'Pretendard', sans-serif",
     sizeAdjust: 0.954,
-    boldWeights: [700, 700, 700],
-  },
-  {
-    key: "hahmlet",
-    label: "함렡 (Hahmlet)",
-    cssFamily: "var(--font-hahmlet), 'Pretendard', sans-serif",
-    sizeAdjust: 0.979,
-    boldWeights: [700, 700, 900],
-  },
-  {
-    key: "joseon-gungseo",
-    label: "조선궁서체 (Joseon Gungseo)",
-    cssFamily: "'JoseonGungseo', 'Pretendard', sans-serif",
-    sizeAdjust: 0.923,
-    boldWeights: [700, 700, 700],
-  },
-  {
-    key: "sd-unicef-dodam",
-    label: "SD 유니세프 도담체",
-    cssFamily: "'SDUnicefDodam', 'Pretendard', sans-serif",
-    sizeAdjust: 1.111,
-    boldWeights: [700, 700, 700],
+    boldWeights: [500, 700, 900],
   },
   {
     key: "gyeonggi-cheonnyeon-batang",
     label: "경기천년바탕",
     cssFamily: "'GyeonggiCheonnyeonBatang', 'Pretendard', sans-serif",
     sizeAdjust: 0.927,
-    boldWeights: [700, 700, 700],
-  },
-  {
-    key: "lee-seoyoon",
-    label: "이서윤체",
-    cssFamily: "'LeeSeoyoon', 'Pretendard', sans-serif",
-    sizeAdjust: 1.1,
     boldWeights: [700, 700, 700],
   },
   {
@@ -109,20 +66,30 @@ export const FONT_OPTIONS: FontOption[] = [
     boldWeights: [500, 700, 700],
   },
   {
-    key: "bm-dohyeon",
-    label: "배민 도현체",
-    cssFamily: "'BMDoHyeon', 'Pretendard', sans-serif",
-    sizeAdjust: 0.883,
+    key: "joseon-gungseo",
+    label: "조선궁서체 (Joseon Gungseo)",
+    cssFamily: "'JoseonGungseo', 'Pretendard', sans-serif",
+    sizeAdjust: 0.923,
     boldWeights: [700, 700, 700],
   },
   {
-    key: "okdd-gothic",
-    label: "Ok단단체",
-    cssFamily: "'OKDDGothic', 'Pretendard', sans-serif",
-    sizeAdjust: 1.126,
+    key: "sd-unicef-dodam",
+    label: "SD 유니세프 도담체",
+    cssFamily: "'SDUnicefDodam', 'Pretendard', sans-serif",
+    sizeAdjust: 1.111,
+    boldWeights: [700, 700, 700],
+  },
+  {
+    key: "lee-seoyoon",
+    label: "이서윤체",
+    cssFamily: "'LeeSeoyoon', 'Pretendard', sans-serif",
+    sizeAdjust: 1.1,
     boldWeights: [700, 700, 700],
   },
 ];
+
+/** 설정 화면의 선택 목록. 모든 글꼴이 선택 가능하므로 FONT_OPTIONS와 같다. */
+export const FONT_PICKER_OPTIONS: FontOption[] = FONT_OPTIONS;
 
 export function getFontOptionByKey(key: string | null | undefined): FontOption {
   return FONT_OPTIONS.find((f) => f.key === key) ?? FONT_OPTIONS[0];

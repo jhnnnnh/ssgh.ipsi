@@ -147,7 +147,7 @@ function FavoriteGroup({
       </span>
       <div className="flex flex-wrap gap-2">
         {items.length === 0 && (
-          <p className="text-[11px] text-slate-400">등록된 즐겨찾기가 없습니다.</p>
+          <p className="text-xs text-slate-400">등록된 즐겨찾기가 없습니다.</p>
         )}
         {items.map((f) => (
           <div

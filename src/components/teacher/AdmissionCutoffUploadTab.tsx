@@ -153,7 +153,7 @@ export function AdmissionCutoffUploadTab() {
         />
       </label>
 
-      <div className="flex items-start gap-1.5 text-[11px] text-slate-400">
+      <div className="flex items-start gap-1.5 text-xs text-slate-400">
         <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>지역·대학·연도·수시/정시·교과/종합·전형·학과 등 26개 컬럼을 가진 대학자료 시트만 읽습니다.</span>
       </div>

@@ -153,14 +153,14 @@ export function CascadingPickerModal<
   const filteredAdmissionTypes = (admissionTypes ?? []).filter((t) => t.includes(admissionTypeQuery.trim()));
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[92] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/60 z-[92] flex items-center justify-center p-4" onClick={onClose}>
       {/* 높이를 vh(뷰포트 높이) 단위로 주면, 모바일 브라우저가 스크롤하는 동안 주소창을
           접었다 펼쳤다 하면서 실제 보이는 화면 크기가 바뀌는 것과 별개로 계산되어(이른바
           "모바일 100vh 문제") 박스 크기가 제멋대로 커지거나 작아지는 것처럼 보일 수 있다.
           바깥 배경(position:fixed; inset:0)은 항상 실제 보이는 화면 크기를 정확히 따라가므로,
           그 배경의 실제 높이에 대한 비율(%)로 주면 이 문제 없이 항상 안정적으로 고정된다. */}
       <div
-        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full h-[85%] overflow-hidden flex flex-col"
+        className="bg-white rounded-3xl shadow-xl max-w-4xl w-full h-[85%] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -182,7 +182,7 @@ export function CascadingPickerModal<
           </div>
         </div>
 
-        {resolving && <p className="px-5 pt-3 text-[11px] text-slate-400">카드와 가장 비슷한 항목을 찾는 중...</p>}
+        {resolving && <p className="px-5 pt-3 text-xs text-slate-400">카드와 가장 비슷한 항목을 찾는 중...</p>}
 
         <div className="p-5 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr sm:auto-rows-auto gap-4 overflow-y-auto min-h-0 flex-1">
           <PickColumn
@@ -272,7 +272,7 @@ function PickColumn({
     <div className="flex flex-col min-h-0 border border-slate-200 rounded-2xl overflow-hidden">
       <h4 className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 border-b border-slate-200">{title}</h4>
       {disabled ? (
-        <p className="flex-1 flex items-center justify-center text-center text-[11px] text-slate-400 px-3 py-8">{disabledLabel}</p>
+        <p className="flex-1 flex items-center justify-center text-center text-xs text-slate-400 px-3 py-8">{disabledLabel}</p>
       ) : (
         <>
           <div className="p-2 relative">
@@ -324,7 +324,7 @@ function PickColumn({
               </button>
             )}
             {items.length === 0 && !extraOption && (
-              <p className="text-center text-[11px] text-slate-400 py-6">일치하는 항목이 없어요.</p>
+              <p className="text-center text-xs text-slate-400 py-6">일치하는 항목이 없어요.</p>
             )}
             {items.map((item) => {
               const isSelected = item === selected;

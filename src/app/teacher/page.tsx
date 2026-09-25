@@ -68,7 +68,7 @@ export default function TeacherPage() {
 
   if (loading || !profile || profile.role !== "teacher") {
     return (
-      <div className="max-w-5xl mx-auto w-full px-4 py-10 flex-1 flex items-center justify-center">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex-1 flex items-center justify-center">
         <p className="text-sm text-slate-400">불러오는 중...</p>
       </div>
     );
@@ -131,7 +131,7 @@ function TeacherDashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto w-full px-4 py-6 sm:py-10 flex-1 space-y-6">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 space-y-5 sm:space-y-6">
       <DashboardHeader
         icon={<Contact className="w-5 h-5" />}
         actions={
@@ -198,13 +198,13 @@ function TeacherDashboard() {
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <span>{profile?.name} 선생님</span>
           {isAdmin && (
-            <span className="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-2 py-0.5 rounded-full">
               전체관리자
             </span>
           )}
         </h2>
         {!isAdmin && grade != null && classNo != null && (
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             {formatClassLabel(grade, classNo)} 담임
           </p>
         )}
@@ -212,6 +212,7 @@ function TeacherDashboard() {
 
       <Tabs items={tabs} active={tab} onChange={(k) => setTab(k as TeacherTab)} />
 
+      <main id="main-content" className="min-w-0">
       {!loading &&
       grade == null &&
       classNo == null &&
@@ -260,11 +261,12 @@ function TeacherDashboard() {
       )}
       {tab === "teachers" && isAdmin && <TeacherManageTab />}
       {tab === "cutoffs" && isAdmin && (
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
           <AdmissionCutoffUploadTab />
           <AdmissionOfferingUploadTab />
         </div>
       )}
+      </main>
 
       <ChangePasswordModal open={pwModalOpen} onClose={() => setPwModalOpen(false)} />
       <ManualHelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />

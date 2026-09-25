@@ -62,11 +62,11 @@ export function WonseoImageLightbox({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[95] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-950/90 z-[95] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center"
+        className="relative max-w-4xl w-full max-h-[90dvh] flex flex-col items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -81,10 +81,10 @@ export function WonseoImageLightbox({
           <img
             src={url}
             alt="첨부 이미지"
-            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            className="max-w-full max-h-[85dvh] object-contain rounded-2xl shadow-xl border border-white/10"
           />
         ) : (
-          <div className="w-full aspect-video max-h-[85vh] rounded-2xl bg-white/10 animate-pulse" />
+          <div className="w-full aspect-video max-h-[85dvh] rounded-2xl bg-white/10 animate-pulse" />
         )}
 
         {images.length > 1 && (

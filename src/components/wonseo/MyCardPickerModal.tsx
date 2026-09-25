@@ -31,9 +31,9 @@ export function MyCardPickerModal<T extends PickableCard>({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[95] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/60 z-[95] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-3xl shadow-xl max-w-2xl w-full max-h-[80dvh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -62,13 +62,13 @@ export function MyCardPickerModal<T extends PickableCard>({
                   >
                     <div className={`w-1.5 shrink-0 ${emphasis.bar}`} />
                     <div className="flex-1 p-3.5 space-y-1.5 min-w-0">
-                      <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-lg ${emphasis.badge}`}>
+                      <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-lg ${emphasis.badge}`}>
                         {card.level}
                       </span>
                       <h4 className="font-bold text-slate-900 text-sm truncate">
                         {card.university} {card.department}
                       </h4>
-                      <p className="text-[11px] text-slate-500 flex items-center gap-1 truncate">
+                      <p className="text-xs text-slate-500 flex items-center gap-1 truncate">
                         <FileText className="w-3 h-3 shrink-0" />
                         {card.category}
                         {card.sub_category ? ` · ${card.sub_category}` : ""}

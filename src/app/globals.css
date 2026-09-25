@@ -8,26 +8,54 @@ html {
 }
 
 :root {
-  --background: #f8fafc;
-  --foreground: #1e293b;
+  --background: #ffffff;
+  --foreground: #172033;
   --font-sans: "Pretendard", system-ui, -apple-system, sans-serif;
   --font-scale: 1;
   --font-bold-weight: 800;
-  --border-width: 1.5px;
+  --border-width: 1px;
+
+  /* 최신 디자인 가이드의 흰 바탕·차분한 네이비·얇은 경계를 앱 기본값으로 둔다.
+     개인 강조색을 저장한 계정은 AuthProvider가 아래 인디고 램프를 계속 덮어쓴다. */
+  --color-slate-50: #f1f5fa;
+  --color-slate-100: #e9eef5;
+  --color-slate-200: #dce3ed;
+  --color-slate-300: #7a879a;
+  --color-slate-400: #596579;
+  --color-slate-500: #596579;
+  --color-slate-600: #465267;
+  --color-slate-700: #344055;
+  --color-slate-800: #172033;
+  --color-slate-900: #172033;
+  --color-slate-950: #0d1627;
+
+  /* Tailwind radius tokens: 컨트롤 6px, 패널 8px. 원형 배지와 아바타는 유지한다. */
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.5rem;
+  --radius-3xl: 0.5rem;
+
+  /* 그림자는 목록/기본 표면에는 쓰지 않고 떠 있는 패널에만 두 단계로 제한한다. */
+  --shadow-xs: 0 1px 2px rgb(23 32 51 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(23 32 51 / 0.06), 0 4px 12px rgb(23 32 51 / 0.08);
+  --shadow-md: 0 1px 2px rgb(23 32 51 / 0.06), 0 4px 12px rgb(23 32 51 / 0.08);
+  --shadow-lg: 0 1px 2px rgb(23 32 51 / 0.06), 0 4px 12px rgb(23 32 51 / 0.08);
+  --shadow-xl: 0 4px 8px rgb(23 32 51 / 0.08), 0 16px 40px rgb(23 32 51 / 0.14);
+  --shadow-2xl: 0 4px 8px rgb(23 32 51 / 0.08), 0 16px 40px rgb(23 32 51 / 0.14);
 
   /* 테마 색상을 따로 설정하지 않은 학생/교사에게 적용되는 기본 강조색(#16366b) 램프.
      src/lib/theme-color.ts의 buildThemeColorVars와 동일한 규칙으로 생성했다. */
-  --color-indigo-50: #eef3fc;
-  --color-indigo-100: #d9e4f7;
-  --color-indigo-200: #b7cdf0;
-  --color-indigo-300: #89ace7;
-  --color-indigo-400: #5688dc;
-  --color-indigo-500: #2b6bd4;
-  --color-indigo-600: #255cb6;
-  --color-indigo-700: #1f4d98;
-  --color-indigo-800: #193e7b;
-  --color-indigo-900: #153366;
-  --color-indigo-950: #0d203f;
+  --color-indigo-50: #e8eef7;
+  --color-indigo-100: #d8e2f1;
+  --color-indigo-200: #bacbe4;
+  --color-indigo-300: #98b1d6;
+  --color-indigo-400: #718fbe;
+  --color-indigo-500: #4d6fa5;
+  --color-indigo-600: #16366b;
+  --color-indigo-700: #102b57;
+  --color-indigo-800: #0c2348;
+  --color-indigo-900: #081b3a;
+  --color-indigo-950: #051126;
 }
 
 @theme inline {
@@ -45,7 +73,7 @@ html {
    (@theme inline인 위 블록과 이 블록을 분리한 이유: inline은 값을 빌드 타임에 그대로
    박아 넣어서 var(--font-scale)을 담은 계산식이 살아남지 못한다.) */
 @theme {
-  --text-xs: calc(0.75rem * var(--font-scale));
+  --text-xs: calc(0.8125rem * var(--font-scale));
   --text-sm: calc(0.875rem * var(--font-scale));
   --text-base: calc(1rem * var(--font-scale));
   --text-lg: calc(1.125rem * var(--font-scale));
@@ -79,7 +107,7 @@ html {
 
 /* 기본 폰트(Pretendard)를 쓸 때만 메인 타이틀·화면 섹션 제목·학번 표시(emphasis-title)를
    한 단계 더 진하게(900) 보정한다. AuthProvider가 커스텀 폰트를 고르지 않은 사용자에게
-   data-pretendard 속성을 달아주므로, 다른 13종 폰트를 선택한 화면에는 영향이 없다. */
+   data-pretendard 속성을 달아주므로, 다른 폰트를 선택한 화면에는 영향이 없다. */
 [data-pretendard] .emphasis-title.font-bold,
 [data-pretendard] .emphasis-title {
   font-weight: 900;
@@ -119,28 +147,10 @@ html {
 }
 
 @font-face {
-  font-family: "SCDream";
-  src: url("/fonts/SCDream/SCDream-Regular.woff") format("woff");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "SCDream";
-  src: url("/fonts/SCDream/SCDream-ExtraBold.woff") format("woff");
-  font-weight: 800;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "NanumSquare";
-  src: url("/fonts/NanumSquare/NanumSquareR.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "NanumSquare";
-  src: url("/fonts/NanumSquare/NanumSquareB.woff2") format("woff2");
-  font-weight: 700;
+  font-family: "NanumSquareNeo";
+  src: url("/fonts/NanumSquareNeo/NanumSquareNeo-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 300 900;
   font-display: swap;
 }
 
@@ -204,20 +214,6 @@ html {
   font-display: swap;
 }
 
-@font-face {
-  font-family: "BMDoHyeon";
-  src: url("/fonts/BMDoHyeon/BMDoHyeon.woff2") format("woff2");
-  font-weight: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "OKDDGothic";
-  src: url("/fonts/OKDDGothic/OkDanDan.woff2") format("woff2");
-  font-weight: normal;
-  font-display: swap;
-}
-
 /* 한글은 띄어쓰기 없이도 글자 사이 어디서든 줄바꿈될 수 있다는 CSS 기본 규칙 때문에,
    화면이 좁아지면(특히 모바일) 이름·버튼 글자 같은 짧은 단어가 "김O"/"O"처럼 음절
    중간에서 잘려 두 줄로 넘어가곤 했다. word-break: keep-all은 한글도 (영어처럼) 띄어쓰기
@@ -228,8 +224,59 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-weight: 500;
+  line-height: 1.6;
+  caret-color: var(--color-indigo-600);
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+
+::selection {
+  background: #c9d7ee;
+  color: #172033;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: 2px;
+}
+
+a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.scroll-area {
+  scrollbar-color: #7a879a transparent;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.bg-transparent),
+select,
+textarea {
+  background-color: #fff;
+  border-radius: 0.375rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #596579;
+  opacity: 1;
+}
+
+table,
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::-webkit-scrollbar {

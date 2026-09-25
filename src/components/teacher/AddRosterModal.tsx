@@ -59,7 +59,7 @@ export function AddRosterModal({
           placeholder={"학번 이름\n학번 이름\n학번 이름"}
           className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3.5 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
         />
-        <p className="text-[11px] text-slate-400 mt-2">
+        <p className="text-xs text-slate-400 mt-2">
           * 명단에 등록된 학생만 학생 모드 로그인이 허용되며 최초 로그인 시 비밀번호가
           지정됩니다.
         </p>

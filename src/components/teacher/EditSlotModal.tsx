@@ -124,7 +124,7 @@ export function EditSlotModal({
           <p className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800">
             {slot.label}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">정해진 시각이 없는 예비 슬롯이라 이름은 바꿀 수 없어요.</p>
+          <p className="text-xs text-slate-400 mt-1">정해진 시각이 없는 예비 슬롯이라 이름은 바꿀 수 없어요.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -154,7 +154,7 @@ export function EditSlotModal({
             <button
               onClick={handleCancelReservation}
               disabled={saving}
-              className="text-[11px] font-bold text-rose-600 hover:underline disabled:opacity-50"
+              className="text-xs font-bold text-rose-600 hover:underline disabled:opacity-50"
             >
               예약 취소
             </button>
@@ -174,7 +174,7 @@ export function EditSlotModal({
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800"
           />
         </div>
-        <p className="text-[11px] text-slate-400 mt-1.5">
+        <p className="text-xs text-slate-400 mt-1.5">
           학번과 이름을 모두 입력하면 예약으로 등록되고, 비워두면 예약이 해제됩니다.
         </p>
       </div>

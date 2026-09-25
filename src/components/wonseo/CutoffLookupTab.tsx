@@ -254,7 +254,7 @@ export function CutoffLookupTab({
   const showEmpty = searched && !loading && cutoffGroups.length === 0 && offerings.length === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
       <Card className="space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-800">모집 정보 및 입결 조회</h3>
@@ -287,7 +287,7 @@ export function CutoffLookupTab({
       </Card>
 
       {searched && !loading && (offerings.length > 0 || cutoffGroups.length > 0) && (
-        <Card className="space-y-4">
+        <Card className="space-y-4 xl:col-span-2">
           <h3 className="text-base font-bold text-slate-900">
             {university}
             {department && ` · ${department}`}
@@ -303,7 +303,7 @@ export function CutoffLookupTab({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-800 text-sm">{o.admissionType}</span>
                       {o.track && (
-                        <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                           {o.track}
                         </span>
                       )}
@@ -328,7 +328,7 @@ export function CutoffLookupTab({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-800 text-sm">{g.admissionType}</span>
                       {g.track && (
-                        <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                           {g.track}
                         </span>
                       )}
@@ -378,11 +378,11 @@ export function CutoffLookupTab({
 
       {showEmpty &&
         (findingCandidates ? (
-          <Card>
+          <Card className="xl:col-span-2">
             <p className="text-center text-xs text-slate-400 py-6">비슷한 학과를 찾는 중...</p>
           </Card>
         ) : candidates && candidates.length > 0 ? (
-          <Card className="space-y-3">
+          <Card className="space-y-3 xl:col-span-2">
             <p className="text-xs font-bold text-slate-700">
               정확히 일치하는 데이터가 없어요. 이름이 비슷한 다른 학과를 참고해 보세요.
             </p>
@@ -398,23 +398,23 @@ export function CutoffLookupTab({
                     <div className="font-bold text-slate-800 text-xs">
                       {c.university} · {c.department}
                     </div>
-                    <div className="text-slate-400 text-[10px] mt-0.5">
+                    <div className="text-slate-400 text-xs mt-0.5">
                       {c.years[0]?.year}학년도 · 모집 {c.years[0]?.enrollment ?? "-"}명 · 경쟁률{" "}
                       {c.years[0]?.competition_rate ?? "-"}
                     </div>
                   </div>
-                  <span className="shrink-0 text-[11px] font-bold text-indigo-600">확인</span>
+                  <span className="shrink-0 text-xs font-bold text-indigo-600">확인</span>
                 </button>
               ))}
             </div>
           </Card>
         ) : (
-          <Card>
+          <Card className="xl:col-span-2">
             <p className="text-center text-xs text-slate-400 py-6">일치하는 모집정보·입결 데이터가 없습니다.</p>
           </Card>
         ))}
 
-      <Card className="space-y-4">
+      <Card className="space-y-4 xl:col-start-2 xl:row-start-1">
         <div>
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
             <FileBarChart className="w-4 h-4 text-indigo-600" />
@@ -459,9 +459,9 @@ export function CutoffLookupTab({
               저장된 경쟁률{competitionSaves && competitionSaves.length > 0 && ` ${competitionSaves.length}`}
             </p>
             {savesLoading ? (
-              <p className="text-[11px] text-slate-400">불러오는 중...</p>
+              <p className="text-xs text-slate-400">불러오는 중...</p>
             ) : !competitionSaves || competitionSaves.length === 0 ? (
-              <p className="text-[11px] text-slate-400">아직 저장된 경쟁률이 없어요. 작년 경쟁률을 조회한 뒤 저장해 보세요.</p>
+              <p className="text-xs text-slate-400">아직 저장된 경쟁률이 없어요. 작년 경쟁률을 조회한 뒤 저장해 보세요.</p>
             ) : (
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {competitionSaves.map((s) => (
@@ -479,7 +479,7 @@ export function CutoffLookupTab({
                         {s.department && ` · ${s.department}`}
                         {s.admission_type && ` · ${s.admission_type}`}
                       </p>
-                      <p className="text-[11px] text-slate-400">{new Date(s.created_at).toLocaleDateString("ko-KR")}</p>
+                      <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleDateString("ko-KR")}</p>
                     </button>
                     <button
                       type="button"

@@ -11,7 +11,7 @@ export function Modal({
   children,
   footer,
   maxWidth = "max-w-lg",
-  backdropBlur = true,
+  backdropBlur = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,7 +34,7 @@ export function Modal({
     >
       <div
         className={cn(
-          "bg-white rounded-3xl p-6 w-full shadow-xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto",
+          "bg-white rounded-3xl p-4 sm:p-6 w-full shadow-xl border border-slate-200 space-y-4 max-h-[90dvh] overflow-y-auto",
           maxWidth,
         )}
       >

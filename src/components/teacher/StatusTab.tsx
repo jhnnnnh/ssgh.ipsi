@@ -418,7 +418,7 @@ export function StatusTab() {
                 <span>즐겨찾기</span>
               </span>
               <div className="flex items-center gap-2">
-                <div className="flex items-center bg-white border border-indigo-200 rounded-xl p-0.5 text-[11px] font-bold">
+                <div className="flex items-center bg-white border border-indigo-200 rounded-xl p-0.5 text-xs font-bold">
                   {(
                     [
                       { key: "weekday", label: "평일" },
@@ -441,7 +441,7 @@ export function StatusTab() {
                 </div>
                 <button
                   onClick={() => setFavoritesModalOpen(true)}
-                  className="text-[11px] font-bold text-slate-500 hover:text-indigo-600 underline flex items-center gap-1 shrink-0"
+                  className="text-xs font-bold text-slate-500 hover:text-indigo-600 underline flex items-center gap-1 shrink-0"
                 >
                   <Settings className="w-3 h-3" />
                   <span>설정</span>
@@ -450,21 +450,21 @@ export function StatusTab() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {favoritesLoading ? (
-                <p className="text-[11px] text-slate-400">즐겨찾기 시간을 불러오는 중...</p>
+                <p className="text-xs text-slate-400">즐겨찾기 시간을 불러오는 중...</p>
               ) : favoritesError ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-[11px] font-semibold text-rose-600">{favoritesError}</p>
+                  <p className="text-xs font-semibold text-rose-600">{favoritesError}</p>
                   <button
                     type="button"
                     onClick={() => void reloadFavorites()}
-                    className="px-2 py-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                    className="px-2 py-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1"
                   >
                     <RefreshCw className="w-3 h-3" />
                     다시 불러오기
                   </button>
                 </div>
               ) : visibleFavorites.length === 0 ? (
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-slate-400">
                   등록된 즐겨찾기가 없습니다. &ldquo;설정&rdquo;에서 추가해 보세요.
                 </p>
               ) : (
@@ -532,7 +532,7 @@ export function StatusTab() {
                     />
                     <span className="text-lg font-bold text-slate-900">{formatSlotDisplay(s)}</span>
                     {s.is_booked && (
-                      <span className="whitespace-nowrap text-[11px] font-bold emphasis-title bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                      <span className="whitespace-nowrap text-xs font-bold emphasis-title bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                         {s.student_id} {s.student_name}
                       </span>
                     )}
@@ -555,12 +555,12 @@ export function StatusTab() {
 
                 {s.is_booked ? (
                   s.booked_at && (
-                    <p className="text-[11px] text-slate-400 font-semibold">
+                    <p className="text-xs text-slate-400 font-semibold">
                       신청일시: {new Date(s.booked_at).toLocaleString("ko-KR")}
                     </p>
                   )
                 ) : (
-                  <span className="text-[11px] font-bold text-slate-400 bg-slate-100 inline-block px-2 py-0.5 rounded-full w-fit">
+                  <span className="text-xs font-bold text-slate-400 bg-slate-100 inline-block px-2 py-0.5 rounded-full w-fit">
                     신청 가능
                   </span>
                 )}

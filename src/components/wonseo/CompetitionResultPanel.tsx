@@ -119,8 +119,8 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
           const yy = y(ratioVal);
           return (
             <g key={t}>
-              <line x1={PAD_L} x2={CHART_W - PAD_R} y1={yy} y2={yy} stroke="#e2e8f0" strokeWidth={1} />
-              <text x={PAD_L - 6} y={yy + 3} textAnchor="end" fontSize={10} fill="#94a3b8">
+              <line x1={PAD_L} x2={CHART_W - PAD_R} y1={yy} y2={yy} stroke="#dce3ed" strokeWidth={1} />
+              <text x={PAD_L - 6} y={yy + 3} textAnchor="end" fontSize={11} fill="#596579">
                 {ratioVal.toFixed(1)}
               </text>
             </g>
@@ -128,12 +128,12 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
         })}
         {/* x축 라벨: 요일만 — 날짜(며칠)보다 요일이 맞아야 작년과 비교가 직관적이다 */}
         {Array.from({ length: Math.floor(maxElapsed / (24 * 60)) + 1 }, (_, d) => d * 24 * 60).map((m) => (
-          <text key={m} x={x(m)} y={CHART_H - PAD_B + 16} textAnchor="middle" fontSize={10} fill="#94a3b8">
+          <text key={m} x={x(m)} y={CHART_H - PAD_B + 16} textAnchor="middle" fontSize={11} fill="#596579">
             {weekdayAt(series.startAt, m)}
           </text>
         ))}
 
-        {linePath && <path d={linePath} fill="none" stroke="#4f46e5" strokeWidth={2} />}
+        {linePath && <path d={linePath} fill="none" stroke="var(--color-indigo-600)" strokeWidth={2} />}
 
         {showNowMarker && (
           <line
@@ -175,7 +175,7 @@ function CompetitionChart({ series }: { series: CompetitionSeries }) {
               stroke="#cbd5e1"
               strokeWidth={1}
             />
-            <circle cx={x(hoverPoint.elapsedMin)} cy={y(hoverPoint.ratio)} r={4} fill="#4f46e5" />
+            <circle cx={x(hoverPoint.elapsedMin)} cy={y(hoverPoint.ratio)} r={4} fill="var(--color-indigo-600)" />
             {(() => {
               const label = `${weekdayAt(series.startAt, hoverPoint.elapsedMin)}요일 ${timeOfDayAt(series.startAt, hoverPoint.elapsedMin)} 기준  ${hoverPoint.ratio.toFixed(2)} : 1`;
               const { boxX, boxY, boxW } = tooltipBox(x(hoverPoint.elapsedMin), y(hoverPoint.ratio), label);
@@ -276,7 +276,7 @@ export function CompetitionResultPanel({
                 className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl transition"
               >
                 <span className="font-bold text-slate-800 text-xs">{o.admissionType}</span>
-                <span className="shrink-0 text-[11px] font-bold text-indigo-600">선택</span>
+                <span className="shrink-0 text-xs font-bold text-indigo-600">선택</span>
               </button>
             ))}
           </div>
@@ -316,12 +316,12 @@ export function CompetitionResultPanel({
           <button
             type="button"
             onClick={onPickManually}
-            className="w-full text-center text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+            className="w-full text-center text-xs font-semibold text-indigo-600 hover:text-indigo-700"
           >
             찾는 학교·학과·전형이 아닌가요? 직접 선택하기
           </button>
         )}
-        <p className="text-[11px] text-slate-400">2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.</p>
+        <p className="text-xs text-slate-400">2026학년도(작년) 수시 원서접수 기간 기록입니다. 올해와 다를 수 있습니다.</p>
       </div>
     </>
   );

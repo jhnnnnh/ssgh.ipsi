@@ -88,7 +88,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-sm border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap">나의 수시 카드</h3>
           <button
@@ -161,7 +161,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             }}
           >
             <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
                 {submittedCards.map((card, index) => (
                   <SortableWonseoCard
                     key={card.id}
@@ -186,7 +186,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             </SortableContext>
             <DragOverlay>
               {activeCard && (
-                <div className="shadow-2xl shadow-indigo-900/30 rounded-3xl rotate-1 scale-[1.03]">
+                <div className="shadow-lg rounded-3xl">
                   <WonseoCardView
                     card={activeCard}
                     autoAssign={autoAssign}
@@ -226,7 +226,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           }}
         >
           <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
               {cards.map((card, index) => (
                 <SortableWonseoCard
                   key={card.id}
@@ -250,7 +250,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           </SortableContext>
           <DragOverlay>
             {activeCard && (
-              <div className="shadow-2xl shadow-indigo-900/30 rounded-3xl rotate-1 scale-[1.03]">
+              <div className="shadow-lg rounded-3xl">
                 <WonseoCardView
                   card={activeCard}
                   autoAssign={autoAssign}

@@ -102,7 +102,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
   return (
     <div className="space-y-6">
       {myReservations.length > 0 && (
-        <div className="bg-white border-2 border-indigo-500/80 rounded-3xl p-6 shadow-xs">
+        <div className="bg-white border border-indigo-200 rounded-3xl p-4 sm:p-5">
           <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2">
             <CircleCheck className="w-4 h-4 text-indigo-600" />
             <span>내가 신청한 상담 내역</span>
@@ -130,7 +130,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
         </div>
       )}
 
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-indigo-200 space-y-4">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 space-y-4">
         <div className="border-b border-slate-100 pb-4">
           <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-600" />
@@ -160,7 +160,7 @@ export function SlotBookingTab({ studentId }: { studentId: string }) {
         </div>
 
         {daySlots.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 pt-2">
             {daySlots.map((slot) => {
               const isMine = slot.is_booked && slot.student_id === studentId;
               const isTaken = slot.is_booked && !isMine;

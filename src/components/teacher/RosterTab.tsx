@@ -321,7 +321,7 @@ export function RosterTab() {
         {roster.length === 0 && (
           <div className="text-center py-8">
             <p className="text-xs font-semibold text-slate-500">등록된 학생 명단이 없습니다.</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               &ldquo;명단 추가&rdquo; 버튼을 눌러 학생을 등록해 주세요.
             </p>
           </div>

@@ -230,7 +230,7 @@ export function TeacherManageTab() {
                   <td className="px-5 py-3">
                     <span
                       className={cn(
-                        "text-[11px] font-bold px-2.5 py-1 rounded-full border",
+                        "text-xs font-bold px-2.5 py-1 rounded-full border",
                         t.teacher_role === "admin"
                           ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                           : "bg-amber-50 text-amber-700 border-amber-200",

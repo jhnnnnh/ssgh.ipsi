@@ -33,14 +33,14 @@ export default function StudentPage() {
 
   if (loading || !profile || profile.role !== "student" || !profile.student_id) {
     return (
-      <div className="max-w-4xl mx-auto w-full px-4 py-10 flex-1 flex items-center justify-center">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex-1 flex items-center justify-center">
         <p className="text-sm text-slate-400">불러오는 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4 py-6 sm:py-10 flex-1 space-y-6">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 space-y-5 sm:space-y-6">
       <DashboardHeader
         icon={<School className="w-5 h-5" />}
         actions={
@@ -76,11 +76,13 @@ export default function StudentPage() {
         onChange={(k) => setTab(k as StudentTab)}
       />
 
-      {tab === "consulting" && <SlotBookingTab studentId={profile.student_id} />}
-      {tab === "wonseo" && <WonseoTab studentId={profile.student_id} />}
-      {tab === "cutoffs" && <CutoffLookupTab studentId={profile.student_id} />}
-      {tab === "probability" && <AdmissionProbabilityTab studentId={profile.student_id} />}
-      {tab === "calendar" && <StudentCalendarTab studentId={profile.student_id} />}
+      <main id="main-content" className="min-w-0">
+        {tab === "consulting" && <SlotBookingTab studentId={profile.student_id} />}
+        {tab === "wonseo" && <WonseoTab studentId={profile.student_id} />}
+        {tab === "cutoffs" && <CutoffLookupTab studentId={profile.student_id} />}
+        {tab === "probability" && <AdmissionProbabilityTab studentId={profile.student_id} />}
+        {tab === "calendar" && <StudentCalendarTab studentId={profile.student_id} />}
+      </main>
 
       <footer className="mt-6 text-center text-xs text-slate-400 pb-6 border-t border-slate-200/60 pt-6">
         <p>© 2026. jinhyeokapply All rights reserved.</p>

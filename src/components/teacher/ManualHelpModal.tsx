@@ -41,7 +41,7 @@ export function ManualHelpModal({ open, onClose }: { open: boolean; onClose: () 
         </>
       }
     >
-      <PdfViewer src={MANUAL_PATH} className="w-full max-h-[70vh] overflow-y-auto" />
+      <PdfViewer src={MANUAL_PATH} className="w-full max-h-[70dvh] overflow-y-auto" />
     </Modal>
   );
 }

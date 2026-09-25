@@ -153,7 +153,7 @@ export function AdmissionOfferingUploadTab() {
         />
       </label>
 
-      <div className="flex items-start gap-1.5 text-[11px] text-slate-400">
+      <div className="flex items-start gap-1.5 text-xs text-slate-400">
         <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>식별 CODE·대학명·전형유형 등 93개 컬럼을 가진 &ldquo;전형데이터&rdquo; 시트만 읽습니다.</span>
       </div>

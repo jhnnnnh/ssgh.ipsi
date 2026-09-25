@@ -265,24 +265,24 @@ export const WonseoCardView = forwardRef<
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}
           {autoAssign ? (
-            <span className="text-[11px] font-bold text-slate-900">{rankLabel}</span>
+            <span className="text-xs font-bold text-slate-900">{rankLabel}</span>
           ) : (
             <InlineEditableText
               value={card.rank ?? ""}
               placeholder="미지정"
               onCommit={(text) => onRankChange?.(text)}
-              displayClassName="text-[11px] font-bold text-slate-900"
-              inputClassName="w-16 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded text-[11px] font-bold text-slate-900 placeholder:font-semibold placeholder:text-slate-400"
+              displayClassName="text-xs font-bold text-slate-900"
+              inputClassName="w-16 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded text-xs font-bold text-slate-900 placeholder:font-semibold placeholder:text-slate-400"
             />
           )}
           <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${emphasis.badge}`}
+            className={`text-xs font-bold px-2.5 py-1 rounded-lg ${emphasis.badge}`}
           >
             {card.level}
           </span>
           {showStatus && (
             <span
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${STATUS_BADGE_STYLE[card.status]}`}
+              className={`text-xs font-bold px-2 py-0.5 rounded-full border ${STATUS_BADGE_STYLE[card.status]}`}
             >
               {statusLabel}
             </span>
@@ -363,13 +363,13 @@ export const WonseoCardView = forwardRef<
               <button
                 type="button"
                 onClick={addSchedule}
-                className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-bold flex items-center gap-1"
+                className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
                 추가
               </button>
             </div>
-            {scheduleEvents.length === 0 && <p className="text-[11px] text-slate-400">등록된 일정이 없어요.</p>}
+            {scheduleEvents.length === 0 && <p className="text-xs text-slate-400">등록된 일정이 없어요.</p>}
             <div className="space-y-1">
               {scheduleEvents.map((s) => (
                 <div key={s.id} className="flex items-center gap-1.5">

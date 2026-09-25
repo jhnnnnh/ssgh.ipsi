@@ -91,12 +91,12 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4 py-6 sm:py-10 flex-1">
-      <main className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 space-y-6">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex-1 flex flex-col">
+      <main id="main-content" className="bg-white rounded-3xl p-5 sm:p-8 w-full max-w-md mx-auto my-auto border border-slate-200 space-y-6">
         <div className="flex justify-end">
           <button
             onClick={() => setTeacherModalOpen(true)}
-            className="text-[11px] font-bold text-slate-400 hover:text-indigo-600 transition flex items-center gap-1"
+            className="text-xs font-bold text-slate-400 hover:text-indigo-600 transition flex items-center gap-1"
           >
             <ShieldUser className="w-3 h-3" />
             <span>선생님 모드</span>
@@ -106,19 +106,19 @@ export default function HomePage() {
           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto text-xl font-bold mb-3">
             <LogIn className="w-5 h-5" />
           </div>
-          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">로그인</h2>
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">로그인</h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
             학번과 이름, 비밀번호를 입력하여 로그인하세요.
             <br />
-            <span className="text-slate-400 text-[11px]">
+            <span className="text-slate-500 text-xs">
               * 최초 로그인 시 입력한 비밀번호가 내 비밀번호로 설정됩니다.
             </span>
           </p>
         </div>
 
-        <div className="max-w-md mx-auto space-y-3.5 pt-2">
+        <div className="max-w-md mx-auto space-y-4 pt-2">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
               <IdCard className="w-3.5 h-3.5 text-indigo-500" />
               <span>학번</span>
             </label>
@@ -127,11 +127,11 @@ export default function HomePage() {
               onChange={(e) => setStudentId(e.target.value)}
               placeholder="예: 30225"
               maxLength={10}
-              className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-indigo-500" />
               <span>이름</span>
             </label>
@@ -140,11 +140,11 @@ export default function HomePage() {
               onChange={(e) => setStudentName(e.target.value)}
               placeholder="예: 홍길동"
               maxLength={10}
-              className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-indigo-500" />
               <span>비밀번호</span>
             </label>
@@ -155,14 +155,14 @@ export default function HomePage() {
               placeholder="비밀번호 입력"
               maxLength={20}
               onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
-              className="w-full bg-slate-50 border border-slate-300 rounded-2xl px-4 py-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
             />
           </div>
 
           <button
             onClick={handleStudentLogin}
             disabled={submitting}
-            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-100 flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
+            className="w-full min-h-11 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>{submitting ? "로그인 중..." : "로그인"}</span>

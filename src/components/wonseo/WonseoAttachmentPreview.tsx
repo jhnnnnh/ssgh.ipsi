@@ -36,7 +36,7 @@ export function WonseoAttachmentPreview({
       ) : (
         <div className="w-full h-full animate-pulse bg-slate-200" />
       )}
-      <span className="absolute bottom-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-slate-900/80 text-white text-[10px] font-bold flex items-center justify-center">
+      <span className="absolute bottom-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-slate-900/80 text-white text-xs font-bold flex items-center justify-center">
         {images.length}
       </span>
     </button>

@@ -88,27 +88,27 @@ export function WonseoScheduleModal({
   return (
     <Modal open={open} onClose={onClose} title="내 원서 일정" maxWidth="max-w-md">
       {loading ? (
-        <p className="text-[11px] text-slate-400 text-center py-6">불러오는 중...</p>
+        <p className="text-xs text-slate-400 text-center py-6">불러오는 중...</p>
       ) : error ? (
         <div className="text-center py-6 space-y-3">
           <AlertCircle className="w-5 h-5 mx-auto text-rose-500" />
-          <p className="text-[11px] font-semibold text-slate-500">{error}</p>
+          <p className="text-xs font-semibold text-slate-500">{error}</p>
           <button
             type="button"
             onClick={() => setReloadKey((key) => key + 1)}
-            className="mx-auto px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5"
+            className="mx-auto px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
           >
             <RefreshCw className="w-3 h-3" />
             다시 불러오기
           </button>
         </div>
       ) : groups.length === 0 ? (
-        <p className="text-[11px] text-slate-400 text-center py-6">
+        <p className="text-xs text-slate-400 text-center py-6">
           추가할 수 있는 일정이 없어요. &ldquo;접수한 원서&rdquo;로 표시한 카드에 날짜가 정해진 일정을
           등록해야 여기서 캘린더에 추가할 수 있어요.
         </p>
       ) : (
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-3 max-h-[60dvh] overflow-y-auto">
           {groups.map((group) => {
             return (
               <div key={group.cardId} className="border border-slate-200 rounded-xl p-3">
@@ -128,11 +128,11 @@ export function WonseoScheduleModal({
                         className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5"
                       >
                         <div className="min-w-0">
-                          <span className="text-[11px] font-bold text-slate-700">{item.label}</span>
-                          <span className="text-[10px] text-slate-400 ml-1.5">{item.date}</span>
+                          <span className="text-xs font-bold text-slate-700">{item.label}</span>
+                          <span className="text-xs text-slate-400 ml-1.5">{item.date}</span>
                         </div>
                         {item.added ? (
-                          <span className="shrink-0 flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                          <span className="shrink-0 flex items-center gap-1 text-xs font-bold text-emerald-600">
                             <Check className="w-3 h-3" />
                             추가됨
                           </span>
@@ -141,7 +141,7 @@ export function WonseoScheduleModal({
                             type="button"
                             onClick={() => handleAdd(group, item)}
                             disabled={addingKey === key}
-                            className="shrink-0 flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition disabled:opacity-60"
+                            className="shrink-0 flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition disabled:opacity-60"
                           >
                             <Plus className="w-3 h-3" />
                             캘린더에 추가

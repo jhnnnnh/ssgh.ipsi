@@ -533,7 +533,7 @@ export function AdmissionProbabilityCalculator({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6 items-start">
         {/* 입력 */}
         <div className="space-y-4">
         <Card className="space-y-4">
@@ -575,7 +575,7 @@ export function AdmissionProbabilityCalculator({
 
           {deptCandidates && (
             <div className="space-y-1.5 border border-amber-200 bg-amber-50/50 rounded-xl p-3">
-              <p className="text-[11px] font-bold text-amber-700">
+              <p className="text-xs font-bold text-amber-700">
                 정확히 일치하는 학과가 없어요. 이름이 비슷한 학과를 참고해 보세요.
               </p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -589,7 +589,7 @@ export function AdmissionProbabilityCalculator({
                     <span className="font-bold text-slate-800 text-xs">
                       {c.university} · {c.department}
                     </span>
-                    <span className="shrink-0 text-[11px] font-bold text-amber-700">선택</span>
+                    <span className="shrink-0 text-xs font-bold text-amber-700">선택</span>
                   </button>
                 ))}
               </div>
@@ -730,9 +730,9 @@ export function AdmissionProbabilityCalculator({
               저장된 결과{saves && saves.length > 0 && ` ${saves.length}`}
             </p>
             {savesLoading ? (
-              <p className="text-[11px] text-slate-400">불러오는 중...</p>
+              <p className="text-xs text-slate-400">불러오는 중...</p>
             ) : !saves || saves.length === 0 ? (
-              <p className="text-[11px] text-slate-400">아직 저장된 결과가 없어요. 결과를 조회한 뒤 저장해 보세요.</p>
+              <p className="text-xs text-slate-400">아직 저장된 결과가 없어요. 결과를 조회한 뒤 저장해 보세요.</p>
             ) : (
               <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {saves.map((s) => (
@@ -750,7 +750,7 @@ export function AdmissionProbabilityCalculator({
                         {s.department && ` · ${s.department}`}
                         {s.admission_type && ` · ${s.admission_type}`}
                       </p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-xs text-slate-400">
                         {s.input.userScore}등급 · {s.prob_low}~{s.prob_high}% ·{" "}
                         {new Date(s.created_at).toLocaleDateString("ko-KR")}
                       </p>
@@ -775,14 +775,14 @@ export function AdmissionProbabilityCalculator({
         <div className="space-y-4">
           <Card className="flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-[11px] text-slate-400">{deptLabel || "대학·학과를 입력하면 표시됩니다"}</p>
+              <p className="text-xs text-slate-400">{deptLabel || "대학·학과를 입력하면 표시됩니다"}</p>
               {!result && <p className="text-lg font-bold text-slate-400">분석 대기중</p>}
               {result && "insufficient" in result && <p className="text-lg font-bold text-slate-400">데이터 부족</p>}
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="text-3xl font-bold text-slate-900">{ok ? `${ok.probLow}~${ok.probHigh}%` : "—"}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">추정 합격 가능성</p>
+                <p className="text-xs text-slate-400 mt-0.5">추정 합격 가능성</p>
               </div>
               {ok && (
                 <button
@@ -816,11 +816,11 @@ export function AdmissionProbabilityCalculator({
             <>
               <div className="grid grid-cols-2 gap-px bg-slate-200 border border-slate-200">
                 <div className="bg-white p-3">
-                  <p className="text-[10px] text-slate-400">50%컷 예측</p>
+                  <p className="text-xs text-slate-400">50%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p50Predicted.toFixed(2)} 등급</p>
                 </div>
                 <div className="bg-white p-3">
-                  <p className="text-[10px] text-slate-400">70%컷 예측</p>
+                  <p className="text-xs text-slate-400">70%컷 예측</p>
                   <p className="text-base font-bold text-slate-800">{ok.p70Predicted.toFixed(2)} 등급</p>
                 </div>
               </div>
@@ -975,7 +975,7 @@ function StepRow({ n, title, last, children }: { n: number; title: string; last?
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center shrink-0">
-        <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
           {n}
         </div>
         {!last && <div className="w-px flex-1 bg-slate-200 mt-1" />}
@@ -1099,12 +1099,12 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
         }}
         onMouseLeave={() => setHoverX(null)}
       >
-        <line x1={marginL} y1={marginT} x2={marginL} y2={marginT + plotH} stroke="#cbd5e1" />
-        <line x1={marginL} y1={marginT + plotH} x2={marginL + plotW} y2={marginT + plotH} stroke="#cbd5e1" />
+        <line x1={marginL} y1={marginT} x2={marginL} y2={marginT + plotH} stroke="#dce3ed" />
+        <line x1={marginL} y1={marginT + plotH} x2={marginL + plotW} y2={marginT + plotH} stroke="#dce3ed" />
         {[0, 25, 50, 75, 100].map((p) => (
           <g key={p}>
-            <line x1={marginL - 4} y1={Y(p)} x2={marginL + plotW} y2={Y(p)} stroke="#f1f5f9" />
-            <text x={marginL - 7} y={Y(p) + 3} fontSize={9} fill="#94a3b8" textAnchor="end">
+            <line x1={marginL - 4} y1={Y(p)} x2={marginL + plotW} y2={Y(p)} stroke="#e9eef5" />
+            <text x={marginL - 7} y={Y(p) + 3} fontSize={11} fill="#596579" textAnchor="end">
               {p}%
             </text>
           </g>
@@ -1115,7 +1115,7 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
           y1={marginT}
           x2={X(result.p50Predicted)}
           y2={marginT + plotH}
-          stroke="#a5b4fc"
+          stroke="var(--color-indigo-300)"
           strokeWidth={1}
           strokeDasharray="3,3"
         />
@@ -1124,12 +1124,12 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
           y1={marginT}
           x2={X(result.p70Predicted)}
           y2={marginT + plotH}
-          stroke="#a5b4fc"
+          stroke="var(--color-indigo-300)"
           strokeWidth={1}
           strokeDasharray="3,3"
         />
 
-        <path d={pathD} fill="none" stroke="#4f46e5" strokeWidth={2} />
+        <path d={pathD} fill="none" stroke="var(--color-indigo-600)" strokeWidth={2} />
 
         {/* 사용자 성적 위치 — 확률 범위(±)를 세로 막대로 표시 */}
         <line
@@ -1137,12 +1137,12 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
           y1={Y(result.probHigh)}
           x2={X(userScore)}
           y2={Y(result.probLow)}
-          stroke="#4f46e5"
+          stroke="var(--color-indigo-600)"
           strokeWidth={3}
           strokeLinecap="round"
           opacity={0.35}
         />
-        <circle cx={X(userScore)} cy={Y(result.prob)} r={4.5} fill="#4f46e5" stroke="#fff" strokeWidth={1.2} />
+        <circle cx={X(userScore)} cy={Y(result.prob)} r={4.5} fill="var(--color-indigo-600)" stroke="#fff" strokeWidth={1.2} />
 
         {hoverPoint && (
           <>
@@ -1151,14 +1151,14 @@ function ProbabilityChart({ result, userScore }: { result: EstimatorResult; user
               y1={marginT}
               x2={X(hoverPoint.grade)}
               y2={marginT + plotH}
-              stroke="#64748b"
+              stroke="#596579"
               strokeWidth={1}
             />
-            <circle cx={X(hoverPoint.grade)} cy={Y(hoverPoint.prob)} r={3.5} fill="#1e293b" />
+            <circle cx={X(hoverPoint.grade)} cy={Y(hoverPoint.prob)} r={3.5} fill="#172033" />
           </>
         )}
       </svg>
-      <p className="text-[11px] text-center text-slate-500 -mt-1">
+      <p className="text-xs text-center text-slate-500 -mt-1">
         {hoverPoint
           ? `${hoverPoint.grade.toFixed(2)}등급 → 합격확률 약 ${Math.round(hoverPoint.prob)}%`
           : `점선: 50%·70%컷 예측 / 굵은 점: 내 성적(${userScore.toFixed(2)}등급)`}

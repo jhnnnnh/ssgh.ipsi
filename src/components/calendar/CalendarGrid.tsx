@@ -152,19 +152,21 @@ export function CalendarGrid({
         </div>
       </div>
 
-      <div>
-        <div className="grid grid-cols-7 mb-1">
-          {WEEKDAY_KR.map((label, i) => (
-            <div
-              key={label}
-              className={cn("text-center text-[11px] font-bold py-1.5", weekdayLabelClass(i))}
-            >
-              {label}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)] gap-5 items-start">
+        <div className="min-w-0">
+          <div>
+            <div className="grid grid-cols-7 mb-1">
+              {WEEKDAY_KR.map((label, i) => (
+                <div
+                  key={label}
+                  className={cn("text-center text-xs font-bold py-1.5", weekdayLabelClass(i))}
+                >
+                  {label}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((cell, idx) => {
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((cell, idx) => {
             const dayEvents = eventsByDate.get(cell.dateStr) ?? [];
             const shownEvents = dayEvents.slice(0, MAX_BADGES_PER_DAY);
             const prevShown =
@@ -196,7 +198,7 @@ export function CalendarGrid({
               >
                 <span
                   className={cn(
-                    "text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full shrink-0",
+                    "text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full shrink-0",
                     isToday ? "bg-indigo-600 text-white" : weekdayLabelClass(cell.dayOfWeek),
                   )}
                 >
@@ -216,7 +218,7 @@ export function CalendarGrid({
                           if (canManageEvent(ev)) onEditEvent(ev);
                         }}
                         className={cn(
-                          "relative text-[9px] sm:text-[10px] font-bold text-white px-1.5 py-0.5 truncate",
+                          "relative text-xs font-bold text-white px-1.5 py-0.5 truncate",
                           connectLeft && connectRight
                             ? "rounded-none"
                             : connectLeft
@@ -240,58 +242,61 @@ export function CalendarGrid({
                     );
                   })}
                   {dayEvents.length > MAX_BADGES_PER_DAY && (
-                    <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 px-1.5">
+                    <div className="text-xs font-bold text-slate-400 px-1.5">
                       +{dayEvents.length - MAX_BADGES_PER_DAY}
                     </div>
                   )}
                 </div>
               </div>
             );
-          })}
-        </div>
-      </div>
-
-      <div className="border-t border-slate-100 pt-4">
-        <h4 className="text-xs font-bold text-slate-700 mb-2">{selectedDate} 일정</h4>
-        {selectedEvents.length === 0 ? (
-          <p className="text-[11px] text-slate-400">등록된 일정이 없습니다.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {selectedEvents.map((ev) => (
-              <div
-                key={ev.id}
-                className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: ev.color }}
-                />
-                <span className="text-xs font-bold text-slate-800 truncate flex-1">
-                  {displayTitle(ev)}
-                </span>
-                <span className="text-[10px] font-bold text-slate-400 shrink-0">
-                  {EVENT_TYPE_LABELS[ev.type]}
-                </span>
-                {canManageEvent(ev) && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => onEditEvent(ev)}
-                      className="w-6 h-6 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteEvent(ev)}
-                      className="w-6 h-6 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              })}
+            </div>
           </div>
-        )}
+        </div>
+        <div className="xl:border-l xl:border-slate-200 xl:pl-5">
+          <div className="border-t border-slate-100 pt-4 xl:border-t-0 xl:pt-0">
+            <h4 className="text-xs font-bold text-slate-700 mb-2">{selectedDate} 일정</h4>
+            {selectedEvents.length === 0 ? (
+              <p className="text-xs text-slate-400">등록된 일정이 없습니다.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {selectedEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: ev.color }}
+                    />
+                    <span className="text-xs font-bold text-slate-800 truncate flex-1">
+                      {displayTitle(ev)}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400 shrink-0">
+                      {EVENT_TYPE_LABELS[ev.type]}
+                    </span>
+                    {canManageEvent(ev) && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => onEditEvent(ev)}
+                          className="w-6 h-6 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteEvent(ev)}
+                          className="w-6 h-6 rounded-lg hover:bg-rose-100 text-rose-500 flex items-center justify-center"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </Card>
   );

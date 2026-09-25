@@ -454,7 +454,7 @@ export function WonseoCardModal({
         <div className="border-t border-b border-slate-100 py-2.5">
           <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
             <span>진행 / 합격 상태</span>
-            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
               선생님 전용
             </span>
           </label>
@@ -517,7 +517,7 @@ export function WonseoCardModal({
                 type="button"
                 onClick={() => set("category", opt)}
                 className={cn(
-                  "py-2 rounded-xl border font-bold text-[11px] sm:text-xs transition",
+                  "py-2 rounded-xl border font-bold text-xs transition",
                   form.category === opt
                     ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
@@ -530,7 +530,7 @@ export function WonseoCardModal({
               type="button"
               onClick={() => !isCustomCategory && set("category", "")}
               className={cn(
-                "py-2 rounded-xl border font-bold text-[11px] sm:text-xs transition",
+                "py-2 rounded-xl border font-bold text-xs transition",
                 isCustomCategory
                   ? "bg-indigo-600 text-white border-indigo-600"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
@@ -617,7 +617,7 @@ export function WonseoCardModal({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-0.5">1단계</label>
+              <label className="block text-xs font-bold text-slate-500 mb-0.5">1단계</label>
               <input
                 value={form.stage1}
                 onChange={(e) => set("stage1", e.target.value)}
@@ -626,7 +626,7 @@ export function WonseoCardModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-0.5">2단계</label>
+              <label className="block text-xs font-bold text-slate-500 mb-0.5">2단계</label>
               <input
                 value={form.stage2}
                 onChange={(e) => set("stage2", e.target.value)}
@@ -684,14 +684,14 @@ export function WonseoCardModal({
         title="불러올 전형 정보를 확인해 주세요"
         maxWidth="max-w-sm"
       >
-        <p className="flex items-start gap-1.5 text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5">
+        <p className="flex items-start gap-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5">
           <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
             본 정보는 참고용이며 실제와 다를 수 있습니다. 지원 전 반드시 해당 대학 입학처 공식
             모집요강을 확인하세요!
           </span>
         </p>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-xs text-slate-400">
           {offeringOptions && offeringOptions.length > 1
             ? "입력한 대학·모집단위에 전형이 여러 개 있어요. 지원하는 전형을 선택하면 전형방법·수능최저학력기준·모집인원과 최근 입결이 함께 채워져요."
             : "아래 내용으로 전형방법·수능최저학력기준·모집인원과 최근 입결을 채울게요. 맞으면 선택해 주세요."}
@@ -706,12 +706,12 @@ export function WonseoCardModal({
             >
               <div>
                 <div className="font-bold text-slate-800">{opt.admissionType}</div>
-                <div className="text-slate-400 text-[10px] mt-0.5">
+                <div className="text-slate-400 text-xs mt-0.5">
                   {opt.track} · {opt.methodSingle || `${opt.methodStage1} → ${opt.methodStage2}`} · 모집{" "}
                   {opt.enrollment ?? "-"}명
                 </div>
               </div>
-              <span className="shrink-0 text-[11px] font-bold text-indigo-600">확인</span>
+              <span className="shrink-0 text-xs font-bold text-indigo-600">확인</span>
             </button>
           ))}
         </div>
@@ -723,7 +723,7 @@ export function WonseoCardModal({
         title="비슷한 학과의 입결을 확인해 주세요"
         maxWidth="max-w-sm"
       >
-        <p className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+        <p className="flex items-start gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
           <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
             {form.university} {form.department}와(과) 이름이 비슷한 다른 학과의 입결이에요. 학과 개편·명칭
@@ -742,12 +742,12 @@ export function WonseoCardModal({
                 <div className="font-bold text-slate-800">
                   {c.university} · {c.department}
                 </div>
-                <div className="text-slate-400 text-[10px] mt-0.5">
+                <div className="text-slate-400 text-xs mt-0.5">
                   {c.years[0]?.year}학년도 · 모집 {c.years[0]?.enrollment ?? "-"}명 · 경쟁률{" "}
                   {c.years[0]?.competition_rate ?? "-"}
                 </div>
               </div>
-              <span className="shrink-0 text-[11px] font-bold text-indigo-600">확인</span>
+              <span className="shrink-0 text-xs font-bold text-indigo-600">확인</span>
             </button>
           ))}
         </div>
@@ -767,7 +767,7 @@ export function WonseoCardModal({
       <div className="space-y-2 border-t border-slate-100 pt-3">
         <div className="flex items-center justify-between">
           <label className="block font-bold text-slate-700">이미지 파일 첨부</label>
-          <label className="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-[11px] font-bold transition flex items-center gap-1">
+          <label className="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center gap-1">
             <Paperclip className="w-3 h-3" />
             <span>사진 선택</span>
             <input
@@ -798,7 +798,7 @@ export function WonseoCardModal({
                 alt={file.name}
                 className="w-full h-full object-cover"
               />
-              <span className="absolute bottom-0 inset-x-0 bg-indigo-600/80 text-white text-[9px] text-center">
+              <span className="absolute bottom-0 inset-x-0 bg-indigo-600/80 text-white text-xs text-center">
                 신규
               </span>
             </div>

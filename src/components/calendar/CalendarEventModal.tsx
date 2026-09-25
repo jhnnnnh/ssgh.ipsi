@@ -217,12 +217,12 @@ export function CalendarEventModal({
     >
       {isWonseoSchedule ? (
         <div className="space-y-3">
-          <p className="text-[11px] text-slate-400">
+          <p className="text-xs text-slate-400">
             원서 카드에 연결된 일정은 제목·날짜를 여기서 직접 바꿀 수 없어요. 색상만 바꿀 수 있습니다.
           </p>
           <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
             <p className="font-bold text-slate-800">{title}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{date}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{date}</p>
           </div>
         </div>
       ) : (
@@ -303,12 +303,12 @@ export function CalendarEventModal({
               </div>
             </div>
             {date && endDate && endDate > date && (
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 {dateRange(date, endDate).length}일간 이어진 일정으로 저장됩니다.
               </p>
             )}
             {editingEvent && originalGroup.length > 1 && (
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 연속된 {originalGroup.length}일짜리 일정이에요. 날짜를 바꾸면 묶음 전체에 반영됩니다.
               </p>
             )}
@@ -337,7 +337,7 @@ export function CalendarEventModal({
       <div>
         <label className="block font-bold text-slate-700 mb-1.5">미리보기</label>
         <span
-          className="inline-block text-[11px] font-bold text-white px-2.5 py-1 rounded-lg truncate max-w-full"
+          className="inline-block text-xs font-bold text-white px-2.5 py-1 rounded-lg truncate max-w-full"
           style={{ backgroundColor: color }}
         >
           {isWonseoSchedule ? title : title.trim() || "제목 미입력"}

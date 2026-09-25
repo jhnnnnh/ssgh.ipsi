@@ -8,7 +8,7 @@ import {
   DEFAULT_FONT_KEY,
   DEFAULT_FONT_SIZE_LEVEL,
   DEFAULT_FONT_WEIGHT_LEVEL,
-  FONT_OPTIONS,
+  FONT_PICKER_OPTIONS,
   FONT_SIZE_LEVELS,
   FONT_WEIGHT_LEVELS,
   getFontBoldWeightByKey,
@@ -53,6 +53,15 @@ export function AppearanceSettingsModal({
   );
   const [saving, setSaving] = useState(false);
 
+  function handleClose() {
+    // 미리보기만 하고 저장하지 않은 값이 다시 열었을 때 남아 있지 않도록 원래 설정으로 되돌린다.
+    setColor(currentColor ?? DEFAULT_SWATCH);
+    setSelectedFont(currentFontKey ?? DEFAULT_FONT_KEY);
+    setSelectedSizeLevel((currentFontSizeLevel as FontSizeLevel) ?? DEFAULT_FONT_SIZE_LEVEL);
+    setSelectedWeightLevel((currentFontWeightLevel as FontWeightLevel) ?? DEFAULT_FONT_WEIGHT_LEVEL);
+    onClose();
+  }
+
   async function handleSave(
     hex: string | null,
     fontKey: string = selectedFont,
@@ -78,7 +87,7 @@ export function AppearanceSettingsModal({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title="테마 및 폰트 설정"
       icon={<Settings className="w-4 h-4 text-indigo-600" />}
       maxWidth="max-w-sm"
@@ -112,7 +121,7 @@ export function AppearanceSettingsModal({
             className="w-14 h-14 rounded-xl border border-slate-200 cursor-pointer bg-white p-1"
           />
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
               선택한 색상
             </span>
             <span className="text-sm font-black text-slate-800 tracking-tight">{color}</span>
@@ -123,7 +132,7 @@ export function AppearanceSettingsModal({
       <div>
         <label className="block font-bold text-slate-700 mb-1.5">폰트 종류</label>
         <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-          {FONT_OPTIONS.map((font) => (
+          {FONT_PICKER_OPTIONS.map((font) => (
             <button
               key={font.key}
               type="button"
@@ -135,7 +144,7 @@ export function AppearanceSettingsModal({
                   : "bg-white border-slate-200 hover:bg-slate-50",
               )}
             >
-              <span className="text-[11px] font-bold text-slate-500 shrink-0">{font.label}</span>
+              <span className="text-xs font-bold text-slate-500 shrink-0">{font.label}</span>
               <span
                 className="text-slate-900 truncate"
                 style={{ fontFamily: font.cssFamily, fontSize: `${font.sizeAdjust}rem` }}
@@ -190,7 +199,7 @@ export function AppearanceSettingsModal({
                 )}
               >
                 <span
-                  className="text-[11px] text-slate-900"
+                  className="text-xs text-slate-900"
                   style={{ fontWeight: getFontBoldWeightByKey(selectedFont, level) }}
                 >
                   가

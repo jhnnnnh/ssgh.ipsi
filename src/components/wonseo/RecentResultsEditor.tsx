@@ -43,7 +43,7 @@ export function RecentResultsEditor({
       type="button"
       onClick={onFindSimilar}
       disabled={findingSimilar}
-      className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold transition disabled:opacity-60"
+      className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition disabled:opacity-60"
     >
       <Search className="w-3 h-3" />
       {findingSimilar ? "찾는 중..." : "비슷한 학과 입결 찾기"}
@@ -57,7 +57,7 @@ export function RecentResultsEditor({
         <button
           type="button"
           onClick={addYear}
-          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-bold flex items-center gap-1"
+          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold flex items-center gap-1"
         >
           <Plus className="w-3 h-3" />
           연도 추가
@@ -66,13 +66,13 @@ export function RecentResultsEditor({
 
       {years.length === 0 ? (
         <div className="text-center py-3 bg-slate-50 rounded-xl space-y-2">
-          <p className="text-[11px] text-slate-400">등록된 입결 정보가 없습니다. 연도를 추가해 주세요.</p>
+          <p className="text-xs text-slate-400">등록된 입결 정보가 없습니다. 연도를 추가해 주세요.</p>
           {findSimilarButton}
         </div>
       ) : (
         <div className="overflow-x-auto">
           {!hasData && findSimilarButton && <div className="mb-1.5">{findSimilarButton}</div>}
-          <table className="text-[11px] border-collapse w-full">
+          <table className="text-xs border-collapse w-full">
             <thead>
               <tr>
                 <th className="text-left p-1.5 sticky left-0 bg-white" />
@@ -119,7 +119,7 @@ export function RecentResultsEditor({
         </div>
       )}
       {sourceNote && (
-        <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
           참고용: {sourceNote}
         </p>
       )}
