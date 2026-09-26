@@ -23,6 +23,7 @@ export function SortableWonseoCard({
   onRankChange,
   bodyMode,
   onSubmittedFieldsCommit,
+  extraActions,
 }: {
   id: string;
   card: WonseoCard;
@@ -36,10 +37,11 @@ export function SortableWonseoCard({
   setEqualHeightRef: (el: HTMLElement | null) => void;
   isDragging: boolean;
   autoAssign: boolean;
-  rankLabel: string;
+  rankLabel: string | undefined;
   onRankChange: (text: string) => void;
   bodyMode?: "full" | "submitted";
   onSubmittedFieldsCommit?: (fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] }) => void;
+  extraActions?: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isSorting } = useSortable({ id });
 
@@ -59,6 +61,7 @@ export function SortableWonseoCard({
       onRankChange={onRankChange}
       bodyMode={bodyMode}
       onSubmittedFieldsCommit={onSubmittedFieldsCommit}
+      extraActions={extraActions}
       minHeight={minHeight}
       style={{
         transform: CSS.Transform.toString(transform),

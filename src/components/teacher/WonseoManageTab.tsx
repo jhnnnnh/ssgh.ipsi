@@ -22,7 +22,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
-import { useEqualHeights } from "@/lib/hooks/useEqualHeights";
 import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
 import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { useActiveClass } from "@/components/providers/ActiveClassProvider";
@@ -30,6 +29,7 @@ import { Card } from "@/components/ui/Card";
 import { SortableWonseoCard } from "@/components/wonseo/SortableWonseoCard";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
 import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
+import { WonseoCardBoard } from "@/components/wonseo/WonseoCardBoard";
 import { WonseoTableView } from "@/components/teacher/WonseoTableView";
 import { exportWonseoExcel } from "@/lib/wonseo-excel";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
@@ -57,6 +57,15 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const supabase = useMemo(() => createClient(), []);
   const {
     cards,
+    groups,
+    sections,
+    rankLabels,
+    moveCardToGroup,
+    createGroup,
+    renameGroup,
+    toggleGroupRanked,
+    moveGroup,
+    deleteGroup,
     reloadCards,
     deleteCard,
     toggleSubmitted,
@@ -73,10 +82,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     onError: (message) => showToast(message, "error"),
     onSuccess: (message) => showToast(message, "success"),
   });
-  const { setRef, maxHeight } = useEqualHeights(
-    cards.map((c) => c.id).join("|"),
-    cards.length,
-  );
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -138,7 +143,6 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   }
 
   const activeCard = cards.find((c) => c.id === activeId) ?? null;
-  const rankLabels = computeAutoRankLabels(cards);
   // "접수한 원서" 화면은 자신만의 순서(submitted_sort_order)와 그 순서 기준의 지망
   // 라벨을 따로 계산한다 — 접수 전 화면(rankLabels/cards)과는 독립적이다.
   const submittedCards = cards.filter((c) => c.is_submitted).sort((a, b) => a.submitted_sort_order - b.submitted_sort_order);
@@ -345,57 +349,26 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   </div>
                 )
               ) : cards.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragStart={(e) => setActiveId(String(e.active.id))}
-                  onDragCancel={() => setActiveId(null)}
-                  onDragEnd={(e) => {
-                    setActiveId(null);
-                    void reorderCards(e);
-                  }}
-                >
-                  <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-                      {cards.map((card, index) => (
-                        <SortableWonseoCard
-                          key={card.id}
-                          id={card.id}
-                          setEqualHeightRef={setRef(index)}
-                          minHeight={maxHeight}
-                          isDragging={activeId === card.id}
-                          card={card}
-                          autoAssign={autoAssign}
-                          rankLabel={rankLabels[index]}
-                          onRankChange={(text) => void saveRank(card, text)}
-                          showStatus={statusVisible}
-                          showRecentResults={showRecentResults}
-                          onEdit={() => openEdit(card)}
-                          onDelete={() => void deleteCard(card)}
-                          isSubmitted={card.is_submitted}
-                          onToggleSubmitted={() => void toggleSubmitted(card)}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                  <DragOverlay>
-                    {activeCard && (
-                      <div className="shadow-lg rounded-3xl">
-                        <WonseoCardView
-                          card={activeCard}
-                          autoAssign={autoAssign}
-                          rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
-                          showStatus={statusVisible}
-                          showRecentResults={showRecentResults}
-                          onEdit={() => {}}
-                          onDelete={() => {}}
-                          isSubmitted={activeCard.is_submitted}
-                          onToggleSubmitted={() => {}}
-                        />
-                      </div>
-                    )}
-                  </DragOverlay>
-                </DndContext>
+                <WonseoCardBoard
+                  sections={sections}
+                  groups={groups}
+                  rankLabels={rankLabels}
+                  autoAssign={autoAssign}
+                  gridClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                  showStatus={statusVisible}
+                  showRecentResults={showRecentResults}
+                  onEdit={openEdit}
+                  onDelete={(card) => void deleteCard(card)}
+                  onToggleSubmitted={(card) => void toggleSubmitted(card)}
+                  onRankChange={(card, text) => void saveRank(card, text)}
+                  onReorder={(e) => void reorderCards(e)}
+                  onMoveCardToGroup={(card, groupId) => void moveCardToGroup(card, groupId)}
+                  onCreateGroup={createGroup}
+                  onRenameGroup={(group, name) => void renameGroup(group, name)}
+                  onToggleGroupRanked={(group) => void toggleGroupRanked(group)}
+                  onMoveGroup={(group, direction) => void moveGroup(group, direction)}
+                  onDeleteGroup={(group) => void deleteGroup(group)}
+                />
               ) : (
                 <div className="text-center py-12">
                   <p className="text-xs font-semibold text-slate-500">

@@ -111,8 +111,20 @@ export type WonseoCard = {
   /** "접수한 원서" 화면 전용 정렬 순서. sort_order(접수 전 화면)와 완전히 분리되어 있어,
    * 한쪽 화면에서 드래그로 순서를 바꿔도 다른 화면의 카드 순서에 영향을 주지 않는다. */
   submitted_sort_order: number;
+  /** 학생이 만든 그룹(wonseo_card_groups). null이면 미분류. */
+  group_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** 학생이 직접 만드는 원서 카드 그룹. is_ranked가 켜진 그룹의 카드만 N지망 번호를 받는다. */
+export type WonseoCardGroup = {
+  id: string;
+  student_id: string;
+  name: string;
+  sort_order: number;
+  is_ranked: boolean;
+  created_at: string;
 };
 
 /** schedule_events 배열의 한 항목. id는 배열 안 위치(순서)가 바뀌거나 다른 항목이
@@ -354,6 +366,12 @@ export type Database = {
         Insert: Pick<WonseoCard, "student_id" | "university"> &
           Partial<Omit<WonseoCard, "student_id" | "university" | "id">> & { id?: string };
         Update: Partial<WonseoCard>;
+      } & NoRelationships;
+      wonseo_card_groups: {
+        Row: WonseoCardGroup;
+        Insert: Pick<WonseoCardGroup, "student_id" | "name"> &
+          Partial<Pick<WonseoCardGroup, "id" | "sort_order" | "is_ranked" | "created_at">>;
+        Update: Partial<WonseoCardGroup>;
       } & NoRelationships;
       wonseo_images: {
         Row: WonseoImage;

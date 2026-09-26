@@ -20,12 +20,12 @@ import { ChevronDown, Eye, EyeOff, Layers, Plus, SlidersHorizontal, Star } from 
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
-import { useEqualHeights } from "@/lib/hooks/useEqualHeights";
 import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
 import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { SortableWonseoCard } from "@/components/wonseo/SortableWonseoCard";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
 import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
+import { WonseoCardBoard } from "@/components/wonseo/WonseoCardBoard";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
 import { cn } from "@/lib/cn";
 import type { WonseoCard } from "@/lib/database.types";
@@ -115,6 +115,15 @@ export function WonseoTab({ studentId }: { studentId: string }) {
 
   const {
     cards,
+    groups,
+    sections,
+    rankLabels,
+    moveCardToGroup,
+    createGroup,
+    renameGroup,
+    toggleGroupRanked,
+    moveGroup,
+    deleteGroup,
     reloadCards,
     deleteCard,
     toggleSubmitted,
@@ -131,11 +140,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     onError: (message) => showToast(message, "error"),
     onSuccess: (message) => showToast(message, "success"),
   });
-  const { setRef, maxHeight } = useEqualHeights(
-    cards.map((c) => c.id).join("|"),
-    cards.length,
-  );
-
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -152,7 +156,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
   }
 
   const activeCard = cards.find((c) => c.id === activeId) ?? null;
-  const rankLabels = computeAutoRankLabels(cards);
   // "접수한 원서" 화면은 자신만의 순서(submitted_sort_order)와 그 순서 기준의 지망
   // 라벨을 따로 계산한다 — 접수 전 화면(rankLabels/cards)과는 독립적이다.
   const submittedCards = cards.filter((c) => c.is_submitted).sort((a, b) => a.submitted_sort_order - b.submitted_sort_order);
@@ -325,57 +328,26 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           </div>
         )
       ) : cards.length > 0 ? (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={(e) => setActiveId(String(e.active.id))}
-          onDragCancel={() => setActiveId(null)}
-          onDragEnd={(e) => {
-            setActiveId(null);
-            void reorderCards(e);
-          }}
-        >
-          <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-            <div className={cardGridClassName}>
-              {cards.map((card, index) => (
-                <SortableWonseoCard
-                  key={card.id}
-                  id={card.id}
-                  setEqualHeightRef={setRef(index)}
-                  minHeight={maxHeight}
-                  isDragging={activeId === card.id}
-                  card={card}
-                  autoAssign={autoAssign}
-                  rankLabel={rankLabels[index]}
-                  onRankChange={(text) => void saveRank(card, text)}
-                  showStatus={statusVisible}
-                  showRecentResults={showRecentResults}
-                  onEdit={() => openEdit(card)}
-                  onDelete={() => void deleteCard(card)}
-                  isSubmitted={card.is_submitted}
-                  onToggleSubmitted={() => void toggleSubmitted(card)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-          <DragOverlay>
-            {activeCard && (
-              <div className="shadow-lg rounded-3xl">
-                <WonseoCardView
-                  card={activeCard}
-                  autoAssign={autoAssign}
-                  rankLabel={rankLabels[cards.findIndex((c) => c.id === activeCard.id)]}
-                  showStatus={statusVisible}
-                  showRecentResults={showRecentResults}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  isSubmitted={activeCard.is_submitted}
-                  onToggleSubmitted={() => {}}
-                />
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+        <WonseoCardBoard
+          sections={sections}
+          groups={groups}
+          rankLabels={rankLabels}
+          autoAssign={autoAssign}
+          gridClassName={cardGridClassName.replace(" pt-2", "")}
+          showStatus={statusVisible}
+          showRecentResults={showRecentResults}
+          onEdit={openEdit}
+          onDelete={(card) => void deleteCard(card)}
+          onToggleSubmitted={(card) => void toggleSubmitted(card)}
+          onRankChange={(card, text) => void saveRank(card, text)}
+          onReorder={(e) => void reorderCards(e)}
+          onMoveCardToGroup={(card, groupId) => void moveCardToGroup(card, groupId)}
+          onCreateGroup={createGroup}
+          onRenameGroup={(group, name) => void renameGroup(group, name)}
+          onToggleGroupRanked={(group) => void toggleGroupRanked(group)}
+          onMoveGroup={(group, direction) => void moveGroup(group, direction)}
+          onDeleteGroup={(group) => void deleteGroup(group)}
+        />
       ) : (
         <div className="bg-white rounded-3xl p-12 text-center border border-indigo-200 space-y-3">
           <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-2xl shadow-xs">

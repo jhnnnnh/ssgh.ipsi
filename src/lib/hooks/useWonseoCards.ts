@@ -4,8 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { createClient } from "@/lib/supabase/client";
-import { computeAutoRankLabels } from "@/lib/wonseo-rank";
-import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
+import {
+  UNGROUPED_SECTION_ID,
+  buildCardSections,
+  computeSectionRankLabels,
+} from "@/lib/wonseo-rank";
+import type { ScheduleEvent, WonseoCard, WonseoCardGroup } from "@/lib/database.types";
+
+/** 빈 구역에도 카드를 끌어다 놓을 수 있게 구역마다 두는 드롭 영역의 id 접두어. */
+export const SECTION_DROPPABLE_PREFIX = "section:";
 
 type ConfirmOptions = {
   message: string;
@@ -38,20 +45,68 @@ export function useWonseoCards({
 }: UseWonseoCardsOptions) {
   const supabase = useMemo(() => createClient(), []);
   const [cards, setCards] = useState<WonseoCard[]>([]);
+  const [groups, setGroups] = useState<WonseoCardGroup[]>([]);
 
   const reloadCards = useCallback(async () => {
     if (!studentId) {
       setCards([]);
+      setGroups([]);
       return;
     }
-    const { data } = await supabase
-      .from("wonseo_cards")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
+    const [{ data }, { data: groupData }] = await Promise.all([
+      supabase
+        .from("wonseo_cards")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("wonseo_card_groups")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true }),
+    ]);
     setCards(data ?? []);
+    setGroups(groupData ?? []);
   }, [studentId, supabase]);
+
+  const sections = useMemo(() => buildCardSections(cards, groups), [cards, groups]);
+  const rankLabels = useMemo(() => computeSectionRankLabels(sections), [sections]);
+
+  /** 화면 구역 순서를 그대로 펼쳐 sort_order·group_id를 다시 매기고, 바뀐 카드만 저장한다. */
+  const saveSectionLayout = useCallback(
+    async (nextSections: { id: string; cards: WonseoCard[] }[]) => {
+      const flattened = nextSections.flatMap((section) =>
+        section.cards.map((card) => ({
+          ...card,
+          group_id: section.id === UNGROUPED_SECTION_ID ? null : section.id,
+        })),
+      );
+      const next = flattened.map((card, index) => ({ ...card, sort_order: index }));
+      const previous = new Map(cards.map((card) => [card.id, card]));
+      const changed = next.filter((card) => {
+        const before = previous.get(card.id);
+        return !before || before.sort_order !== card.sort_order || before.group_id !== card.group_id;
+      });
+      setCards(next);
+      if (changed.length === 0) return;
+
+      const results = await Promise.all(
+        changed.map((card) =>
+          supabase
+            .from("wonseo_cards")
+            .update({ sort_order: card.sort_order, group_id: card.group_id })
+            .eq("id", card.id),
+        ),
+      );
+      if (results.some((result) => result.error)) {
+        onError("순서 저장에 실패했습니다.");
+        await reloadCards();
+      }
+    },
+    [cards, onError, reloadCards, supabase],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -94,32 +149,142 @@ export function useWonseoCards({
     [cards, onError, reloadCards, supabase],
   );
 
+  /** 같은 구역 안에서 순서를 바꾸거나, 다른 구역의 카드(또는 구역 빈칸) 위에 놓으면 그 구역으로 옮긴다. */
   const reorderCards = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
+      const activeId = String(active.id);
+      const overId = String(over.id);
 
-      const oldIndex = cards.findIndex((card) => card.id === active.id);
-      const newIndex = cards.findIndex((card) => card.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
+      const fromSection = sections.find((s) => s.cards.some((c) => c.id === activeId));
+      const toSection = overId.startsWith(SECTION_DROPPABLE_PREFIX)
+        ? sections.find((s) => s.id === overId.slice(SECTION_DROPPABLE_PREFIX.length))
+        : sections.find((s) => s.cards.some((c) => c.id === overId));
+      if (!fromSection || !toSection) return;
 
-      const reordered = arrayMove(cards, oldIndex, newIndex).map((card, index) => ({
-        ...card,
-        sort_order: index,
-      }));
-      setCards(reordered);
+      const nextSections = sections.map((s) => ({ id: s.id, cards: [...s.cards] }));
+      const from = nextSections.find((s) => s.id === fromSection.id)!;
+      const to = nextSections.find((s) => s.id === toSection.id)!;
 
-      const results = await Promise.all(
-        reordered.map((card) =>
-          supabase.from("wonseo_cards").update({ sort_order: card.sort_order }).eq("id", card.id),
-        ),
-      );
-      if (results.some((result) => result.error)) {
-        onError("순서 저장에 실패했습니다.");
-        await reloadCards();
+      if (from === to) {
+        const oldIndex = from.cards.findIndex((c) => c.id === activeId);
+        const newIndex = from.cards.findIndex((c) => c.id === overId);
+        if (oldIndex === -1 || newIndex === -1) return;
+        from.cards = arrayMove(from.cards, oldIndex, newIndex);
+      } else {
+        const oldIndex = from.cards.findIndex((c) => c.id === activeId);
+        const [moved] = from.cards.splice(oldIndex, 1);
+        const overIndex = to.cards.findIndex((c) => c.id === overId);
+        to.cards.splice(overIndex === -1 ? to.cards.length : overIndex, 0, moved);
       }
+      await saveSectionLayout(nextSections);
     },
-    [cards, onError, reloadCards, supabase],
+    [saveSectionLayout, sections],
+  );
+
+  /** 카드 메뉴의 "그룹 이동": 대상 구역 맨 끝으로 옮긴다(휴대폰에서 드래그 대신 쓴다). */
+  const moveCardToGroup = useCallback(
+    async (card: WonseoCard, groupId: string | null) => {
+      const targetId = groupId ?? UNGROUPED_SECTION_ID;
+      const nextSections = sections.map((s) => ({
+        id: s.id,
+        cards: s.cards.filter((c) => c.id !== card.id),
+      }));
+      const target = nextSections.find((s) => s.id === targetId);
+      if (!target) return;
+      target.cards.push(card);
+      await saveSectionLayout(nextSections);
+    },
+    [saveSectionLayout, sections],
+  );
+
+  const createGroup = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return false;
+      const { error } = await supabase.from("wonseo_card_groups").insert({
+        student_id: studentId,
+        name: trimmed.slice(0, 20),
+        sort_order: groups.length === 0 ? 0 : Math.max(...groups.map((g) => g.sort_order)) + 1,
+        is_ranked: false,
+      });
+      if (error) {
+        onError("그룹을 만들지 못했습니다.");
+        return false;
+      }
+      await reloadCards();
+      return true;
+    },
+    [groups, onError, reloadCards, studentId, supabase],
+  );
+
+  const renameGroup = useCallback(
+    async (group: WonseoCardGroup, name: string) => {
+      const trimmed = name.trim().slice(0, 20);
+      if (!trimmed || trimmed === group.name) return;
+      const { error } = await supabase.from("wonseo_card_groups").update({ name: trimmed }).eq("id", group.id);
+      if (error) {
+        onError("이름을 바꾸지 못했습니다.");
+        return;
+      }
+      await reloadCards();
+    },
+    [onError, reloadCards, supabase],
+  );
+
+  const toggleGroupRanked = useCallback(
+    async (group: WonseoCardGroup) => {
+      const { error } = await supabase
+        .from("wonseo_card_groups")
+        .update({ is_ranked: !group.is_ranked })
+        .eq("id", group.id);
+      if (error) {
+        onError("저장에 실패했습니다.");
+        return;
+      }
+      await reloadCards();
+    },
+    [onError, reloadCards, supabase],
+  );
+
+  /** 그룹 순서를 한 칸 위(-1)/아래(+1)로 옮긴다. 순서는 지망 번호 순서에도 반영된다. */
+  const moveGroup = useCallback(
+    async (group: WonseoCardGroup, direction: -1 | 1) => {
+      const ordered = [...groups].sort((a, b) => a.sort_order - b.sort_order);
+      const index = ordered.findIndex((g) => g.id === group.id);
+      const swapIndex = index + direction;
+      if (index === -1 || swapIndex < 0 || swapIndex >= ordered.length) return;
+      const reordered = arrayMove(ordered, index, swapIndex);
+      const results = await Promise.all(
+        reordered.map((g, i) => supabase.from("wonseo_card_groups").update({ sort_order: i }).eq("id", g.id)),
+      );
+      if (results.some((result) => result.error)) onError("순서 저장에 실패했습니다.");
+      await reloadCards();
+    },
+    [groups, onError, reloadCards, supabase],
+  );
+
+  const deleteGroup = useCallback(
+    async (group: WonseoCardGroup) => {
+      const count = cards.filter((c) => c.group_id === group.id).length;
+      const ok = await confirm({
+        message:
+          count > 0
+            ? `"${group.name}" 그룹을 삭제할까요? 안에 있는 카드 ${count}개는 지워지지 않고 미분류로 옮겨집니다.`
+            : `"${group.name}" 그룹을 삭제할까요?`,
+        confirmLabel: "삭제",
+        danger: true,
+      });
+      if (!ok) return;
+      const { error } = await supabase.from("wonseo_card_groups").delete().eq("id", group.id);
+      if (error) {
+        onError("삭제에 실패했습니다.");
+        return;
+      }
+      await reloadCards();
+    },
+    [cards, confirm, onError, reloadCards, supabase],
   );
 
   const reorderSubmittedCards = useCallback(
@@ -188,10 +353,12 @@ export function useWonseoCards({
 
   const toggleAutoAssign = useCallback(async () => {
     if (autoAssign) {
-      const labels = computeAutoRankLabels(cards);
       const results = await Promise.all(
-        cards.map((card, index) =>
-          supabase.from("wonseo_cards").update({ rank: labels[index] }).eq("id", card.id),
+        cards.map((card) =>
+          supabase
+            .from("wonseo_cards")
+            .update({ rank: rankLabels.get(card.id) ?? null })
+            .eq("id", card.id),
         ),
       );
       if (results.some((result) => result.error)) {
@@ -226,10 +393,19 @@ export function useWonseoCards({
       return;
     }
     setAutoAssign(true);
-  }, [autoAssign, cards, confirm, onError, reloadCards, setAutoAssign, studentId, supabase]);
+  }, [autoAssign, cards, confirm, onError, rankLabels, reloadCards, setAutoAssign, studentId, supabase]);
 
   return {
     cards,
+    groups,
+    sections,
+    rankLabels,
+    moveCardToGroup,
+    createGroup,
+    renameGroup,
+    toggleGroupRanked,
+    moveGroup,
+    deleteGroup,
     reloadCards,
     deleteCard,
     toggleSubmitted,

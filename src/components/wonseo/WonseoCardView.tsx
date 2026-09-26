@@ -163,6 +163,8 @@ export const WonseoCardView = forwardRef<
     style?: React.CSSProperties;
     className?: string;
     dragHandle?: React.ReactNode;
+    /** 상단 오른쪽 버튼 줄 맨 앞에 붙는 추가 버튼(예: 그룹 이동 메뉴). */
+    extraActions?: React.ReactNode;
     /** 지망 순위 자동 배정이 켜져 있을 때 보여줄, 카드 위치로 계산된 라벨(예: "1지망"). */
     autoAssign?: boolean;
     rankLabel?: string;
@@ -187,6 +189,7 @@ export const WonseoCardView = forwardRef<
     style,
     className,
     dragHandle,
+    extraActions,
     autoAssign = true,
     rankLabel,
     onRankChange,
@@ -265,7 +268,7 @@ export const WonseoCardView = forwardRef<
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}
           {autoAssign ? (
-            <span className="text-xs font-bold text-slate-900">{rankLabel}</span>
+            rankLabel && <span className="text-xs font-bold text-slate-900">{rankLabel}</span>
           ) : (
             <InlineEditableText
               value={card.rank ?? ""}
@@ -289,6 +292,7 @@ export const WonseoCardView = forwardRef<
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {extraActions}
           <button
             onClick={onToggleSubmitted}
             title={isSubmitted ? "접수 표시 해제" : "실제로 접수한 카드로 표시"}
