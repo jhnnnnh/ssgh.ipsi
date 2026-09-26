@@ -117,6 +117,43 @@ export type WonseoCard = {
   updated_at: string;
 };
 
+/** 우리 학교 학생들의 지난 수시 합불 결과(엑셀 업로드). 개인 식별 정보(반·번호·이름)는 저장하지 않는다. */
+export type SchoolAdmissionResult = {
+  id: string;
+  result_year: number;
+  region: string | null;
+  university: string;
+  admission_type: string | null;
+  track: string | null;
+  department: string;
+  enrollment: number | null;
+  /** 합격 / 충원합격 / 불합격 */
+  final_stage: string | null;
+  fail_reason: string | null;
+  waitlist_rank: number | null;
+  gpa: number | null;
+  uploaded_at: string;
+  created_at: string;
+};
+
+/** admin_wonseo_overview() 한 줄: 학생 한 명 × 카드 한 장(카드가 없으면 card_id null). */
+export type AdminWonseoOverviewRow = {
+  student_id: string;
+  student_name: string;
+  grade: number;
+  class_no: number;
+  card_id: string | null;
+  university: string | null;
+  department: string | null;
+  category: string | null;
+  level: SupportLevel | null;
+  status: ApplicationStatus | null;
+  is_submitted: boolean | null;
+  calculated_grade: string | null;
+  recent_results: RecentResultYear[] | null;
+  min_standard: string | null;
+};
+
 /** 학생이 직접 만드는 원서 카드 그룹. is_ranked가 켜진 그룹의 카드만 N지망 번호를 받는다. */
 export type WonseoCardGroup = {
   id: string;
@@ -373,6 +410,11 @@ export type Database = {
           Partial<Pick<WonseoCardGroup, "id" | "sort_order" | "is_ranked" | "created_at">>;
         Update: Partial<WonseoCardGroup>;
       } & NoRelationships;
+      school_admission_results: {
+        Row: SchoolAdmissionResult;
+        Insert: Omit<SchoolAdmissionResult, "id" | "created_at">;
+        Update: Partial<SchoolAdmissionResult>;
+      } & NoRelationships;
       wonseo_images: {
         Row: WonseoImage;
         Insert: Pick<WonseoImage, "card_id" | "student_id" | "storage_path"> &
@@ -433,6 +475,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      admin_wonseo_overview: {
+        Args: Record<string, never>;
+        Returns: AdminWonseoOverviewRow[];
+      };
       book_slot: {
         Args: { p_slot_id: string };
         Returns: CounselingSlot;

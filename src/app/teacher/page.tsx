@@ -28,6 +28,8 @@ import { TeacherManageTab } from "@/components/teacher/TeacherManageTab";
 import { AdmissionCutoffUploadTab } from "@/components/teacher/AdmissionCutoffUploadTab";
 import { AdmissionOfferingUploadTab } from "@/components/teacher/AdmissionOfferingUploadTab";
 import { AdmissionProbabilityTab } from "@/components/teacher/AdmissionProbabilityTab";
+import { GradeOverviewTab } from "@/components/teacher/GradeOverviewTab";
+import { SchoolResultsUploadTab } from "@/components/teacher/SchoolResultsUploadTab";
 import { ChangePasswordModal } from "@/components/teacher/ChangePasswordModal";
 import { ManualHelpModal } from "@/components/teacher/ManualHelpModal";
 import { formatClassLabel } from "@/lib/student-id";
@@ -41,6 +43,7 @@ type TeacherTab =
   | "admissionProbability"
   | "roster"
   | "calendar"
+  | "gradeOverview"
   | "teachers"
   | "cutoffs";
 
@@ -99,6 +102,7 @@ function TeacherDashboard() {
     { key: "roster", label: "학생명단" },
     ...(isAdmin
       ? [
+          { key: "gradeOverview", label: "학년 현황" },
           { key: "teachers", label: "교사 계정 관리" },
           { key: "cutoffs", label: "데이터 관리" },
         ]
@@ -329,11 +333,13 @@ function TeacherDashboard() {
               {tab === "calendar" && <TeacherCalendarTab />}
             </>
           )}
+          {tab === "gradeOverview" && isAdmin && <GradeOverviewTab />}
           {tab === "teachers" && isAdmin && <TeacherManageTab />}
           {tab === "cutoffs" && isAdmin && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
               <AdmissionCutoffUploadTab />
               <AdmissionOfferingUploadTab />
+              <SchoolResultsUploadTab />
             </div>
           )}
         </main>
