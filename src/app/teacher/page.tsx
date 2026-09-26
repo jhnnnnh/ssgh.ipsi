@@ -4,19 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
-  CalendarDays,
   CircleHelp,
-  Contact,
-  Database,
-  GraduationCap,
   KeyRound,
-  ListChecks,
   LogOut,
-  Percent,
-  Search,
+  MoreHorizontal,
   ShieldUser,
-  UsersRound,
-  UserCog,
   RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -26,7 +18,7 @@ import { DashboardHeader } from "@/components/ui/DashboardHeader";
 import { Card } from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
-import { Tabs } from "@/components/ui/Tabs";
+import type { TabItem } from "@/components/ui/Tabs";
 import { StatusTab } from "@/components/teacher/StatusTab";
 import { WonseoManageTab } from "@/components/teacher/WonseoManageTab";
 import { CutoffLookupTab } from "@/components/wonseo/CutoffLookupTab";
@@ -40,6 +32,7 @@ import { ChangePasswordModal } from "@/components/teacher/ChangePasswordModal";
 import { ManualHelpModal } from "@/components/teacher/ManualHelpModal";
 import { formatClassLabel } from "@/lib/student-id";
 import { useRoster } from "@/lib/hooks/useRoster";
+import { useHashTab } from "@/lib/hooks/useHashTab";
 
 type TeacherTab =
   | "status"
@@ -68,8 +61,8 @@ export default function TeacherPage() {
 
   if (loading || !profile || profile.role !== "teacher") {
     return (
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex-1 flex items-center justify-center">
-        <p className="text-sm text-slate-400">불러오는 중...</p>
+      <div className="app-loading" role="status" aria-live="polite">
+        불러오는 중…
       </div>
     );
   }
@@ -92,26 +85,36 @@ function TeacherDashboard() {
     error: rosterError,
     reload: reloadRoster,
   } = useRoster();
-  const [tab, setTab] = useState<TeacherTab>("status");
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [togglingAdmin, setTogglingAdmin] = useState(false);
   const showToast = useToast();
 
-  const tabs = [
-    { key: "status", label: "상담관리", icon: <ListChecks className="w-4 h-4" /> },
-    { key: "wonseo", label: "수시원서", icon: <GraduationCap className="w-4 h-4" /> },
-    { key: "cutoffLookup", label: "대입정보", icon: <Search className="w-4 h-4" /> },
-    { key: "admissionProbability", label: "합격률계산기", icon: <Percent className="w-4 h-4" /> },
-    { key: "calendar", label: "입시일정", icon: <CalendarDays className="w-4 h-4" /> },
-    { key: "roster", label: "학생명단", icon: <UsersRound className="w-4 h-4" /> },
+  const tabs: TabItem[] = [
+    { key: "status", label: "상담관리" },
+    { key: "wonseo", label: "수시원서" },
+    { key: "cutoffLookup", label: "대입정보" },
+    { key: "admissionProbability", label: "합격률계산기" },
+    { key: "calendar", label: "입시일정" },
+    { key: "roster", label: "학생명단" },
     ...(isAdmin
       ? [
-          { key: "teachers", label: "교사 계정 관리", icon: <UserCog className="w-4 h-4" /> },
-          { key: "cutoffs", label: "데이터 관리", icon: <Database className="w-4 h-4" /> },
+          { key: "teachers", label: "교사 계정 관리" },
+          { key: "cutoffs", label: "데이터 관리" },
         ]
       : []),
   ];
+  const [tab, setTab] = useHashTab<TeacherTab>(
+    "status",
+    tabs.map((item) => item.key as TeacherTab),
+  );
+  const headerContext = `${profile?.name ?? ""} 선생님${
+    isAdmin
+      ? " · 전체관리자"
+      : grade != null && classNo != null
+        ? ` · ${formatClassLabel(grade, classNo)} 담임`
+        : ""
+  }`;
   const needsRoster = tab === "wonseo" || tab === "cutoffLookup" || tab === "admissionProbability";
 
   async function handleToggleAdminMode() {
@@ -130,34 +133,34 @@ function TeacherDashboard() {
     await refreshProfile();
   }
 
+  async function handleSignOut() {
+    await signOut();
+    router.replace("/");
+  }
+
+  function closeToolsMenu(target: HTMLElement) {
+    target.closest("details")?.removeAttribute("open");
+  }
+
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 space-y-5 sm:space-y-6">
+    <div className="dashboard-page">
+      <a className="app-skip-link" href="#app-tab-panel">본문으로 건너뛰기</a>
       <DashboardHeader
-        icon={<Contact className="w-5 h-5" />}
+        context={headerContext}
+        items={tabs}
+        active={tab}
+        onChange={(key) => setTab(key as TeacherTab)}
         actions={
           <>
-            {profile?.dual_admin && (
-              <button
-                onClick={handleToggleAdminMode}
-                disabled={togglingAdmin}
-                title={`관리자 모드 ${profile.admin_mode_enabled ? "켜짐" : "꺼짐"}`}
-                className={`p-2 rounded-xl transition border disabled:opacity-60 ${
-                  profile.admin_mode_enabled
-                    ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 border-slate-200"
-                }`}
-              >
-                <ShieldUser className="w-3.5 h-3.5" />
-              </button>
-            )}
             {canSwitchClass && (
               <select
+                aria-label="관리할 학급 선택"
                 value={grade != null && classNo != null ? `${grade}-${classNo}` : ""}
                 onChange={(e) => {
                   const [g, c] = e.target.value.split("-").map(Number);
                   setActiveClass(g, c);
                 }}
-                className="bg-white border border-slate-300 text-slate-800 text-sm font-bold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="header-select"
               >
                 {classOptions.length === 0 && <option value="">등록된 반 없음</option>}
                 {classOptions.map((c) => (
@@ -167,106 +170,178 @@ function TeacherDashboard() {
                 ))}
               </select>
             )}
-            <AppearanceSettingsButtons />
-            <button
-              onClick={() => setHelpModalOpen(true)}
-              title="사용 매뉴얼"
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl transition border border-slate-200"
-            >
-              <CircleHelp className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setPwModalOpen(true)}
-              title="비밀번호 변경"
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl transition border border-slate-200"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={async () => {
-                await signOut();
-                router.replace("/");
+            <AppearanceSettingsButtons className="header-icon-action" />
+            <div className="teacher-header-desktop-tools">
+              {profile?.dual_admin && (
+                <button
+                  onClick={handleToggleAdminMode}
+                  disabled={togglingAdmin}
+                  type="button"
+                  title={`관리자 모드 ${profile.admin_mode_enabled ? "켜짐" : "꺼짐"}`}
+                  aria-label={`관리자 모드 ${profile.admin_mode_enabled ? "켜짐" : "꺼짐"}`}
+                  className={`header-icon-action disabled:opacity-60 ${
+                    profile.admin_mode_enabled ? "is-active" : ""
+                  }`}
+                >
+                  <ShieldUser className="w-4 h-4" aria-hidden="true" />
+                </button>
+              )}
+              <button
+                onClick={() => setHelpModalOpen(true)}
+                type="button"
+                aria-label="사용 매뉴얼"
+                title="사용 매뉴얼"
+                className="header-icon-action"
+              >
+                <CircleHelp className="w-4 h-4" aria-hidden="true" />
+              </button>
+              <button
+                onClick={() => setPwModalOpen(true)}
+                type="button"
+                aria-label="비밀번호 변경"
+                title="비밀번호 변경"
+                className="header-icon-action"
+              >
+                <KeyRound className="w-4 h-4" aria-hidden="true" />
+              </button>
+              <button
+                onClick={handleSignOut}
+                type="button"
+                aria-label="로그아웃"
+                title="나가기"
+                className="header-icon-action is-danger"
+              >
+                <LogOut className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+            <details
+              className="teacher-header-mobile-tools"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  closeToolsMenu(event.currentTarget);
+                  event.currentTarget.querySelector("summary")?.focus();
+                }
               }}
-              title="나가기"
-              className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition shadow-xs"
             >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
+              <summary className="header-icon-action" aria-label="교사 도구 더 보기">
+                <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+              </summary>
+              <div className="header-more-popover" aria-label="교사 도구">
+                {profile?.dual_admin && (
+                  <button
+                    type="button"
+                    disabled={togglingAdmin}
+                    onClick={(event) => {
+                      closeToolsMenu(event.currentTarget);
+                      void handleToggleAdminMode();
+                    }}
+                  >
+                    <ShieldUser className="w-4 h-4" aria-hidden="true" />
+                    관리자 모드 {profile.admin_mode_enabled ? "끄기" : "켜기"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    closeToolsMenu(event.currentTarget);
+                    setHelpModalOpen(true);
+                  }}
+                >
+                  <CircleHelp className="w-4 h-4" aria-hidden="true" />
+                  사용 매뉴얼
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    closeToolsMenu(event.currentTarget);
+                    setPwModalOpen(true);
+                  }}
+                >
+                  <KeyRound className="w-4 h-4" aria-hidden="true" />
+                  비밀번호 변경
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    closeToolsMenu(event.currentTarget);
+                    void handleSignOut();
+                  }}
+                  className="is-danger"
+                >
+                  <LogOut className="w-4 h-4" aria-hidden="true" />
+                  로그아웃
+                </button>
+              </div>
+            </details>
           </>
         }
-      >
-        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <span>{profile?.name} 선생님</span>
-          {isAdmin && (
-            <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-2 py-0.5 rounded-full">
-              전체관리자
-            </span>
-          )}
-        </h2>
-        {!isAdmin && grade != null && classNo != null && (
-          <p className="text-xs text-slate-400 mt-0.5">
-            {formatClassLabel(grade, classNo)} 담임
-          </p>
-        )}
-      </DashboardHeader>
+      />
 
-      <Tabs items={tabs} active={tab} onChange={(k) => setTab(k as TeacherTab)} />
-
-      <main id="main-content" className="min-w-0">
-      {!loading &&
-      grade == null &&
-      classNo == null &&
-      tab !== "teachers" &&
-      tab !== "cutoffs" &&
-      tab !== "cutoffLookup" &&
-      tab !== "admissionProbability" ? (
-        <Card padded={false} className="p-12 text-center space-y-2">
-          <p className="text-sm font-bold text-slate-600">
-            {isAdmin ? "아직 등록된 반이 없습니다." : "담당 반 정보를 확인할 수 없습니다."}
-          </p>
-          {isAdmin && (
-            <p className="text-xs text-slate-400">
-              &ldquo;교사 계정 관리&rdquo;에서 담임교사를 먼저 등록하거나, 학생 명단이 있는 반을 만들어 주세요.
-            </p>
+      <div className="app-content">
+        <main
+          id="app-tab-panel"
+          className="min-w-0"
+          role="tabpanel"
+          aria-labelledby={`app-tab-${tab}`}
+          tabIndex={-1}
+        >
+          {!loading &&
+          grade == null &&
+          classNo == null &&
+          tab !== "teachers" &&
+          tab !== "cutoffs" &&
+          tab !== "cutoffLookup" &&
+          tab !== "admissionProbability" ? (
+            <Card padded={false} className="p-12 text-center space-y-2">
+              <p className="text-sm font-bold text-slate-600">
+                {isAdmin ? "아직 등록된 반이 없습니다." : "담당 반 정보를 확인할 수 없습니다."}
+              </p>
+              {isAdmin && (
+                <p className="text-xs text-slate-400">
+                  &ldquo;교사 계정 관리&rdquo;에서 담임교사를 먼저 등록하거나, 학생 명단이 있는 반을 만들어 주세요.
+                </p>
+              )}
+            </Card>
+          ) : needsRoster && rosterLoading ? (
+            <Card padded={false} className="p-12 text-center">
+              <p className="text-sm text-slate-400">학생 명단을 불러오는 중...</p>
+            </Card>
+          ) : needsRoster && rosterError ? (
+            <Card padded={false} className="p-12 text-center space-y-3">
+              <AlertCircle className="w-6 h-6 mx-auto text-rose-500" aria-hidden="true" />
+              <p className="text-sm font-bold text-slate-600">{rosterError}</p>
+              <button
+                type="button"
+                onClick={() => void reloadRoster()}
+                className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                다시 불러오기
+              </button>
+            </Card>
+          ) : (
+            <>
+              {tab === "status" && <StatusTab />}
+              {tab === "wonseo" && <WonseoManageTab roster={roster} />}
+              {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
+              {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
+              {tab === "roster" && <RosterTab />}
+              {tab === "calendar" && <TeacherCalendarTab />}
+            </>
           )}
-        </Card>
-      ) : (
-        needsRoster && rosterLoading ? (
-          <Card padded={false} className="p-12 text-center">
-            <p className="text-sm text-slate-400">학생 명단을 불러오는 중...</p>
-          </Card>
-        ) : needsRoster && rosterError ? (
-          <Card padded={false} className="p-12 text-center space-y-3">
-            <AlertCircle className="w-6 h-6 mx-auto text-rose-500" />
-            <p className="text-sm font-bold text-slate-600">{rosterError}</p>
-            <button
-              type="button"
-              onClick={() => void reloadRoster()}
-              className="mx-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-sm font-bold transition flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              다시 불러오기
-            </button>
-          </Card>
-        ) : (
-          <>
-            {tab === "status" && <StatusTab />}
-            {tab === "wonseo" && <WonseoManageTab roster={roster} />}
-            {tab === "cutoffLookup" && <CutoffLookupTab roster={roster} />}
-            {tab === "admissionProbability" && <AdmissionProbabilityTab roster={roster} />}
-            {tab === "roster" && <RosterTab />}
-            {tab === "calendar" && <TeacherCalendarTab />}
-          </>
-        )
-      )}
-      {tab === "teachers" && isAdmin && <TeacherManageTab />}
-      {tab === "cutoffs" && isAdmin && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
-          <AdmissionCutoffUploadTab />
-          <AdmissionOfferingUploadTab />
-        </div>
-      )}
-      </main>
+          {tab === "teachers" && isAdmin && <TeacherManageTab />}
+          {tab === "cutoffs" && isAdmin && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+              <AdmissionCutoffUploadTab />
+              <AdmissionOfferingUploadTab />
+            </div>
+          )}
+        </main>
+
+        <footer className="app-footer">
+          <p>© 2026. jinhyeokapply All rights reserved.</p>
+        </footer>
+      </div>
 
       <ChangePasswordModal open={pwModalOpen} onClose={() => setPwModalOpen(false)} />
       <ManualHelpModal open={helpModalOpen} onClose={() => setHelpModalOpen(false)} />

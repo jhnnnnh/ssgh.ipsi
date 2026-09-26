@@ -9,7 +9,7 @@ import { AppearanceSettingsModal } from "@/components/settings/AppearanceSetting
 
 /** 테마 색상/폰트 설정 진입점. 학생·교사 화면 양쪽에서 동일하게 사용한다. */
 export function AppearanceSettingsButtons({
-  className = "p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl transition border border-indigo-200",
+  className = "header-icon-action",
 }: {
   className?: string;
 }) {
@@ -44,8 +44,16 @@ export function AppearanceSettingsButtons({
 
   return (
     <>
-      <button onClick={() => setModalOpen(true)} title="테마 및 폰트 설정" className={className}>
-        <Settings className="w-3.5 h-3.5" />
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        title="테마 및 폰트 설정"
+        aria-label="테마 및 폰트 설정"
+        aria-haspopup="dialog"
+        aria-expanded={modalOpen}
+        className={className}
+      >
+        <Settings className="w-4 h-4" aria-hidden="true" />
       </button>
 
       <AppearanceSettingsModal

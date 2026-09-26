@@ -1,11 +1,10 @@
 "use client";
 
-import { cn } from "@/lib/cn";
+import { useEffect, useRef } from "react";
 
 export interface TabItem {
   key: string;
   label: string;
-  icon: React.ReactNode;
 }
 
 export function Tabs({
@@ -17,24 +16,58 @@ export function Tabs({
   active: string;
   onChange: (key: string) => void;
 }) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    const activeIndex = items.findIndex((item) => item.key === active);
+    if (activeIndex >= 0) {
+      tabRefs.current[activeIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [active, items]);
+
+  function moveFocus(currentIndex: number, key: string, event: React.KeyboardEvent<HTMLButtonElement>) {
+    let nextIndex = currentIndex;
+    if (key === "ArrowRight") nextIndex = (currentIndex + 1) % items.length;
+    else if (key === "ArrowLeft") nextIndex = (currentIndex - 1 + items.length) % items.length;
+    else if (key === "Home") nextIndex = 0;
+    else if (key === "End") nextIndex = items.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTab = items[nextIndex];
+    tabRefs.current[nextIndex]?.focus();
+    tabRefs.current[nextIndex]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    onChange(nextTab.key);
+  }
+
   return (
-    <nav className="-mx-4 sm:mx-0 border-b border-slate-200">
-      <div className="flex w-full gap-1 overflow-x-auto overflow-y-hidden px-4 sm:px-0 text-sm sm:text-base whitespace-nowrap pt-1 scroll-area">
-      {items.map((item) => (
-        <button
-          key={item.key}
-          onClick={() => onChange(item.key)}
-          className={cn(
-            "min-h-11 shrink-0 px-3 sm:px-4 border-b-2 flex items-center gap-2 transition-colors duration-150",
-            active === item.key
-              ? "border-indigo-600 text-indigo-800 font-bold emphasis-title"
-              : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50",
-          )}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </button>
-      ))}
+    <nav className="app-header-tabs" aria-label="주요 화면">
+      <div className="segmented app-tabs" role="tablist" aria-label="주요 화면">
+        {items.map((item, index) => {
+          const selected = active === item.key;
+          return (
+            <button
+              key={item.key}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
+              id={`app-tab-${item.key}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="app-tab-panel"
+              tabIndex={selected ? 0 : -1}
+              className={selected ? "segmented-tab active" : "segmented-tab"}
+              onClick={(event) => {
+                event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+                onChange(item.key);
+              }}
+              onKeyDown={(event) => moveFocus(index, event.key, event)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

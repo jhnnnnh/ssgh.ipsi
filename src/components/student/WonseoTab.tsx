@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -16,7 +16,7 @@ import {
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
-import { Eye, EyeOff, Layers, Plus, Star, Wand2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, Layers, Plus, SlidersHorizontal, Star } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
@@ -30,6 +30,49 @@ import { computeAutoRankLabels } from "@/lib/wonseo-rank";
 import { cn } from "@/lib/cn";
 import type { WonseoCard } from "@/lib/database.types";
 
+type CardColumnCount = 1 | 2 | 3 | 4;
+
+const DEFAULT_CARD_COLUMN_COUNT: CardColumnCount = 3;
+const cardColumnFallback = new Map<string, CardColumnCount>();
+
+const CARD_GRID_CLASSES: Record<CardColumnCount, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-1 md:grid-cols-2",
+  3: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+  4: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+};
+
+function readCardColumnCount(storageKey: string): CardColumnCount {
+  const fallback = cardColumnFallback.get(storageKey);
+  if (fallback !== undefined) return fallback;
+  try {
+    const parsed = Number(window.localStorage.getItem(storageKey));
+    if (parsed === 1 || parsed === 2 || parsed === 3 || parsed === 4) return parsed;
+  } catch {
+    // Fall back to in-memory preference when browser storage is unavailable.
+  }
+  return DEFAULT_CARD_COLUMN_COUNT;
+}
+
+function subscribeToCardColumnCount(storageKey: string, onChange: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === storageKey || event.key === null) {
+      cardColumnFallback.delete(storageKey);
+      onChange();
+    }
+  };
+  const onLocalPreferenceChange = (event: Event) => {
+    if ((event as CustomEvent<{ storageKey: string }>).detail?.storageKey === storageKey) onChange();
+  };
+
+  window.addEventListener("storage", onStorage);
+  window.addEventListener("wonseo-card-columns-change", onLocalPreferenceChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener("wonseo-card-columns-change", onLocalPreferenceChange);
+  };
+}
+
 export function WonseoTab({ studentId }: { studentId: string }) {
   const showToast = useToast();
   const confirm = useConfirm();
@@ -40,6 +83,35 @@ export function WonseoTab({ studentId }: { studentId: string }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showRecentResults, setShowRecentResults] = useState(false);
   const [view, setView] = useState<"all" | "submitted">("all");
+  const cardColumnsStorageKey = `wonseo-card-columns:${studentId}`;
+  const subscribeToColumns = useCallback(
+    (onChange: () => void) => subscribeToCardColumnCount(cardColumnsStorageKey, onChange),
+    [cardColumnsStorageKey],
+  );
+  const getColumnsSnapshot = useCallback(
+    () => readCardColumnCount(cardColumnsStorageKey),
+    [cardColumnsStorageKey],
+  );
+  const cardColumns = useSyncExternalStore(
+    subscribeToColumns,
+    getColumnsSnapshot,
+    () => DEFAULT_CARD_COLUMN_COUNT,
+  );
+
+  function changeCardColumns(count: CardColumnCount) {
+    try {
+      window.localStorage.setItem(cardColumnsStorageKey, String(count));
+      cardColumnFallback.delete(cardColumnsStorageKey);
+    } catch {
+      // The current view still changes even if the browser blocks persistent storage.
+      cardColumnFallback.set(cardColumnsStorageKey, count);
+    }
+    window.dispatchEvent(
+      new CustomEvent("wonseo-card-columns-change", { detail: { storageKey: cardColumnsStorageKey } }),
+    );
+  }
+
+  const cardGridClassName = `grid ${CARD_GRID_CLASSES[cardColumns]} gap-4 pt-2`;
 
   const {
     cards,
@@ -105,17 +177,15 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           </button>
         </div>
         <div
-          className={cn(
-            "flex items-center gap-2 flex-wrap shrink-0",
-            view !== "all" && "invisible pointer-events-none",
-          )}
-          aria-hidden={view !== "all"}
+          className="flex items-center justify-end gap-2 flex-wrap shrink-0"
         >
           <button
             onClick={() => setShowRecentResults((v) => !v)}
             tabIndex={view === "all" ? 0 : -1}
+            aria-hidden={view !== "all"}
             className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              "shrink-0 whitespace-nowrap px-3 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
+              view !== "all" && "invisible pointer-events-none",
               showRecentResults
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-600",
@@ -124,23 +194,63 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             {showRecentResults ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
             <span>지난 입결</span>
           </button>
-          <button
-            onClick={() => void toggleAutoAssign()}
-            tabIndex={view === "all" ? 0 : -1}
-            className={cn(
-              "shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5",
-              autoAssign
-                ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-600",
-            )}
-          >
-            <Wand2 className="w-3.5 h-3.5" />
-            <span>N지망 정렬</span>
-          </button>
+          <details className="relative">
+            <summary
+              className={cn(
+                "list-none [&::-webkit-details-marker]:hidden shrink-0 whitespace-nowrap px-3 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 cursor-pointer",
+                autoAssign
+                  ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-600",
+              )}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>정렬</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </summary>
+            <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+              <label className="flex items-center justify-between gap-3 cursor-pointer">
+                <span className="text-sm font-bold text-slate-800">N지망 정렬</span>
+                <input
+                  type="checkbox"
+                  checked={autoAssign}
+                  onChange={() => void toggleAutoAssign()}
+                  className="h-4 w-4 accent-indigo-600"
+                />
+              </label>
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <p className="text-sm font-bold text-slate-800">한 줄 카드 개수</p>
+                <div className="mt-2 grid grid-cols-4 gap-1.5" role="group" aria-label="한 줄 카드 개수">
+                  {([1, 2, 3, 4] as const).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      aria-pressed={cardColumns === count}
+                      onClick={() => changeCardColumns(count)}
+                      className={cn(
+                        "rounded-lg py-1.5 text-sm font-bold transition",
+                        cardColumns === count
+                          ? "bg-indigo-600 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                      )}
+                    >
+                      {count}개
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                  선택한 개수는 최대 열 수예요. 4열은 화면 폭 1280px부터 적용되고, 좁은 화면에서는 자동으로 줄어듭니다.
+                </p>
+              </div>
+            </div>
+          </details>
           <button
             onClick={openCreate}
             tabIndex={view === "all" ? 0 : -1}
-            className="shrink-0 whitespace-nowrap pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
+            aria-hidden={view !== "all"}
+            className={cn(
+              "shrink-0 whitespace-nowrap pl-3.5 pr-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5",
+              view !== "all" && "invisible pointer-events-none",
+            )}
           >
             <Plus className="w-3.5 h-3.5" />
             <span>원서 추가</span>
@@ -161,7 +271,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
             }}
           >
             <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+              <div className={cardGridClassName}>
                 {submittedCards.map((card, index) => (
                   <SortableWonseoCard
                     key={card.id}
@@ -226,7 +336,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           }}
         >
           <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+            <div className={cardGridClassName}>
               {cards.map((card, index) => (
                 <SortableWonseoCard
                   key={card.id}

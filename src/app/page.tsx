@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IdCard, KeyRound, LogIn, ShieldUser, User } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { useToast } from "@/components/providers/ToastProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -91,135 +90,134 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex-1 flex flex-col">
-      <main id="main-content" className="bg-white rounded-3xl p-5 sm:p-8 w-full max-w-md mx-auto my-auto border border-slate-200 space-y-6">
-        <div className="flex justify-end">
-          <button
-            onClick={() => setTeacherModalOpen(true)}
-            className="text-xs font-bold text-slate-400 hover:text-indigo-600 transition flex items-center gap-1"
-          >
-            <ShieldUser className="w-3 h-3" />
-            <span>선생님 모드</span>
-          </button>
-        </div>
-        <div className="text-center max-w-md mx-auto space-y-2 -mt-2">
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto text-xl font-bold mb-3">
-            <LogIn className="w-5 h-5" />
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">로그인</h2>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            학번과 이름, 비밀번호를 입력하여 로그인하세요.
-            <br />
-            <span className="text-slate-500 text-xs">
-              * 최초 로그인 시 입력한 비밀번호가 내 비밀번호로 설정됩니다.
-            </span>
-          </p>
-        </div>
+    <div className="login-page">
+      <a className="app-skip-link" href="#main-content">본문으로 건너뛰기</a>
+      <header className="login-header">
+        <span className="app-name">삼성여고 2026 입시</span>
+        <button
+          type="button"
+          onClick={() => setTeacherModalOpen(true)}
+          className="ui-button ui-button-outline"
+        >
+          선생님 로그인
+        </button>
+      </header>
 
-        <div className="max-w-md mx-auto space-y-4 pt-2">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-              <IdCard className="w-3.5 h-3.5 text-indigo-500" />
-              <span>학번</span>
-            </label>
-            <input
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              placeholder="예: 30225"
-              maxLength={10}
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-indigo-500" />
-              <span>이름</span>
-            </label>
-            <input
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              placeholder="예: 홍길동"
-              maxLength={10}
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-indigo-500" />
-              <span>비밀번호</span>
-            </label>
-            <input
-              type="password"
-              value={studentPw}
-              onChange={(e) => setStudentPw(e.target.value)}
-              placeholder="비밀번호 입력"
-              maxLength={20}
-              onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
-              className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-            />
-          </div>
+      <main id="main-content" className="login-content" tabIndex={-1}>
+        <div className="login-panel">
+          <h1>학생 로그인</h1>
+          <p className="login-description">학번, 이름, 비밀번호를 입력해 주세요.</p>
 
-          <button
-            onClick={handleStudentLogin}
-            disabled={submitting}
-            className="w-full min-h-11 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>{submitting ? "로그인 중..." : "로그인"}</span>
-          </button>
+          <div className="login-fields">
+            <div className="form-field">
+              <label htmlFor="student-id">학번</label>
+              <input
+                id="student-id"
+                type="text"
+                inputMode="numeric"
+                autoComplete="username"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="예: 30225"
+                maxLength={10}
+                className="app-input"
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="student-name">이름</label>
+              <input
+                id="student-name"
+                type="text"
+                autoComplete="name"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="예: 홍길동"
+                maxLength={10}
+                className="app-input"
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="student-password">비밀번호</label>
+              <input
+                id="student-password"
+                type="password"
+                autoComplete="current-password"
+                value={studentPw}
+                onChange={(e) => setStudentPw(e.target.value)}
+                placeholder="비밀번호 입력"
+                maxLength={20}
+                onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
+                className="app-input"
+              />
+              <p className="field-help">처음 로그인하면 입력한 비밀번호가 계정 비밀번호로 설정됩니다.</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleStudentLogin}
+              disabled={submitting}
+              className="ui-button ui-button-primary login-submit"
+            >
+              {submitting ? "로그인 중…" : "로그인"}
+            </button>
+          </div>
         </div>
       </main>
 
-      <footer className="mt-12 text-center text-xs text-slate-400 pb-6 border-t border-slate-200/60 pt-6">
-        <p>© 2026. jinhyeokapply All rights reserved.</p>
+      <footer className="login-footer">
+        © 2026. jinhyeokapply All rights reserved.
       </footer>
 
       <Modal
         open={teacherModalOpen}
         onClose={() => setTeacherModalOpen(false)}
         title="선생님 로그인"
-        icon={<KeyRound className="w-4 h-4 text-indigo-600" />}
         maxWidth="max-w-sm"
         footer={
           <>
             <button
+              type="button"
               onClick={() => setTeacherModalOpen(false)}
-              className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition"
+              className="ui-button ui-button-outline"
             >
               취소
             </button>
             <button
+              type="button"
               onClick={handleTeacherLogin}
               disabled={teacherSubmitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-60"
+              className="ui-button ui-button-primary disabled:opacity-60"
             >
               {teacherSubmitting ? "확인 중..." : "로그인"}
             </button>
           </>
         }
       >
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5">이름</label>
+        <div className="login-fields">
+          <div className="form-field">
+            <label htmlFor="teacher-name">이름</label>
             <input
+              id="teacher-name"
+              type="text"
+              autoComplete="username"
               value={teacherName}
               onChange={(e) => setTeacherName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTeacherLogin()}
               placeholder="이름 입력"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="app-input"
             />
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5">
-              비밀번호 입력
-            </label>
+          <div className="form-field">
+            <label htmlFor="teacher-password">비밀번호</label>
             <input
+              id="teacher-password"
               type="password"
+              autoComplete="current-password"
               value={teacherPw}
               onChange={(e) => setTeacherPw(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleTeacherLogin()}
               placeholder="비밀번호 입력"
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="app-input"
             />
           </div>
         </div>

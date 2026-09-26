@@ -14,16 +14,17 @@ export function DateTabs({
 }) {
   if (dates.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+    <div className="segmented max-w-full" role="group" aria-label="날짜 선택">
       {dates.map((d) => (
         <button
           key={d}
+          type="button"
           onClick={() => onSelect(d)}
           className={cn(
-            "shrink-0 px-4 py-2 rounded-xl text-sm font-bold border transition whitespace-nowrap",
+            "segmented-tab",
             selected === d
-              ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
+              ? "active"
+              : "",
           )}
         >
           {formatDateLabel(d)}

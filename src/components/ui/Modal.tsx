@@ -1,59 +1,103 @@
 "use client";
 
+import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+/** 편집·설정 작업에 쓰는 우측 패널. 짧은 확인 질문은 ConfirmProvider가 담당한다. */
 export function Modal({
   open,
   onClose,
   title,
-  icon,
   children,
   footer,
   maxWidth = "max-w-lg",
-  backdropBlur = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** 기존 호출부 호환을 위해 받지만, 가이드에 따라 제목 장식 아이콘은 표시하지 않는다. */
   icon?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: string;
-  /** PDF 등 <iframe>으로 삽입된 콘텐츠는 backdrop-filter가 있으면 크롬에서 검게 렌더링되는
-   * 알려진 버그가 있어, 그런 모달에서는 false로 꺼서 우회한다. */
+  /** 기존 호출부 호환을 위한 속성. 패널 배경에는 블러를 사용하지 않는다. */
   backdropBlur?: boolean;
 }) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      closeButtonRef.current?.focus();
+      return;
+    }
+
+    returnFocusRef.current?.focus();
+    returnFocusRef.current = null;
+  }, [open]);
+
   if (!open) return null;
+
+  function trapPanelFocus(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusable?.length) {
+      event.preventDefault();
+      panelRef.current?.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
-    <div
-      className={cn(
-        "fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 overflow-y-auto",
-        backdropBlur && "backdrop-blur-sm",
-      )}
-    >
-      <div
-        className={cn(
-          "bg-white rounded-3xl p-4 sm:p-6 w-full shadow-xl border border-slate-200 space-y-4 max-h-[90dvh] overflow-y-auto",
-          maxWidth,
-        )}
+    <div className="panel-scrim" role="presentation">
+      <aside
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={cn("side-panel", maxWidth)}
+        onKeyDown={trapPanelFocus}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-            {icon}
-            <span>{title}</span>
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-5 h-5" />
+        <header className="side-panel-head">
+          <h2 id={titleId}>{title}</h2>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            aria-label={`${title} 닫기`}
+            className="header-icon-action"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
-        </div>
-        <div className="space-y-3.5 text-xs">{children}</div>
-        {footer && (
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            {footer}
-          </div>
-        )}
-      </div>
+        </header>
+        <div className="side-panel-body">{children}</div>
+        {footer && <footer className="side-panel-footer">{footer}</footer>}
+      </aside>
     </div>
   );
 }

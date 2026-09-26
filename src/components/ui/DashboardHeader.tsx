@@ -1,24 +1,30 @@
 "use client";
 
-/** 학생/교사 화면 상단에 공통으로 쓰는 헤더 박스. 아이콘 + 본문(이름 등) + 우측 액션 버튼들로 구성한다. */
+import type { ReactNode } from "react";
+import { Tabs, type TabItem } from "@/components/ui/Tabs";
+
+/** 학생·교사·전체관리자가 공유하는 앱 이름, 주요 탭, 계정 도구 머리글. */
 export function DashboardHeader({
-  icon,
+  context,
+  items,
+  active,
+  onChange,
   actions,
-  children,
 }: {
-  icon: React.ReactNode;
-  actions: React.ReactNode;
-  children: React.ReactNode;
+  context: string;
+  items: TabItem[];
+  active: string;
+  onChange: (key: string) => void;
+  actions: ReactNode;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
-          {icon}
-        </div>
-        <div>{children}</div>
+    <header className="app-header">
+      <div className="app-header-brand">
+        <span className="app-name">삼성여고 2026 입시</span>
+        <span className="app-context">{context}</span>
       </div>
-      <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">{actions}</div>
-    </div>
+      <Tabs items={items} active={active} onChange={onChange} />
+      <div className="app-header-actions">{actions}</div>
+    </header>
   );
 }

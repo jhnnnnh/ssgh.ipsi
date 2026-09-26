@@ -295,7 +295,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                     }}
                   >
                     <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                         {submittedCards.map((card, index) => (
                           <SortableWonseoCard
                             key={card.id}
@@ -356,7 +356,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   }}
                 >
                   <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                       {cards.map((card, index) => (
                         <SortableWonseoCard
                           key={card.id}

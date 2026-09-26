@@ -84,5 +84,10 @@ export function buildThemeColorVars(hex: string): Record<string, string> {
   for (const [shade, lightness] of RAMP_LIGHTNESS) {
     vars[`--color-indigo-${shade}`] = hslToHex(h, saturation, lightness);
   }
+  vars["--color-brand"] = vars["--color-indigo-600"];
+  vars["--color-brand-hover"] = vars["--color-indigo-700"];
+  vars["--color-brand-active"] = vars["--color-indigo-800"];
+  vars["--color-brand-soft"] = vars["--color-indigo-50"];
+  vars["--color-focus"] = vars["--color-indigo-600"];
   return vars;
 }

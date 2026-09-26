@@ -1,24 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, FileSignature, LogOut, MessageCircle, Percent, School, Search } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { AppearanceSettingsButtons } from "@/components/settings/AppearanceSettingsButtons";
 import { DashboardHeader } from "@/components/ui/DashboardHeader";
-import { Tabs } from "@/components/ui/Tabs";
+import type { TabItem } from "@/components/ui/Tabs";
 import { SlotBookingTab } from "@/components/student/SlotBookingTab";
 import { WonseoTab } from "@/components/student/WonseoTab";
 import { CutoffLookupTab } from "@/components/wonseo/CutoffLookupTab";
 import { StudentCalendarTab } from "@/components/student/StudentCalendarTab";
 import { AdmissionProbabilityTab } from "@/components/teacher/AdmissionProbabilityTab";
+import { useHashTab } from "@/lib/hooks/useHashTab";
 
 type StudentTab = "consulting" | "wonseo" | "cutoffs" | "probability" | "calendar";
+
+const STUDENT_TABS: TabItem[] = [
+  { key: "consulting", label: "상담신청" },
+  { key: "wonseo", label: "수시원서" },
+  { key: "cutoffs", label: "대입정보" },
+  { key: "probability", label: "합격률계산기" },
+  { key: "calendar", label: "입시일정" },
+];
+const STUDENT_TAB_KEYS = STUDENT_TABS.map((item) => item.key as StudentTab);
 
 export default function StudentPage() {
   const router = useRouter();
   const { session, profile, loading, signOut } = useAuth();
-  const [tab, setTab] = useState<StudentTab>("consulting");
+  const [tab, setTab] = useHashTab<StudentTab>("consulting", STUDENT_TAB_KEYS);
 
   useEffect(() => {
     if (loading) return;
@@ -33,60 +43,58 @@ export default function StudentPage() {
 
   if (loading || !profile || profile.role !== "student" || !profile.student_id) {
     return (
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 flex-1 flex items-center justify-center">
-        <p className="text-sm text-slate-400">불러오는 중...</p>
+      <div className="app-loading" role="status" aria-live="polite">
+        불러오는 중…
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 sm:py-8 flex-1 space-y-5 sm:space-y-6">
+    <div className="dashboard-page">
+      <a className="app-skip-link" href="#app-tab-panel">본문으로 건너뛰기</a>
       <DashboardHeader
-        icon={<School className="w-5 h-5" />}
+        context={`${profile.student_id} ${profile.name}`}
+        items={STUDENT_TABS}
+        active={tab}
+        onChange={(key) => setTab(key as StudentTab)}
         actions={
           <>
-            <AppearanceSettingsButtons />
+            <AppearanceSettingsButtons className="header-icon-action" />
             <button
+              type="button"
               onClick={async () => {
                 await signOut();
                 router.replace("/");
               }}
+              aria-label="로그아웃"
               title="로그아웃"
-              className="p-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition shadow-xs"
+              className="header-icon-action is-danger"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" aria-hidden="true" />
             </button>
           </>
         }
-      >
-        <span className="text-lg font-bold emphasis-title tracking-tight text-slate-900">
-          {profile.student_id} {profile.name}
-        </span>
-      </DashboardHeader>
-
-      <Tabs
-        items={[
-          { key: "consulting", label: "상담신청", icon: <MessageCircle className="w-4 h-4" /> },
-          { key: "wonseo", label: "수시원서", icon: <FileSignature className="w-4 h-4" /> },
-          { key: "cutoffs", label: "대입정보", icon: <Search className="w-4 h-4" /> },
-          { key: "probability", label: "합격률계산기", icon: <Percent className="w-4 h-4" /> },
-          { key: "calendar", label: "입시일정", icon: <CalendarDays className="w-4 h-4" /> },
-        ]}
-        active={tab}
-        onChange={(k) => setTab(k as StudentTab)}
       />
 
-      <main id="main-content" className="min-w-0">
-        {tab === "consulting" && <SlotBookingTab studentId={profile.student_id} />}
-        {tab === "wonseo" && <WonseoTab studentId={profile.student_id} />}
-        {tab === "cutoffs" && <CutoffLookupTab studentId={profile.student_id} />}
-        {tab === "probability" && <AdmissionProbabilityTab studentId={profile.student_id} />}
-        {tab === "calendar" && <StudentCalendarTab studentId={profile.student_id} />}
-      </main>
+      <div className="app-content">
+        <main
+          id="app-tab-panel"
+          className="min-w-0"
+          role="tabpanel"
+          aria-labelledby={`app-tab-${tab}`}
+          tabIndex={-1}
+        >
+          {tab === "consulting" && <SlotBookingTab studentId={profile.student_id} />}
+          {tab === "wonseo" && <WonseoTab studentId={profile.student_id} />}
+          {tab === "cutoffs" && <CutoffLookupTab studentId={profile.student_id} />}
+          {tab === "probability" && <AdmissionProbabilityTab studentId={profile.student_id} />}
+          {tab === "calendar" && <StudentCalendarTab studentId={profile.student_id} />}
+        </main>
 
-      <footer className="mt-6 text-center text-xs text-slate-400 pb-6 border-t border-slate-200/60 pt-6">
-        <p>© 2026. jinhyeokapply All rights reserved.</p>
-      </footer>
+        <footer className="app-footer">
+          <p>© 2026. jinhyeokapply All rights reserved.</p>
+        </footer>
+      </div>
     </div>
   );
 }

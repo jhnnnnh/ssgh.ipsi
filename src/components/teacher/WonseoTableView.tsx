@@ -42,7 +42,7 @@ export function WonseoTableView({
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200">
+    <div className="overflow-x-auto">
       <table className="text-xs border-collapse w-full table-fixed min-w-max">
         <colgroup>
           <col className="w-16" />
