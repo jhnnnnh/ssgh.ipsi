@@ -427,3 +427,28 @@ export function mockGradesFromRow(row: StudentMockGrades): MockGrades {
     history: row.history,
   };
 }
+
+export const EMPTY_MOCK_GRADES: MockGrades = {
+  korean: null,
+  math: null,
+  mathSubject: "확통",
+  english: null,
+  inquiry1: null,
+  inquiry2: null,
+  inquiryType: "사",
+  history: null,
+};
+
+export function mockGradesToRow(studentId: string, g: MockGrades): Omit<StudentMockGrades, "updated_at"> {
+  return {
+    student_id: studentId,
+    korean: g.korean,
+    math: g.math,
+    math_subject: g.mathSubject,
+    english: g.english,
+    inquiry1: g.inquiry1,
+    inquiry2: g.inquiry2,
+    inquiry_type: g.inquiryType,
+    history: g.history,
+  };
+}

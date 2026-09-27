@@ -6,25 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import type { AdminWonseoOverviewRow } from "@/lib/database.types";
 import {
+  EMPTY_MOCK_GRADES,
   evaluateMinimumStandard,
-  type InquiryType,
-  type MathSubject,
+  mockGradesToRow,
   type MinimumVerdict,
   type MockGrades,
 } from "@/lib/suneung-minimum";
-
-const GRADES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-const EMPTY_GRADES: MockGrades = {
-  korean: null,
-  math: null,
-  mathSubject: "확통",
-  english: null,
-  inquiry1: null,
-  inquiry2: null,
-  inquiryType: "사",
-  history: null,
-};
+import { MockGradesFields } from "@/components/teacher/MockGradesFields";
 
 const VERDICT_STYLE: Record<MinimumVerdict["status"], { label: string; className: string }> = {
   pass: { label: "충족", className: "bg-emerald-50 text-emerald-700" },
@@ -36,34 +24,6 @@ const VERDICT_STYLE: Record<MinimumVerdict["status"], { label: string; className
   none: { label: "최저 없음", className: "bg-slate-100 text-slate-500" },
   unknown: { label: "해석 불가", className: "bg-amber-50 text-amber-700" },
 };
-
-function GradeSelect({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number | null;
-  onChange: (v: number | null) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
-      {label}
-      <select
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-        className="rounded-lg border border-slate-200 px-2 py-1 text-sm font-normal text-slate-800"
-      >
-        <option value="">-</option>
-        {GRADES.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 /**
  * 관리자 테스트: 학생을 고르고 모의고사 등급을 넣으면 그 학생 원서 카드마다 수능최저 충족 여부를 판정한다.
@@ -96,34 +56,21 @@ export function MinimumCheckPanel({
   }, [rows]);
 
   const [studentId, setStudentId] = useState<string>("");
-  const [grades, setGrades] = useState<MockGrades>(EMPTY_GRADES);
-  const set =
-    <K extends keyof MockGrades>(key: K) =>
-    (v: MockGrades[K]) =>
-      setGrades((g) => ({ ...g, [key]: v }));
+  const [grades, setGrades] = useState<MockGrades>(EMPTY_MOCK_GRADES);
 
   const student = students.find((s) => s.id === studentId) ?? null;
 
   function selectStudent(id: string) {
     setStudentId(id);
-    setGrades(savedGrades.get(id) ?? EMPTY_GRADES);
+    setGrades(savedGrades.get(id) ?? EMPTY_MOCK_GRADES);
   }
 
   async function save() {
     if (!student) return;
     setSaving(true);
-    const { error } = await createClient().from("student_mock_grades").upsert({
-      student_id: student.id,
-      korean: grades.korean,
-      math: grades.math,
-      math_subject: grades.mathSubject,
-      english: grades.english,
-      inquiry1: grades.inquiry1,
-      inquiry2: grades.inquiry2,
-      inquiry_type: grades.inquiryType,
-      history: grades.history,
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await createClient()
+      .from("student_mock_grades")
+      .upsert({ ...mockGradesToRow(student.id, grades), updated_at: new Date().toISOString() });
     setSaving(false);
     if (error) {
       showToast("등급 저장에 실패했습니다.", "error");
@@ -165,35 +112,7 @@ export function MinimumCheckPanel({
             ))}
           </select>
         </label>
-        <GradeSelect label="국어" value={grades.korean} onChange={set("korean")} />
-        <GradeSelect label="수학" value={grades.math} onChange={set("math")} />
-        <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
-          수학 과목
-          <select
-            value={grades.mathSubject}
-            onChange={(e) => set("mathSubject")(e.target.value as MathSubject)}
-            className="rounded-lg border border-slate-200 px-2 py-1 text-sm font-normal text-slate-800"
-          >
-            <option value="확통">확통</option>
-            <option value="미적">미적</option>
-            <option value="기하">기하</option>
-          </select>
-        </label>
-        <GradeSelect label="영어" value={grades.english} onChange={set("english")} />
-        <GradeSelect label="탐구1" value={grades.inquiry1} onChange={set("inquiry1")} />
-        <GradeSelect label="탐구2" value={grades.inquiry2} onChange={set("inquiry2")} />
-        <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
-          탐구 종류
-          <select
-            value={grades.inquiryType}
-            onChange={(e) => set("inquiryType")(e.target.value as InquiryType)}
-            className="rounded-lg border border-slate-200 px-2 py-1 text-sm font-normal text-slate-800"
-          >
-            <option value="사">사탐</option>
-            <option value="과">과탐</option>
-          </select>
-        </label>
-        <GradeSelect label="한국사" value={grades.history} onChange={set("history")} />
+        <MockGradesFields grades={grades} onChange={setGrades} />
         <button
           type="button"
           onClick={save}

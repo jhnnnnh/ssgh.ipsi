@@ -201,7 +201,8 @@ export function WonseoCardBoard({
               </SectionDropZone>
             );
           }
-          const isCollapsed = collapsed.has(section.id);
+          // 빈 그룹은 안내 문구 없이 접힌 머리줄만 보여 준다. 그룹 상자 전체가 드롭 대상이라 머리줄에 끌어 놓아도 된다.
+          const isCollapsed = section.cards.length === 0 || collapsed.has(section.id);
           const groupIndex = section.group ? orderedGroups.findIndex((g) => g.id === section.group!.id) : -1;
           const isDropTarget = activeId !== null && overSectionId === section.id;
           return (
@@ -230,13 +231,7 @@ export function WonseoCardBoard({
               />
               {!isCollapsed && (
                 <SortableContext items={section.cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-                  {section.cards.length > 0 ? (
-                    <div className={cn(gridClassName, "mt-3")}>{section.cards.map(renderCard)}</div>
-                  ) : (
-                    <p className="mt-3 rounded-2xl border border-dashed border-slate-300 py-10 text-center text-xs font-semibold text-slate-400">
-                      카드를 여기로 끌어오거나, 카드의 <FolderInput className="inline w-3.5 h-3.5" /> 버튼으로 옮겨 보세요.
-                    </p>
-                  )}
+                  <div className={cn(gridClassName, "mt-3")}>{section.cards.map(renderCard)}</div>
                 </SortableContext>
               )}
             </SectionShell>
