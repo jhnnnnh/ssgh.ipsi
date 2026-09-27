@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
-import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
+import { useUngroupedRanked } from "@/lib/hooks/useUngroupedRanked";
 import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { useActiveClass } from "@/components/providers/ActiveClassProvider";
 import { Card } from "@/components/ui/Card";
@@ -33,7 +33,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const { enabled: statusVisible } = useStatusReveal();
   const { isAdmin } = useActiveClass();
   const [selectedStudentId, setSelectedStudentId] = useState("");
-  const { autoAssign, setAutoAssign } = useRankAutoAssign(selectedStudentId);
+  const { ungroupedRanked, setUngroupedRanked } = useUngroupedRanked(selectedStudentId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [allCards, setAllCards] = useState<WonseoCard[]>([]);
@@ -64,11 +64,11 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     reorderSubmittedCards,
     saveSubmittedFields,
     saveRank,
-    toggleAutoAssign,
+    toggleUngroupedRanked,
   } = useWonseoCards({
     studentId: selectedStudentId,
-    autoAssign,
-    setAutoAssign,
+    ungroupedRanked,
+    setUngroupedRanked,
     confirm,
     onError: (message) => showToast(message, "error"),
     onSuccess: (message) => showToast(message, "success"),
@@ -192,9 +192,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   hidden={studentView !== "all"}
                   showRecentResults={showRecentResults}
                   onToggleRecentResults={() => setShowRecentResults((v) => !v)}
-                  autoAssign={autoAssign}
-                  onToggleAutoAssign={() => void toggleAutoAssign()}
-                  cardColumns={cardColumns}
+                                                      cardColumns={cardColumns}
                   onChangeCardColumns={setCardColumns}
                   onCreate={openCreate}
                 />
@@ -206,8 +204,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                 <SubmittedCardList
                   cards={cards}
                   gridClassName={gridClassName}
-                  autoAssign={autoAssign}
-                  showStatus={statusVisible}
+                                    showStatus={statusVisible}
                   onEdit={openEdit}
                   onDelete={(card) => void deleteCard(card)}
                   onToggleSubmitted={(card) => void toggleSubmitted(card)}
@@ -220,8 +217,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   sections={sections}
                   groups={groups}
                   rankLabels={rankLabels}
-                  autoAssign={autoAssign}
-                  gridClassName={gridClassName}
+                                    gridClassName={gridClassName}
                   showStatus={statusVisible}
                   showRecentResults={showRecentResults}
                   onEdit={openEdit}
@@ -233,6 +229,7 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                   onCreateGroup={createGroup}
                   onRenameGroup={(group, name) => void renameGroup(group, name)}
                   onToggleGroupRanked={(group) => void toggleGroupRanked(group)}
+          onToggleUngroupedRanked={() => void toggleUngroupedRanked()}
                   onMoveGroup={(group, direction) => void moveGroup(group, direction)}
                   onDeleteGroup={(group) => void deleteGroup(group)}
                 />

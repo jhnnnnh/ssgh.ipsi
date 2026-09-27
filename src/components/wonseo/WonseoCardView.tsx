@@ -30,6 +30,7 @@ function InlineEditableText({
   displayClassName,
   inputClassName,
   normalize,
+  maxLength,
 }: {
   value: string;
   placeholder: string;
@@ -38,6 +39,7 @@ function InlineEditableText({
   inputClassName: string;
   /** 값을 커밋하기 전에 형식을 다듬는다(예: 날짜 자동 하이픈 삽입). */
   normalize?: (raw: string) => string;
+  maxLength?: number;
 }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
@@ -46,6 +48,7 @@ function InlineEditableText({
         autoFocus
         defaultValue={value}
         placeholder={placeholder}
+        maxLength={maxLength}
         onBlur={(e) => {
           setEditing(false);
           onCommit(normalize ? normalize(e.target.value) : e.target.value);
@@ -165,10 +168,9 @@ export const WonseoCardView = forwardRef<
     dragHandle?: React.ReactNode;
     /** 상단 오른쪽 버튼 줄 맨 앞에 붙는 추가 버튼(예: 그룹 이동 메뉴). */
     extraActions?: React.ReactNode;
-    /** 지망 순위 자동 배정이 켜져 있을 때 보여줄, 카드 위치로 계산된 라벨(예: "1지망"). */
-    autoAssign?: boolean;
+    /** 지망 번호를 받는 구역의 카드면 위치로 계산된 라벨(예: "1지망"). 없으면 지망 칸은 메모 칸이 된다. */
     rankLabel?: string;
-    /** 자동 배정이 꺼져 있을 때 학생/교사가 직접 입력한 텍스트가 바뀌면(blur 시) 저장한다. */
+    /** 번호 없는 카드의 지망 칸 메모가 바뀌면(blur 시) 저장한다. 없으면 메모를 읽기 전용으로 보여준다. */
     onRankChange?: (text: string) => void;
     /** "full"(기본): 전형방법·모집인원·최근입결 등 전체 정보. "submitted": "접수한 원서"
      * 화면 전용으로, 학교/학과/전형만 보이고 그 자리에 수험번호·일정 편집기를 보여준다. */
@@ -190,7 +192,6 @@ export const WonseoCardView = forwardRef<
     className,
     dragHandle,
     extraActions,
-    autoAssign = true,
     rankLabel,
     onRankChange,
     bodyMode = "full",
@@ -267,16 +268,19 @@ export const WonseoCardView = forwardRef<
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}
-          {autoAssign ? (
-            rankLabel && <span className="text-xs font-bold text-slate-900">{rankLabel}</span>
-          ) : (
+          {rankLabel ? (
+            <span className="text-xs font-bold text-slate-900">{rankLabel}</span>
+          ) : onRankChange ? (
             <InlineEditableText
               value={card.rank ?? ""}
-              placeholder="미지정"
-              onCommit={(text) => onRankChange?.(text)}
+              placeholder="메모"
+              maxLength={12}
+              onCommit={onRankChange}
               displayClassName="text-xs font-bold text-slate-900"
-              inputClassName="w-16 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded text-xs font-bold text-slate-900 placeholder:font-semibold placeholder:text-slate-400"
+              inputClassName="w-24 bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded text-xs font-bold text-slate-900 placeholder:font-semibold placeholder:text-slate-400"
             />
+          ) : (
+            card.rank && <span className="text-xs font-bold text-slate-900">{card.rank}</span>
           )}
           <span
             className={`text-xs font-bold px-2.5 py-1 rounded-lg ${emphasis.badge}`}

@@ -23,8 +23,9 @@ type ConfirmOptions = {
 type UseWonseoCardsOptions = {
   /** 학생 화면은 본인 학번, 교사 화면은 선택한 학생의 학번을 넘긴다. */
   studentId: string;
-  autoAssign: boolean;
-  setAutoAssign: (enabled: boolean) => void;
+  /** 미분류 카드가 지망 번호를 받는지(학생별). */
+  ungroupedRanked: boolean;
+  setUngroupedRanked: (enabled: boolean) => void;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
   onError: (message: string) => void;
   onSuccess: (message: string) => void;
@@ -37,8 +38,8 @@ type UseWonseoCardsOptions = {
  */
 export function useWonseoCards({
   studentId,
-  autoAssign,
-  setAutoAssign,
+  ungroupedRanked,
+  setUngroupedRanked,
   confirm,
   onError,
   onSuccess,
@@ -71,7 +72,7 @@ export function useWonseoCards({
     setGroups(groupData ?? []);
   }, [studentId, supabase]);
 
-  const sections = useMemo(() => buildCardSections(cards, groups), [cards, groups]);
+  const sections = useMemo(() => buildCardSections(cards, groups, ungroupedRanked), [cards, groups, ungroupedRanked]);
   const rankLabels = useMemo(() => computeSectionRankLabels(sections), [sections]);
 
   /** 화면 구역 순서를 그대로 펼쳐 sort_order·group_id를 다시 매기고, 바뀐 카드만 저장한다. */
@@ -343,7 +344,7 @@ export function useWonseoCards({
       if (value === card.rank) return;
       const { error } = await supabase.from("wonseo_cards").update({ rank: value }).eq("id", card.id);
       if (error) {
-        onError("지망 순위 저장에 실패했습니다.");
+        onError("지망 칸 저장에 실패했습니다.");
         return;
       }
       await reloadCards();
@@ -351,49 +352,16 @@ export function useWonseoCards({
     [onError, reloadCards, supabase],
   );
 
-  const toggleAutoAssign = useCallback(async () => {
-    if (autoAssign) {
-      const results = await Promise.all(
-        cards.map((card) =>
-          supabase
-            .from("wonseo_cards")
-            .update({ rank: rankLabels.get(card.id) ?? null })
-            .eq("id", card.id),
-        ),
-      );
-      if (results.some((result) => result.error)) {
-        onError("전환에 실패했습니다.");
-        return;
-      }
-      const { error } = await supabase
-        .from("roster")
-        .update({ rank_auto_assign: false })
-        .eq("student_id", studentId);
-      if (error) {
-        onError("전환에 실패했습니다.");
-        return;
-      }
-      setAutoAssign(false);
-      await reloadCards();
-      return;
-    }
-
-    const ok = await confirm({
-      message: "자동 배정으로 전환하면 직접 입력한 지망 값이 초기화됩니다. 계속할까요?",
-      confirmLabel: "전환",
-      danger: true,
-    });
-    if (!ok) return;
-    const { error } = await supabase
-      .from("roster")
-      .update({ rank_auto_assign: true })
-      .eq("student_id", studentId);
+  /** 미분류 구역의 "지망 번호 받기" 스위치. 카드에 적어 둔 메모(rank)는 그대로 둔다. */
+  const toggleUngroupedRanked = useCallback(async () => {
+    const next = !ungroupedRanked;
+    const { error } = await supabase.from("roster").update({ rank_auto_assign: next }).eq("student_id", studentId);
     if (error) {
-      onError("전환에 실패했습니다.");
+      onError("변경에 실패했습니다.");
       return;
     }
-    setAutoAssign(true);
-  }, [autoAssign, cards, confirm, onError, rankLabels, reloadCards, setAutoAssign, studentId, supabase]);
+    setUngroupedRanked(next);
+  }, [onError, setUngroupedRanked, studentId, supabase, ungroupedRanked]);
 
   return {
     cards,
@@ -413,6 +381,6 @@ export function useWonseoCards({
     reorderSubmittedCards,
     saveSubmittedFields,
     saveRank,
-    toggleAutoAssign,
+    toggleUngroupedRanked,
   };
 }

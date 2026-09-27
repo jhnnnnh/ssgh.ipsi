@@ -51,7 +51,6 @@ type Props = {
   sections: WonseoCardSection[];
   groups: WonseoCardGroup[];
   rankLabels: Map<string, string>;
-  autoAssign: boolean;
   gridClassName: string;
   showStatus: boolean;
   showRecentResults: boolean;
@@ -64,6 +63,8 @@ type Props = {
   onCreateGroup: (name: string) => Promise<boolean>;
   onRenameGroup: (group: WonseoCardGroup, name: string) => void;
   onToggleGroupRanked: (group: WonseoCardGroup) => void;
+  /** 미분류 구역의 "지망 번호 받기" 스위치. */
+  onToggleUngroupedRanked: () => void;
   onMoveGroup: (group: WonseoCardGroup, direction: -1 | 1) => void;
   onDeleteGroup: (group: WonseoCardGroup) => void;
 };
@@ -76,7 +77,6 @@ export function WonseoCardBoard({
   sections,
   groups,
   rankLabels,
-  autoAssign,
   gridClassName,
   showStatus,
   showRecentResults,
@@ -89,6 +89,7 @@ export function WonseoCardBoard({
   onCreateGroup,
   onRenameGroup,
   onToggleGroupRanked,
+  onToggleUngroupedRanked,
   onMoveGroup,
   onDeleteGroup,
 }: Props) {
@@ -144,7 +145,6 @@ export function WonseoCardBoard({
         minHeight={maxHeight}
         isDragging={activeId === card.id}
         card={card}
-        autoAssign={autoAssign}
         rankLabel={rankLabels.get(card.id)}
         onRankChange={(text) => onRankChange(card, text)}
         showStatus={showStatus}
@@ -195,6 +195,10 @@ export function WonseoCardBoard({
           if (!hasGroups) {
             return (
               <SectionDropZone key={section.id} sectionId={section.id}>
+                {/* 그룹이 없으면 머리줄도 없어서, 번호 스위치만 카드 위 오른쪽에 둔다. */}
+                <div className="mb-3 flex justify-end">
+                  <RankToggle ranked={section.ranked} onToggle={onToggleUngroupedRanked} />
+                </div>
                 <SortableContext items={section.cards.map((c) => c.id)} strategy={rectSortingStrategy}>
                   <div className={gridClassName}>{section.cards.map(renderCard)}</div>
                 </SortableContext>
@@ -225,7 +229,7 @@ export function WonseoCardBoard({
                 canMoveUp={groupIndex > 0}
                 canMoveDown={groupIndex !== -1 && groupIndex < orderedGroups.length - 1}
                 onRename={(name) => section.group && onRenameGroup(section.group, name)}
-                onToggleRanked={() => section.group && onToggleGroupRanked(section.group)}
+                onToggleRanked={() => (section.group ? onToggleGroupRanked(section.group) : onToggleUngroupedRanked())}
                 onMove={(direction) => section.group && onMoveGroup(section.group, direction)}
                 onDelete={() => section.group && onDeleteGroup(section.group)}
               />
@@ -242,7 +246,6 @@ export function WonseoCardBoard({
             <div className="shadow-lg rounded-3xl">
               <WonseoCardView
                 card={activeCard}
-                autoAssign={autoAssign}
                 rankLabel={rankLabels.get(activeCard.id)}
                 showStatus={showStatus}
                 showRecentResults={showRecentResults}
@@ -383,30 +386,12 @@ function SectionHeader({
           <h4 className="truncate text-sm font-bold text-slate-900">{title}</h4>
         )}
         <span className="shrink-0 text-xs font-bold text-slate-400">{section.cards.length}</span>
-        {!group && section.ranked && (
-          <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
-            지망 번호
-          </span>
-        )}
       </div>
 
-      {group && (
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={onToggleRanked}
-            aria-pressed={group.is_ranked}
-            title="켜면 이 그룹 카드가 N지망 번호를 받아요"
-            className={cn(
-              "flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-              group.is_ranked
-                ? "border-indigo-600 bg-indigo-600 text-white"
-                : "border-slate-300 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600",
-            )}
-          >
-            {group.is_ranked && <Check className="w-3 h-3" />}
-            지망 번호 받기
-          </button>
+      <div className="flex shrink-0 items-center gap-1">
+        <RankToggle ranked={section.ranked} onToggle={onToggleRanked} />
+        {group && (
+          <>
           <button
             type="button"
             onClick={() => onMove(-1)}
@@ -441,9 +426,30 @@ function SectionHeader({
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+function RankToggle({ ranked, onToggle }: { ranked: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={ranked}
+      title="켜면 이 구역 카드가 N지망 번호를 받고, 끄면 지망 칸에 메모를 적을 수 있어요"
+      className={cn(
+        "flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+        ranked
+          ? "border-indigo-600 bg-indigo-600 text-white"
+          : "border-slate-300 bg-white text-slate-500 hover:border-indigo-300 hover:text-indigo-600",
+      )}
+    >
+      {ranked && <Check className="w-3 h-3" />}
+      지망 번호 받기
+    </button>
   );
 }
 

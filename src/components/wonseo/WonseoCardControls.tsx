@@ -122,13 +122,11 @@ export function SubmittedViewToggle({
   );
 }
 
-/** 지난 입결 · 정렬(N지망 정렬, 한 줄 카드 개수) · 원서 추가. "접수한 원서" 보기에서는 자리만 차지하고 숨는다. */
+/** 지난 입결 · 보기(한 줄 카드 개수) · 원서 추가. 지망 번호는 그룹 머리줄의 스위치로만 정한다. "접수한 원서" 보기에서는 자리만 차지하고 숨는다. */
 export function WonseoCardToolbar({
   hidden,
   showRecentResults,
   onToggleRecentResults,
-  autoAssign,
-  onToggleAutoAssign,
   cardColumns,
   onChangeCardColumns,
   onCreate,
@@ -136,8 +134,6 @@ export function WonseoCardToolbar({
   hidden: boolean;
   showRecentResults: boolean;
   onToggleRecentResults: () => void;
-  autoAssign: boolean;
-  onToggleAutoAssign: () => void;
   cardColumns: CardColumnCount;
   onChangeCardColumns: (count: CardColumnCount) => void;
   onCreate: () => void;
@@ -168,28 +164,14 @@ export function WonseoCardToolbar({
       <details className="relative">
         <summary
           tabIndex={tabIndex}
-          className={cn(
-            "list-none [&::-webkit-details-marker]:hidden shrink-0 whitespace-nowrap px-3 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 cursor-pointer",
-            autoAssign
-              ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-600",
-          )}
+          className="list-none [&::-webkit-details-marker]:hidden shrink-0 whitespace-nowrap px-3 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600"
         >
           <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>정렬</span>
+          <span>보기</span>
           <ChevronDown className="w-3.5 h-3.5" />
         </summary>
         <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-          <label className="flex items-center justify-between gap-3 cursor-pointer">
-            <span className="text-sm font-bold text-slate-800">N지망 정렬</span>
-            <input
-              type="checkbox"
-              checked={autoAssign}
-              onChange={onToggleAutoAssign}
-              className="h-4 w-4 accent-indigo-600"
-            />
-          </label>
-          <div className="mt-4 border-t border-slate-100 pt-3">
+          <div>
             <p className="text-sm font-bold text-slate-800">한 줄 카드 개수</p>
             <div className="mt-2 grid grid-cols-4 gap-1.5" role="group" aria-label="한 줄 카드 개수">
               {([1, 2, 3, 4] as const).map((count) => (
@@ -265,7 +247,6 @@ export function WonseoEmptyState({
 export function SubmittedCardList({
   cards,
   gridClassName,
-  autoAssign,
   showStatus,
   onEdit,
   onDelete,
@@ -276,7 +257,6 @@ export function SubmittedCardList({
 }: {
   cards: WonseoCard[];
   gridClassName: string;
-  autoAssign: boolean;
   showStatus: boolean;
   onEdit: (card: WonseoCard) => void;
   onDelete: (card: WonseoCard) => void;
@@ -330,7 +310,6 @@ export function SubmittedCardList({
               setEqualHeightRef={() => {}}
               isDragging={activeId === card.id}
               card={card}
-              autoAssign={autoAssign}
               rankLabel={rankLabels[index]}
               onRankChange={(text) => onRankChange(card, text)}
               showStatus={showStatus}
@@ -350,7 +329,6 @@ export function SubmittedCardList({
           <div className="shadow-lg rounded-3xl">
             <WonseoCardView
               card={activeCard}
-              autoAssign={autoAssign}
               rankLabel={rankLabels[activeIndex]}
               showStatus={showStatus}
               showRecentResults={false}

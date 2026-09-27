@@ -5,7 +5,7 @@ import { Layers } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
-import { useRankAutoAssign } from "@/lib/hooks/useRankAutoAssign";
+import { useUngroupedRanked } from "@/lib/hooks/useUngroupedRanked";
 import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
 import { WonseoCardBoard } from "@/components/wonseo/WonseoCardBoard";
@@ -23,7 +23,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
   const showToast = useToast();
   const confirm = useConfirm();
   const { enabled: statusVisible } = useStatusReveal();
-  const { autoAssign, setAutoAssign } = useRankAutoAssign(studentId);
+  const { ungroupedRanked, setUngroupedRanked } = useUngroupedRanked(studentId);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WonseoCard | null>(null);
   const [showRecentResults, setShowRecentResults] = useState(false);
@@ -49,11 +49,11 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     reorderSubmittedCards,
     saveSubmittedFields,
     saveRank,
-    toggleAutoAssign,
+    toggleUngroupedRanked,
   } = useWonseoCards({
     studentId,
-    autoAssign,
-    setAutoAssign,
+    ungroupedRanked,
+    setUngroupedRanked,
     confirm,
     onError: (message) => showToast(message, "error"),
     onSuccess: (message) => showToast(message, "success"),
@@ -83,8 +83,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           hidden={view !== "all"}
           showRecentResults={showRecentResults}
           onToggleRecentResults={() => setShowRecentResults((v) => !v)}
-          autoAssign={autoAssign}
-          onToggleAutoAssign={() => void toggleAutoAssign()}
           cardColumns={cardColumns}
           onChangeCardColumns={setCardColumns}
           onCreate={openCreate}
@@ -95,7 +93,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
         <SubmittedCardList
           cards={cards}
           gridClassName={gridClassName}
-          autoAssign={autoAssign}
           showStatus={statusVisible}
           onEdit={openEdit}
           onDelete={(card) => void deleteCard(card)}
@@ -109,7 +106,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           sections={sections}
           groups={groups}
           rankLabels={rankLabels}
-          autoAssign={autoAssign}
           gridClassName={gridClassName}
           showStatus={statusVisible}
           showRecentResults={showRecentResults}
@@ -122,6 +118,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           onCreateGroup={createGroup}
           onRenameGroup={(group, name) => void renameGroup(group, name)}
           onToggleGroupRanked={(group) => void toggleGroupRanked(group)}
+          onToggleUngroupedRanked={() => void toggleUngroupedRanked()}
           onMoveGroup={(group, direction) => void moveGroup(group, direction)}
           onDeleteGroup={(group) => void deleteGroup(group)}
         />

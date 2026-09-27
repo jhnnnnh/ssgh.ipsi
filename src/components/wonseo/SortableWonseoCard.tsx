@@ -18,7 +18,6 @@ export function SortableWonseoCard({
   minHeight,
   setEqualHeightRef,
   isDragging,
-  autoAssign,
   rankLabel,
   onRankChange,
   bodyMode,
@@ -36,7 +35,6 @@ export function SortableWonseoCard({
   minHeight?: number;
   setEqualHeightRef: (el: HTMLElement | null) => void;
   isDragging: boolean;
-  autoAssign: boolean;
   rankLabel: string | undefined;
   onRankChange: (text: string) => void;
   bodyMode?: "full" | "submitted";
@@ -56,7 +54,6 @@ export function SortableWonseoCard({
       onDelete={onDelete}
       isSubmitted={isSubmitted}
       onToggleSubmitted={onToggleSubmitted}
-      autoAssign={autoAssign}
       rankLabel={rankLabel}
       onRankChange={onRankChange}
       bodyMode={bodyMode}
