@@ -22,12 +22,12 @@ export const LEVEL_TOGGLE_STYLE: Record<SupportLevel, { active: string; inactive
   },
 };
 
-/** 원서 카드 목록에서 지원 정도를 강조하는 배지/테두리 스타일 */
-export const LEVEL_EMPHASIS_STYLE: Record<SupportLevel, { badge: string; border: string; bar: string }> = {
-  상향: { badge: "bg-rose-600 text-white", border: "border-rose-300", bar: "bg-rose-500" },
-  소신: { badge: "bg-amber-500 text-white", border: "border-amber-300", bar: "bg-amber-500" },
-  적정: { badge: "bg-emerald-600 text-white", border: "border-emerald-300", bar: "bg-emerald-500" },
-  하향: { badge: "bg-blue-600 text-white", border: "border-blue-300", bar: "bg-blue-500" },
+/** 원서 카드에서 지원 정도를 차분하게 구분하는 배지 스타일 */
+export const LEVEL_EMPHASIS_STYLE: Record<SupportLevel, { badge: string }> = {
+  상향: { badge: "bg-rose-50 text-rose-700" },
+  소신: { badge: "bg-amber-50 text-amber-800" },
+  적정: { badge: "bg-emerald-50 text-emerald-700" },
+  하향: { badge: "bg-blue-50 text-blue-700" },
 };
 
 /** 수시 원서 표(화면)에서 지원 정도 값 셀을 강조하는 스타일 */

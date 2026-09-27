@@ -260,10 +260,9 @@ export const WonseoCardView = forwardRef<
     <div
       ref={ref}
       style={{ ...(minHeight ? { minHeight } : undefined), ...style }}
-      className={`bg-white rounded-3xl border-2 ${emphasis.border} shadow-sm overflow-hidden flex ${className ?? ""}`}
+      className={`bg-white rounded-[12px] border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden flex ${className ?? ""}`}
     >
-      <div className={`w-2 shrink-0 ${emphasis.bar}`} />
-      <div ref={measureRef} className="flex-1 self-start p-5 space-y-3 min-w-0">
+      <div ref={measureRef} className="flex-1 self-start p-4 space-y-3 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}
@@ -332,11 +331,11 @@ export const WonseoCardView = forwardRef<
           </div>
 
           <div className="flex flex-wrap gap-1.5 text-xs font-bold">
-            <span className="border border-slate-300 text-slate-700 px-2 py-1 rounded-lg">
+            <span className="border border-slate-200 bg-slate-50 text-slate-700 px-2 py-1 rounded-[8px]">
               {card.category}
             </span>
             {card.sub_category && (
-              <span className="border border-slate-300 text-slate-700 px-2 py-1 rounded-lg">
+              <span className="border border-slate-200 bg-slate-50 text-slate-700 px-2 py-1 rounded-[8px]">
                 {card.sub_category}
               </span>
             )}
@@ -420,7 +419,7 @@ export const WonseoCardView = forwardRef<
           <RecentResultsSection years={card.recent_results ?? []} open={showRecentResults} />
 
           {card.memo && (
-            <p className="text-xs text-amber-900 bg-amber-100 rounded-xl p-3 whitespace-pre-wrap shadow-md shadow-amber-900/5 -rotate-1">
+            <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-[10px] p-3 whitespace-pre-wrap">
               {card.memo}
             </p>
           )}

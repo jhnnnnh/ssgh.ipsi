@@ -15,7 +15,7 @@ export type PickableCard = {
 
 /**
  * "내 원서 카드에서 불러오기"를 <select> 대신 카드 목록 팝업으로 보여준다. 수시 원서
- * 관리 탭의 카드와 같은 모양(지원 등급별 테두리·색상 막대)을 쓰되, 여기서는 조회용
+ * 관리 탭의 카드와 같은 차분한 표면·지원 등급 배지를 쓰되, 여기서는 조회용
  * 검색폼을 채우는 용도라 대학·학과·전형명만 보여준다.
  */
 export function MyCardPickerModal<T extends PickableCard>({
@@ -58,9 +58,8 @@ export function MyCardPickerModal<T extends PickableCard>({
                       onPick(card);
                       onClose();
                     }}
-                    className={`text-left bg-white rounded-2xl border-2 ${emphasis.border} shadow-sm hover:shadow-md transition overflow-hidden flex`}
+                    className="text-left bg-white rounded-[12px] border border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 transition-colors overflow-hidden flex"
                   >
-                    <div className={`w-1.5 shrink-0 ${emphasis.bar}`} />
                     <div className="flex-1 p-3.5 space-y-1.5 min-w-0">
                       <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-lg ${emphasis.badge}`}>
                         {card.level}
