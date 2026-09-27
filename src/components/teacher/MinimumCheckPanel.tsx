@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Save } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/providers/ToastProvider";
 import type { AdminWonseoOverviewRow } from "@/lib/database.types";
 import {
   evaluateMinimumStandard,
@@ -12,6 +14,17 @@ import {
 } from "@/lib/suneung-minimum";
 
 const GRADES = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+const EMPTY_GRADES: MockGrades = {
+  korean: null,
+  math: null,
+  mathSubject: "확통",
+  english: null,
+  inquiry1: null,
+  inquiry2: null,
+  inquiryType: "사",
+  history: null,
+};
 
 const VERDICT_STYLE: Record<MinimumVerdict["status"], { label: string; className: string }> = {
   pass: { label: "충족", className: "bg-emerald-50 text-emerald-700" },
@@ -52,8 +65,21 @@ function GradeSelect({
   );
 }
 
-/** 관리자 테스트: 학생을 고르고 모의고사 등급을 넣으면 그 학생 원서 카드마다 수능최저 충족 여부를 판정한다. */
-export function MinimumCheckPanel({ rows }: { rows: AdminWonseoOverviewRow[] }) {
+/**
+ * 관리자 테스트: 학생을 고르고 모의고사 등급을 넣으면 그 학생 원서 카드마다 수능최저 충족 여부를 판정한다.
+ * 저장한 등급은 학생을 다시 고를 때 불러오고, 지원 현황의 점검 목록에도 쓰인다.
+ */
+export function MinimumCheckPanel({
+  rows,
+  savedGrades,
+  onSaved,
+}: {
+  rows: AdminWonseoOverviewRow[];
+  savedGrades: Map<string, MockGrades>;
+  onSaved: (studentId: string, grades: MockGrades) => void;
+}) {
+  const showToast = useToast();
+  const [saving, setSaving] = useState(false);
   const students = useMemo(() => {
     const map = new Map<string, { id: string; label: string; cards: AdminWonseoOverviewRow[] }>();
     for (const r of rows) {
@@ -70,22 +96,42 @@ export function MinimumCheckPanel({ rows }: { rows: AdminWonseoOverviewRow[] }) 
   }, [rows]);
 
   const [studentId, setStudentId] = useState<string>("");
-  const [grades, setGrades] = useState<MockGrades>({
-    korean: null,
-    math: null,
-    mathSubject: "확통",
-    english: null,
-    inquiry1: null,
-    inquiry2: null,
-    inquiryType: "사",
-    history: null,
-  });
+  const [grades, setGrades] = useState<MockGrades>(EMPTY_GRADES);
   const set =
     <K extends keyof MockGrades>(key: K) =>
     (v: MockGrades[K]) =>
       setGrades((g) => ({ ...g, [key]: v }));
 
   const student = students.find((s) => s.id === studentId) ?? null;
+
+  function selectStudent(id: string) {
+    setStudentId(id);
+    setGrades(savedGrades.get(id) ?? EMPTY_GRADES);
+  }
+
+  async function save() {
+    if (!student) return;
+    setSaving(true);
+    const { error } = await createClient().from("student_mock_grades").upsert({
+      student_id: student.id,
+      korean: grades.korean,
+      math: grades.math,
+      math_subject: grades.mathSubject,
+      english: grades.english,
+      inquiry1: grades.inquiry1,
+      inquiry2: grades.inquiry2,
+      inquiry_type: grades.inquiryType,
+      history: grades.history,
+      updated_at: new Date().toISOString(),
+    });
+    setSaving(false);
+    if (error) {
+      showToast("등급 저장에 실패했습니다.", "error");
+      return;
+    }
+    onSaved(student.id, grades);
+    showToast(`${student.label} 모의고사 등급을 저장했습니다.`, "success");
+  }
 
   return (
     <section className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
@@ -96,8 +142,8 @@ export function MinimumCheckPanel({ rows }: { rows: AdminWonseoOverviewRow[] }) 
         <div>
           <h3 className="font-bold text-slate-900">수능최저 충족 판정</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            학생을 고르고 모의고사 등급을 넣으면, 원서 카드에 적힌 최저학력기준으로 충족 여부를 판정합니다. 등급은
-            저장되지 않습니다.
+            학생을 고르고 모의고사 등급을 넣으면, 원서 카드에 적힌 최저학력기준으로 충족 여부를 판정합니다. [저장]을
+            누르면 학생별로 저장되어 지원 현황의 점검 목록에도 반영됩니다.
           </p>
         </div>
       </div>
@@ -107,13 +153,14 @@ export function MinimumCheckPanel({ rows }: { rows: AdminWonseoOverviewRow[] }) 
           학생
           <select
             value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
+            onChange={(e) => selectStudent(e.target.value)}
             className="rounded-lg border border-slate-200 px-2 py-1 text-sm font-normal text-slate-800"
           >
             <option value="">선택</option>
             {students.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
+                {savedGrades.has(s.id) ? " · 등급 저장됨" : ""}
               </option>
             ))}
           </select>
@@ -147,6 +194,15 @@ export function MinimumCheckPanel({ rows }: { rows: AdminWonseoOverviewRow[] }) 
           </select>
         </label>
         <GradeSelect label="한국사" value={grades.history} onChange={set("history")} />
+        <button
+          type="button"
+          onClick={save}
+          disabled={!student || saving}
+          className="ui-button ui-button-primary flex items-center gap-1.5 disabled:opacity-60"
+        >
+          <Save className="w-4 h-4" />
+          {saving ? "저장 중..." : "저장"}
+        </button>
       </div>
 
       {!student ? (

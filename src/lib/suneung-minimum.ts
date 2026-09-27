@@ -4,6 +4,8 @@
  * (수(확통) 선택시 1등급 하향 적용)". 해석하지 못한 조건은 판정에 넣지 않고 caveats로 돌려준다.
  */
 
+import type { StudentMockGrades } from "@/lib/database.types";
+
 export type MathSubject = "확통" | "미적" | "기하";
 export type InquiryType = "사" | "과";
 
@@ -411,4 +413,17 @@ export function evaluateMinimumStandard(text: string | null | undefined, g: Mock
   const first = results[0];
   if (results.some((r) => r.missing)) return { status: "missing", detail: first.detail, caveats: first.caveats };
   return { status: "fail", detail: first.detail, caveats: first.caveats };
+}
+
+export function mockGradesFromRow(row: StudentMockGrades): MockGrades {
+  return {
+    korean: row.korean,
+    math: row.math,
+    mathSubject: row.math_subject,
+    english: row.english,
+    inquiry1: row.inquiry1,
+    inquiry2: row.inquiry2,
+    inquiryType: row.inquiry_type,
+    history: row.history,
+  };
 }

@@ -1,4 +1,5 @@
 import type { AdminWonseoOverviewRow, SchoolAdmissionResult } from "@/lib/database.types";
+import { evaluateMinimumStandard, type MockGrades } from "@/lib/suneung-minimum";
 
 /** "동아대학교(부산)" / "동아대학교" / "동아대", "국립부경대학교" / "부경대"를 같은 대학으로 본다. */
 export function universityKey(s: string): string {
@@ -124,9 +125,13 @@ export type StudentRisk = {
 
 /**
  * 학생별 원서 조합 위험 신호. 접수한 카드가 있으면 접수한 카드만, 없으면 전체 카드를 본다.
+ * 모의고사 등급이 저장된 학생은 수능최저 미충족 원서 수도 본다.
  * 경고가 있는 학생만 경고 개수가 많은 순으로 돌려준다.
  */
-export function findRiskyStudents(rows: AdminWonseoOverviewRow[]): StudentRisk[] {
+export function findRiskyStudents(
+  rows: AdminWonseoOverviewRow[],
+  mockGrades: Map<string, MockGrades> = new Map(),
+): StudentRisk[] {
   const byStudent = new Map<string, AdminWonseoOverviewRow[]>();
   for (const r of rows) byStudent.set(r.student_id, [...(byStudent.get(r.student_id) ?? []), r]);
 
@@ -146,6 +151,12 @@ export function findRiskyStudents(rows: AdminWonseoOverviewRow[]): StudentRisk[]
     if (tiers.안정 === 0 && tiers.상향 >= 2 && target.length >= 3) warnings.push("안정 지원 없음");
     if (tiers.상향 >= 4) warnings.push(`상향 ${tiers.상향}장`);
     if (tiers.상향 === target.length && target.length >= 2) warnings.push("전부 상향");
+    const grades = mockGrades.get(student_id);
+    if (grades) {
+      const fails = target.filter((c) => evaluateMinimumStandard(c.min_standard, grades).status === "fail").length;
+      // 한 장쯤은 전략적으로 쓸 수 있어 2장 이상일 때만 경고한다.
+      if (fails >= 2) warnings.push(`최저 미충족 ${fails}장`);
+    }
     if (warnings.length === 0) continue;
     result.push({
       student_id,

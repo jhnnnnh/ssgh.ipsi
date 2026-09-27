@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AdminWonseoOverviewRow, SchoolAdmissionResult } from "@/lib/database.types";
 import { findRiskyStudents, groupByProgram, summarizePastResults, type StudentCard } from "@/lib/grade-overview";
 import { fetchAllRows } from "@/lib/school-results-excel";
+import { mockGradesFromRow, type MockGrades } from "@/lib/suneung-minimum";
 import { MinimumCheckPanel } from "@/components/teacher/MinimumCheckPanel";
 import { SeniorResultsPanel } from "@/components/teacher/SeniorResultsPanel";
 
@@ -24,6 +25,7 @@ const VIEWS = [
 export function GradeOverviewTab() {
   const [rows, setRows] = useState<AdminWonseoOverviewRow[] | null>(null);
   const [past, setPast] = useState<PastRow[]>([]);
+  const [mockGrades, setMockGrades] = useState<Map<string, MockGrades>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [grade, setGrade] = useState<number | null>(null);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
@@ -32,7 +34,7 @@ export function GradeOverviewTab() {
   useEffect(() => {
     const supabase = createClient();
     void (async () => {
-      const [overview, results] = await Promise.all([
+      const [overview, results, mocks] = await Promise.all([
         fetchAllRows<AdminWonseoOverviewRow>((from, to) =>
           supabase.rpc("admin_wonseo_overview").order("student_id").order("card_id").range(from, to),
         ).then(
@@ -46,6 +48,7 @@ export function GradeOverviewTab() {
             .order("id")
             .range(from, to),
         ).catch(() => []),
+        supabase.from("student_mock_grades").select("*"),
       ]);
       if (overview.error) {
         setError("학년 현황을 불러오지 못했습니다.");
@@ -53,6 +56,7 @@ export function GradeOverviewTab() {
       }
       setRows(overview.data ?? []);
       setPast(results);
+      setMockGrades(new Map((mocks.data ?? []).map((m) => [m.student_id, mockGradesFromRow(m)])));
     })();
   }, []);
 
@@ -65,7 +69,7 @@ export function GradeOverviewTab() {
     [gradeRows],
   );
   const programs = useMemo(() => groupByProgram(cards), [cards]);
-  const risky = useMemo(() => findRiskyStudents(gradeRows), [gradeRows]);
+  const risky = useMemo(() => findRiskyStudents(gradeRows, mockGrades), [gradeRows, mockGrades]);
   const pastYear = useMemo(() => Math.max(0, ...past.map((p) => p.result_year)), [past]);
   const pastSummary = useMemo(
     () => summarizePastResults(past.filter((p) => p.result_year === pastYear)),
@@ -124,7 +128,13 @@ export function GradeOverviewTab() {
         ))}
       </div>
 
-      {view === "minimum" && <MinimumCheckPanel rows={gradeRows} />}
+      {view === "minimum" && (
+        <MinimumCheckPanel
+          rows={gradeRows}
+          savedGrades={mockGrades}
+          onSaved={(studentId, g) => setMockGrades((prev) => new Map(prev).set(studentId, g))}
+        />
+      )}
       {view === "seniors" && <SeniorResultsPanel results={past} />}
 
       {view === "overview" && (
@@ -138,7 +148,8 @@ export function GradeOverviewTab() {
                 <h3 className="font-bold text-slate-900">원서 조합 점검이 필요한 학생</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   환산 등급과 최근 입결 70% 컷을 비교해 상향·적정·안정으로 나눕니다(입결이 없으면 카드에 고른 지원
-                  수준을 씁니다). 접수한 원서가 있으면 접수한 원서만 봅니다.
+                  수준을 씁니다). 접수한 원서가 있으면 접수한 원서만 봅니다. 수능최저 판정 탭에서 모의고사 등급을 저장한
+                  학생은 최저 미충족 원서가 2장 이상이면 함께 표시합니다.
                 </p>
               </div>
             </div>

@@ -148,3 +148,24 @@ assert.deepEqual(
   ],
 );
 console.log("senior programs ok");
+
+// 모의고사 등급이 저장된 학생은 최저 미충족 원서 2장 이상이면 경고
+const mockRows = [0, 1, 2].map((i) => ({ ...row("E", i, "적정"), min_standard: "2합4" }));
+const mock = new Map([
+  [
+    "E",
+    {
+      korean: 3,
+      math: 4,
+      mathSubject: "확통" as const,
+      english: 3,
+      inquiry1: 4,
+      inquiry2: 5,
+      inquiryType: "사" as const,
+      history: 3,
+    },
+  ],
+]);
+assert.deepEqual(findRiskyStudents(mockRows, mock)[0]?.warnings, ["최저 미충족 3장"]);
+assert.equal(findRiskyStudents(mockRows).length, 0);
+console.log("minimum warnings ok");

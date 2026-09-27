@@ -136,6 +136,20 @@ export type SchoolAdmissionResult = {
   created_at: string;
 };
 
+/** 관리자 학년 현황(테스트)의 수능최저 판정용 학생별 최근 모의고사 등급. */
+export type StudentMockGrades = {
+  student_id: string;
+  korean: number | null;
+  math: number | null;
+  math_subject: "확통" | "미적" | "기하";
+  english: number | null;
+  inquiry1: number | null;
+  inquiry2: number | null;
+  inquiry_type: "사" | "과";
+  history: number | null;
+  updated_at: string;
+};
+
 /** admin_wonseo_overview() 한 줄: 학생 한 명 × 카드 한 장(카드가 없으면 card_id null). */
 export type AdminWonseoOverviewRow = {
   student_id: string;
@@ -409,6 +423,11 @@ export type Database = {
         Insert: Pick<WonseoCardGroup, "student_id" | "name"> &
           Partial<Pick<WonseoCardGroup, "id" | "sort_order" | "is_ranked" | "created_at">>;
         Update: Partial<WonseoCardGroup>;
+      } & NoRelationships;
+      student_mock_grades: {
+        Row: StudentMockGrades;
+        Insert: Omit<StudentMockGrades, "updated_at"> & Partial<Pick<StudentMockGrades, "updated_at">>;
+        Update: Partial<StudentMockGrades>;
       } & NoRelationships;
       school_admission_results: {
         Row: SchoolAdmissionResult;
