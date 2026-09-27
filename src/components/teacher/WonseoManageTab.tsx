@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, FileSpreadsheet, GraduationCap, Layers, LayoutGrid, Star, Table2 } from "lucide-react";
+import { FileSpreadsheet, GraduationCap, Layers, LayoutGrid, Star, Table2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -30,7 +30,7 @@ type ViewMode = "cards" | "table" | "submittedTable";
 export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const showToast = useToast();
   const confirm = useConfirm();
-  const { enabled: statusVisible, toggle } = useStatusReveal();
+  const { enabled: statusVisible } = useStatusReveal();
   const { isAdmin } = useActiveClass();
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const { autoAssign, setAutoAssign } = useRankAutoAssign(selectedStudentId);
@@ -119,35 +119,10 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
     setExporting(false);
   }
 
-  async function handleToggleStatus() {
-    const ok = await toggle();
-    showToast(
-      ok ? (statusVisible ? "합격 상태가 비공개로 전환되었습니다." : "합격 상태가 공개되었습니다.") : "변경에 실패했습니다.",
-      ok ? "success" : "error",
-    );
-  }
-
 
   return (
     <div className="space-y-6">
       <Card className="space-y-5">
-        {isAdmin && (
-          <div className="flex justify-end border-b border-slate-100 pb-4">
-            <button
-              onClick={handleToggleStatus}
-              className={cn(
-                "w-[168px] shrink-0 px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center justify-center gap-1.5",
-                statusVisible
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "bg-slate-200 hover:bg-slate-300 text-slate-700",
-              )}
-            >
-              {statusVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>합격 상태</span>
-            </button>
-          </div>
-        )}
-
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setViewMode("cards")}
