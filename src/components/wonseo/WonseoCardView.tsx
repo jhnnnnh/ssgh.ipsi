@@ -262,6 +262,7 @@ export const WonseoCardView = forwardRef<
       style={{ ...(minHeight ? { minHeight } : undefined), ...style }}
       className={`bg-white rounded-[12px] border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden flex ${className ?? ""}`}
     >
+      <div className={`w-1.5 shrink-0 ${emphasis.bar}`} />
       <div ref={measureRef} className="flex-1 self-start p-4 space-y-3 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
