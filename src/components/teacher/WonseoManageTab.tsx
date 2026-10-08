@@ -22,6 +22,7 @@ import {
   useCardColumns,
 } from "@/components/wonseo/WonseoCardControls";
 import { WonseoTableView } from "@/components/teacher/WonseoTableView";
+import { WonseoListView } from "@/components/teacher/WonseoListView";
 import { exportWonseoExcel } from "@/lib/wonseo-excel";
 import type { Roster, WonseoCard } from "@/lib/database.types";
 
@@ -36,6 +37,8 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
   const { ungroupedRanked, setUngroupedRanked } = useUngroupedRanked(selectedStudentId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  /** 전체 보기·접수한 원서 보기의 표 모양: 학생별 표(원서가 옆으로) / 원서 목록(원서 1장 = 1줄, 필터). */
+  const [tableLayout, setTableLayout] = useState<"student" | "list">("student");
   const [allCards, setAllCards] = useState<WonseoCard[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WonseoCard | null>(null);
@@ -246,7 +249,8 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           </>
         ) : viewMode === "table" ? (
           <div className="space-y-3">
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <TableLayoutToggle value={tableLayout} onChange={setTableLayout} />
               <button
                 onClick={() => handleExportExcel("all")}
                 disabled={exporting}
@@ -256,11 +260,16 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                 <span>{exporting ? "생성 중..." : "엑셀 일괄 다운로드"}</span>
               </button>
             </div>
-            <WonseoTableView roster={roster} cards={allCards} />
+            {tableLayout === "list" ? (
+              <WonseoListView roster={roster} cards={allCards} />
+            ) : (
+              <WonseoTableView roster={roster} cards={allCards} />
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <TableLayoutToggle value={tableLayout} onChange={setTableLayout} />
               <button
                 onClick={() => handleExportExcel("submitted")}
                 disabled={exporting}
@@ -270,7 +279,11 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
                 <span>{exporting ? "생성 중..." : "엑셀 일괄 다운로드"}</span>
               </button>
             </div>
-            <WonseoTableView roster={roster} cards={allCards} variant="submitted" />
+            {tableLayout === "list" ? (
+              <WonseoListView roster={roster} cards={allCards} variant="submitted" />
+            ) : (
+              <WonseoTableView roster={roster} cards={allCards} variant="submitted" />
+            )}
           </div>
         )}
       </Card>
@@ -286,6 +299,37 @@ export function WonseoManageTab({ roster }: { roster: Roster[] }) {
           onSaved={reloadCards}
         />
       )}
+    </div>
+  );
+}
+
+function TableLayoutToggle({
+  value,
+  onChange,
+}: {
+  value: "student" | "list";
+  onChange: (value: "student" | "list") => void;
+}) {
+  const options = [
+    { key: "student", label: "학생별 표" },
+    { key: "list", label: "원서 목록" },
+  ] as const;
+  return (
+    <div className="inline-flex rounded-xl bg-slate-100 p-1" role="group" aria-label="표 모양">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          aria-pressed={value === o.key}
+          onClick={() => onChange(o.key)}
+          className={cn(
+            "px-3 py-1.5 rounded-lg text-xs font-bold transition",
+            value === o.key ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
