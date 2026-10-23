@@ -1,7 +1,13 @@
 // 실행: npx tsx src/lib/wonseo-table-data.check.ts
 import assert from "node:assert/strict";
 import type { Roster, WonseoCard } from "./database.types";
-import { buildWonseoListRows, filterSortListRows, type WonseoListFilter } from "./wonseo-table-data";
+import {
+  buildWonseoListColumns,
+  buildWonseoListRows,
+  filterSortListRows,
+  textWidthEm,
+  type WonseoListFilter,
+} from "./wonseo-table-data";
 
 const roster = [
   { student_id: "30201", name: "가나" },
@@ -41,7 +47,7 @@ assert.deepEqual(
 );
 const sub = buildWonseoListRows(roster, cards, "submitted");
 assert.deepEqual(
-  sub.map((r) => [r.studentId, r.submittedRank, r.firstDate]),
+  sub.map((r) => [r.studentId, r.rank, r.firstDate]),
   [
     ["30201", 1, "2026-11-15"],
     ["30202", 1, "2026-11-20"],
@@ -62,3 +68,15 @@ assert.deepEqual(
   ["2026-11-15", "2026-11-20"],
 );
 console.log("wonseo list ok");
+
+// 열 너비: 반 전체 원서 기준이라 필터와 무관하고, 두 탭의 같은 열 너비가 같다.
+const colsAll = buildWonseoListColumns(roster, cards, "all");
+const colsSub = buildWonseoListColumns(roster, cards, "submitted");
+assert.deepEqual(colsSub.slice(0, colsAll.length), colsAll);
+assert.deepEqual(
+  colsSub.slice(colsAll.length).map((c) => c.label),
+  ["수험번호", "일정"],
+);
+assert.equal(colsAll.find((c) => c.label === "학과")!.widthEm, 4 + 2); // "경영학과" 4em + 여백
+assert.equal(textWidthEm("부산대 12"), 3 + 0.65 * 3);
+console.log("list columns ok");

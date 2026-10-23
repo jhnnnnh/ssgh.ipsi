@@ -5,12 +5,13 @@ import { RotateCcw, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { LEVEL_EMPHASIS_STYLE } from "@/lib/wonseo-constants";
 import {
+  buildWonseoListColumns,
   buildWonseoListRows,
+  scheduleText,
   filterSortListRows,
   type WonseoListFilter,
   type WonseoListSort,
 } from "@/lib/wonseo-table-data";
-import { normalizeDateInput } from "@/lib/time";
 import type { Roster, SupportLevel, WonseoCard } from "@/lib/database.types";
 
 const LEVELS: SupportLevel[] = ["상향", "소신", "적정", "하향"];
@@ -29,12 +30,14 @@ export function WonseoListView({
 }: {
   roster: Roster[];
   cards: WonseoCard[];
-  /** "submitted"면 접수 표시(is_submitted)된 카드만, 지망·수험번호·날짜 열을 더해 보여준다. */
+  /** "submitted"면 접수 표시(is_submitted)된 카드만, 지망·수험번호·일정 열을 더해 보여준다. */
   variant?: "all" | "submitted";
 }) {
   const [filter, setFilter] = useState<WonseoListFilter>(EMPTY_FILTER);
   const submitted = variant === "submitted";
   const rows = useMemo(() => buildWonseoListRows(roster, cards, variant), [roster, cards, variant]);
+  // 열 너비는 반 전체 원서 기준이라 탭·정렬·필터를 바꿔도 표가 흔들리지 않는다.
+  const columns = useMemo(() => buildWonseoListColumns(roster, cards, variant), [roster, cards, variant]);
   const shown = useMemo(() => filterSortListRows(rows, filter), [rows, filter]);
   const categories = useMemo(() => uniqueSorted(rows.map((r) => r.card.category)), [rows]);
   const universities = useMemo(() => uniqueSorted(rows.map((r) => r.card.university)), [rows]);
@@ -51,16 +54,7 @@ export function WonseoListView({
     );
   }
 
-  const headers = [
-    "학생",
-    ...(submitted ? ["지망"] : []),
-    "지원정도",
-    "지망대학",
-    "학과",
-    "전형유형",
-    "세부전형명",
-    ...(submitted ? ["수험번호", "날짜"] : []),
-  ];
+  const tableWidthEm = columns.reduce((sum, c) => sum + c.widthEm, 0);
 
   return (
     <div className="space-y-3">
@@ -139,29 +133,38 @@ export function WonseoListView({
         <span className="ml-auto text-xs text-slate-500">
           <b className="text-slate-800">{shown.length}</b>건 / 전체 {rows.length}건
         </span>
-        {filtered && (
-          <button
-            type="button"
-            onClick={() => setFilter(EMPTY_FILTER)}
-            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-800"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            초기화
-          </button>
-        )}
+        {/* 필터가 없을 때도 자리를 차지해 필터 줄이 움직이지 않게 한다. */}
+        <button
+          type="button"
+          onClick={() => setFilter(EMPTY_FILTER)}
+          tabIndex={filtered ? 0 : -1}
+          aria-hidden={!filtered}
+          className={cn(
+            "flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-800",
+            !filtered && "invisible",
+          )}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          초기화
+        </button>
       </div>
 
       {shown.length === 0 ? (
         <p className="text-center py-12 text-xs font-semibold text-slate-500">조건에 맞는 원서가 없습니다.</p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="text-xs border-collapse w-full min-w-[760px]">
+          <table className="text-xs border-collapse table-fixed" style={{ width: `${tableWidthEm}em` }}>
+            <colgroup>
+              {columns.map((c) => (
+                <col key={c.label} style={{ width: `${c.widthEm}em` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                {headers.map((h) => (
+                {columns.map(({ label: h }) => (
                   <th
                     key={h}
-                    className="bg-slate-900 text-white font-bold px-3 py-2.5 text-left whitespace-nowrap sticky top-0"
+                    className="bg-slate-900 text-white font-bold px-3 py-2.5 text-left whitespace-nowrap sticky top-0 overflow-hidden"
                   >
                     {h}
                   </th>
@@ -173,13 +176,11 @@ export function WonseoListView({
                 const { card } = row;
                 return (
                   <tr key={card.id} className="border-t border-slate-100">
-                    <td className="px-3 py-2 whitespace-nowrap font-bold text-slate-800">
+                    <td className="px-3 py-2 font-bold text-slate-800 break-words">
                       <span className="text-slate-400 font-semibold mr-1.5">{row.studentId}</span>
                       {row.name}
                     </td>
-                    {submitted && (
-                      <td className="px-3 py-2 whitespace-nowrap text-slate-700">{row.submittedRank}지망</td>
-                    )}
+                    <td className="px-3 py-2 text-slate-700">{row.rank}지망</td>
                     <td className="px-3 py-2">
                       <span
                         className={cn(
@@ -192,17 +193,12 @@ export function WonseoListView({
                     </td>
                     <td className="px-3 py-2 text-slate-800 font-semibold">{card.university || "-"}</td>
                     <td className="px-3 py-2 text-slate-700">{card.department || "-"}</td>
-                    <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{card.category || "-"}</td>
+                    <td className="px-3 py-2 text-slate-700 break-words">{card.category || "-"}</td>
                     <td className="px-3 py-2 text-slate-700">{card.sub_category || "-"}</td>
                     {submitted && (
                       <>
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{card.application_number || "-"}</td>
-                        <td className="px-3 py-2 text-slate-700">
-                          {(card.schedule_events ?? [])
-                            .map((e) => [e.label, normalizeDateInput(e.date)].filter(Boolean).join(" "))
-                            .filter(Boolean)
-                            .join(", ") || "-"}
-                        </td>
+                        <td className="px-3 py-2 text-slate-700 break-all">{card.application_number || "-"}</td>
+                        <td className="px-3 py-2 text-slate-700">{scheduleText(card) || "-"}</td>
                       </>
                     )}
                   </tr>

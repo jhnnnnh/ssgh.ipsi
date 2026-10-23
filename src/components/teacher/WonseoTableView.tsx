@@ -19,7 +19,7 @@ export function WonseoTableView({
 }: {
   roster: Roster[];
   cards: WonseoCard[];
-  /** "submitted"면 접수 표시(is_submitted)된 카드만, 수험번호·날짜 행을 더해 보여준다. */
+  /** "submitted"면 접수 표시(is_submitted)된 카드만, 수험번호·일정 행을 더해 보여준다. */
   variant?: "all" | "submitted";
 }) {
   const rowLabels: readonly string[] =
@@ -28,8 +28,10 @@ export function WonseoTableView({
     variant === "submitted"
       ? (card, label) => wonseoSubmittedTableCellValue(card, label as (typeof WONSEO_SUBMITTED_TABLE_ROW_LABELS)[number])
       : (card, label) => wonseoTableCellValue(card, label as (typeof WONSEO_TABLE_ROW_LABELS)[number]);
-  const { maxChoices, students } =
-    variant === "submitted" ? buildSubmittedWonseoTableData(roster, cards) : buildWonseoTableData(roster, cards);
+  const data = variant === "submitted" ? buildSubmittedWonseoTableData(roster, cards) : buildWonseoTableData(roster, cards);
+  const { students } = data;
+  // 탭마다 지망 칸 수가 달라 표 폭이 바뀌지 않도록 최소 6칸(수시 6회)으로 맞춘다.
+  const maxChoices = Math.max(data.maxChoices, 6);
 
   if (students.length === 0) {
     return (

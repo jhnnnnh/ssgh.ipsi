@@ -21,7 +21,7 @@ const BORDER = { style: "thin" as const, color: { argb: "FFCBD5E1" } };
 
 /**
  * variant가 "submitted"면 "접수한 원서 보기" 화면과 같은 데이터(접수 표시된 카드만,
- * submitted_sort_order 순)와 행 구성(수험번호·날짜 포함)으로 내보낸다 — 화면의
+ * submitted_sort_order 순)와 행 구성(수험번호·일정 포함)으로 내보낸다 — 화면의
  * WonseoTableView와 동일한 구분이다.
  */
 export async function exportWonseoExcel(

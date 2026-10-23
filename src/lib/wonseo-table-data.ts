@@ -24,7 +24,7 @@ export function wonseoTableCellValue(card: WonseoCard | undefined, label: Wonseo
 }
 
 /** "접수한 원서 보기" 표에서 지원정도~세부전형명 아래에 덧붙이는 두 행. */
-export const WONSEO_SUBMITTED_TABLE_ROW_LABELS = [...WONSEO_TABLE_ROW_LABELS, "수험번호", "날짜"] as const;
+export const WONSEO_SUBMITTED_TABLE_ROW_LABELS = [...WONSEO_TABLE_ROW_LABELS, "수험번호", "일정"] as const;
 
 export type WonseoSubmittedTableRowLabel = (typeof WONSEO_SUBMITTED_TABLE_ROW_LABELS)[number];
 
@@ -41,7 +41,7 @@ export function wonseoSubmittedTableCellValue(
 ): string {
   if (!card) return "";
   if (label === "수험번호") return card.application_number ?? "";
-  if (label === "날짜") return scheduleEventsCellValue(card);
+  if (label === "일정") return scheduleEventsCellValue(card);
   return wonseoTableCellValue(card, label as WonseoTableRowLabel);
 }
 
@@ -106,8 +106,8 @@ export type WonseoListRow = {
   card: WonseoCard;
   studentId: string;
   name: string;
-  /** 접수한 원서 보기에서 그 학생의 접수 순서(1부터). 전체 보기에서는 null. */
-  submittedRank: number | null;
+  /** 그 학생 안에서의 순서(1부터). 학생별 표의 "N지망" 칸과 같은 순서다. */
+  rank: number;
   /** 가장 이른 일정 날짜(YYYY-MM-DD). 없으면 null. */
   firstDate: string | null;
 };
@@ -148,7 +148,7 @@ export function buildWonseoListRows(
         card,
         studentId: s.studentId,
         name: s.name,
-        submittedRank: variant === "submitted" ? i + 1 : null,
+        rank: i + 1,
         firstDate: firstEventDate(card),
       })),
     );
@@ -177,4 +177,94 @@ export function filterSortListRows(rows: WonseoListRow[], f: WonseoListFilter): 
     .map((r, i) => ({ r, i }))
     .sort((a, b) => key[f.sort](a.r).localeCompare(key[f.sort](b.r), "ko") || a.i - b.i)
     .map(({ r }) => r);
+}
+
+/** 원서의 일정을 "면접 2026-11-20, 발표 2026-12-18"처럼 한 줄로 만든다. */
+export function scheduleText(card: WonseoCard): string {
+  return (card.schedule_events ?? [])
+    .map((e) => [e.label, normalizeDateInput(e.date)].filter(Boolean).join(" "))
+    .filter(Boolean)
+    .join(", ");
+}
+
+/** 대략적인 글자 폭(em). 한글·한자는 1em, 그 밖(숫자·영문·기호)은 0.65em으로 본다. */
+export function textWidthEm(text: string): number {
+  let w = 0;
+  for (const ch of text) w += /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF\u4E00-\u9FFF]/.test(ch) ? 1 : 0.65;
+  return w;
+}
+
+export type WonseoListColumn = {
+  label: string;
+  /** 열 너비(em, 표 글자 크기 기준). */
+  widthEm: number;
+};
+
+/**
+ * 원서 목록의 열 너비. 화면에 보이는 줄이 아니라 반 전체 원서에서 열마다 가장 긴 글자에 맞춰서,
+ * 필터·정렬·탭을 바꿔도 너비가 그대로이고 빈 여백도 남지 않는다. 길어질 수 있는 열은 최대 너비
+ * 안에서 줄바꿈한다. 두 탭이 같은 열을 같은 기준(반 전체 원서)으로 재서 위치가 맞는다.
+ */
+export function buildWonseoListColumns(
+  roster: Roster[],
+  cards: WonseoCard[],
+  variant: "all" | "submitted",
+): WonseoListColumn[] {
+  const all = buildWonseoListRows(roster, cards, "all");
+  const PAD = 2; // 좌우 여백 px-3 × 2 = 24px = 2em(12px 기준)
+  const col = (label: string, values: string[], maxEm: number, extra = 0): WonseoListColumn => {
+    const content = Math.max(textWidthEm(label), ...values.map(textWidthEm));
+    return { label, widthEm: Math.round((Math.min(content, maxEm) + PAD + extra) * 10) / 10 };
+  };
+  const columns = [
+    // 굵은 글씨라 조금 더 넓게 잡는다.
+    col(
+      "학생",
+      all.map((r) => `${r.studentId} ${r.name}`),
+      12,
+      0.6,
+    ),
+    col(
+      "지망",
+      all.map((r) => `${r.rank}지망`),
+      5,
+    ),
+    col("지원정도", ["소신"], 4, 0.8),
+    col(
+      "지망대학",
+      all.map((r) => r.card.university ?? ""),
+      11,
+    ),
+    col(
+      "학과",
+      all.map((r) => r.card.department ?? ""),
+      11,
+    ),
+    col(
+      "전형유형",
+      all.map((r) => r.card.category ?? ""),
+      8,
+    ),
+    col(
+      "세부전형명",
+      all.map((r) => r.card.sub_category ?? ""),
+      11,
+    ),
+  ];
+  if (variant === "submitted") {
+    const submitted = buildWonseoListRows(roster, cards, "submitted");
+    columns.push(
+      col(
+        "수험번호",
+        submitted.map((r) => r.card.application_number ?? ""),
+        8,
+      ),
+      col(
+        "일정",
+        submitted.map((r) => scheduleText(r.card)),
+        12,
+      ),
+    );
+  }
+  return columns;
 }
