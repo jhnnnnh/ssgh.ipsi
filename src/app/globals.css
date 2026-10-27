@@ -681,7 +681,9 @@ tbody tr:hover {
   inset: 0;
   z-index: var(--z-overlay);
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
   background: var(--color-scrim);
 }
 
@@ -689,12 +691,13 @@ tbody tr:hover {
   position: relative;
   z-index: var(--z-modal);
   display: flex;
-  width: min(32rem, 100vw);
-  height: 100dvh;
-  max-height: 100dvh;
+  width: 100%;
+  max-height: calc(100dvh - 2rem);
   flex: 0 0 auto;
   flex-direction: column;
-  border-left: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-panel);
   background: var(--color-surface);
   box-shadow: var(--shadow-overlay);
 }

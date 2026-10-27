@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CalendarPlus, Check } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/providers/ToastProvider";
 import { cn } from "@/lib/cn";
@@ -276,11 +277,11 @@ export function CalendarEventModal({
                 <label className="block font-bold text-slate-700 mb-1">
                   시작일 {dateError && <span className="text-rose-500">(필수)</span>}
                 </label>
-                <input
-                  type="date"
+                <DatePicker
+                  label="시작일"
                   value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
+                  onChange={(value) => {
+                    setDate(value);
                     if (dateError) setDateError(false);
                   }}
                   className={cn(
@@ -293,11 +294,11 @@ export function CalendarEventModal({
               </div>
               <div>
                 <label className="block font-bold text-slate-700 mb-1">종료일 (선택)</label>
-                <input
-                  type="date"
+                <DatePicker
+                  label="종료일"
                   value={endDate}
                   min={date || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={setEndDate}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-/** 편집·설정 작업에 쓰는 우측 패널. 짧은 확인 질문은 ConfirmProvider가 담당한다. */
+/** 편집·설정 작업에 쓰는 팝업. 짧은 확인 질문은 ConfirmProvider가 담당한다. */
 export function Modal({
   open,
   onClose,
@@ -47,10 +47,12 @@ export function Modal({
   function trapPanelFocus(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       onClose();
       return;
     }
     if (event.key !== "Tab") return;
+    event.stopPropagation();
 
     const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',

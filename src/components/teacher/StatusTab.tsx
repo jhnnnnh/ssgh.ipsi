@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  CalendarPlus,
   CalendarX,
   FileDown,
   History,
@@ -25,7 +24,7 @@ import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { DateTabs } from "@/components/ui/DateTabs";
 import { EditSlotModal } from "@/components/teacher/EditSlotModal";
 import { Card } from "@/components/ui/Card";
-import { AddDateModal } from "@/components/teacher/AddDateModal";
+import { CalendarPicker } from "@/components/ui/DatePicker";
 import { FavoritesSettingsModal } from "@/components/teacher/FavoritesSettingsModal";
 import { downloadCsv } from "@/lib/csv";
 import {
@@ -74,7 +73,6 @@ export function StatusTab() {
   const [showPastDates, setShowPastDates] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [editingSlot, setEditingSlot] = useState<CounselingSlot | null>(null);
-  const [addDateModalOpen, setAddDateModalOpen] = useState(false);
   const [favoritesModalOpen, setFavoritesModalOpen] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -147,6 +145,7 @@ export function StatusTab() {
   function handleAddDate(date: string) {
     setExtraDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
     setSelectedDate(date);
+    if (date < today) setShowPastDates(true);
   }
 
   async function createNewSlot() {
@@ -351,13 +350,12 @@ export function StatusTab() {
             <DateTabs dates={visibleDates} selected={activeDate} onSelect={setSelectedDate} />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setAddDateModalOpen(true)}
+            <CalendarPicker
+              label="날짜 추가"
+              value={activeDate ?? ""}
+              onChange={handleAddDate}
               className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold border transition whitespace-nowrap bg-white text-slate-600 border-slate-200 hover:bg-slate-50 flex items-center gap-1.5"
-            >
-              <CalendarPlus className="w-3.5 h-3.5" />
-              <span>날짜 추가</span>
-            </button>
+            />
             <button
               onClick={() => setShowPastDates((v) => !v)}
               className={cn(
@@ -582,11 +580,6 @@ export function StatusTab() {
       </Card>
 
       <EditSlotModal slot={editingSlot} onClose={() => setEditingSlot(null)} onSaved={reload} />
-      <AddDateModal
-        open={addDateModalOpen}
-        onClose={() => setAddDateModalOpen(false)}
-        onAdd={handleAddDate}
-      />
       <FavoritesSettingsModal
         open={favoritesModalOpen}
         onClose={() => setFavoritesModalOpen(false)}

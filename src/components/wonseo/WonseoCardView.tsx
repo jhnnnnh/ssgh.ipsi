@@ -1,7 +1,8 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { CalendarDays, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { CalendarPicker } from "@/components/ui/DatePicker";
 import { createClient } from "@/lib/supabase/client";
 import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPreview";
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
@@ -72,12 +73,7 @@ function InlineEditableText({
   );
 }
 
-/** 일정 한 건의 날짜. 클릭하기 전엔 일반 텍스트로 보이고, 클릭하면 자유 타이핑 입력칸 +
- * 달력 아이콘(누르면 네이티브 날짜 선택기)이 함께 뜬다. 세그먼트를 하나씩 클릭해서 채워야
- * 하는 &lt;input type="date"&gt; 특유의 불편함 대신, 숫자만 이어 쳐도(예: 20261111)
- * blur 시 "2026-11-11" 형식으로 자동 정리된다. 달력 아이콘은 편집 중에도 폭을 넓히지
- * 않도록 입력칸 안쪽에 겹쳐 놓아서, 클릭 전/후 박스 폭이 항상 같다(width는 이 컴포넌트
- * 안에 고정해 두고 호출부에서 따로 지정하지 않는다). */
+/** 자유 입력과 달력 선택 모두 같은 고정 폭을 유지한다. */
 const SCHEDULE_DATE_WIDTH = "w-[84px]";
 
 function InlineEditableDate({
@@ -92,46 +88,33 @@ function InlineEditableDate({
   className: string;
 }) {
   const [editing, setEditing] = useState(false);
-  const pickerRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   if (editing) {
     return (
-      <span className={`relative inline-block ${SCHEDULE_DATE_WIDTH} shrink-0`}>
+      <span className={`relative inline-block ${SCHEDULE_DATE_WIDTH} shrink-0`} onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setEditing(false);
+          onCommit(normalizeDateInput(inputRef.current?.value ?? value));
+        }
+      }}>
         <input
+          ref={inputRef}
           autoFocus
           defaultValue={value}
           placeholder={placeholder}
-          onBlur={(e) => {
-            setEditing(false);
-            onCommit(normalizeDateInput(e.target.value));
-          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
-            if (e.key === "Escape") setEditing(false);
+            if (e.key === "Escape") { e.stopPropagation(); setEditing(false); }
           }}
           className="w-full bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded pl-0.5 pr-3.5 text-xs font-semibold text-slate-800"
         />
-        <button
-          type="button"
-          tabIndex={-1}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => pickerRef.current?.showPicker?.()}
-          className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500"
-        >
-          <CalendarDays className="w-3 h-3" />
-        </button>
-        <input
-          ref={pickerRef}
-          type="date"
-          value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""}
-          onChange={(e) => {
+        <span className="absolute right-0 top-1/2 -translate-y-1/2">
+          <CalendarPicker value={value} onChange={(date) => {
             setEditing(false);
-            onCommit(e.target.value);
-          }}
-          tabIndex={-1}
-          aria-hidden
-          className="sr-only"
-        />
+            onCommit(date);
+          }} className="text-slate-400 hover:text-indigo-500 [&_svg]:w-3 [&_svg]:h-3" />
+        </span>
       </span>
     );
   }
