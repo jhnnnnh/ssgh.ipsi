@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { WonseoAttachmentPreview } from "@/components/wonseo/WonseoAttachmentPreview";
 import { WonseoImageLightbox } from "@/components/wonseo/WonseoImageLightbox";
 import { RecentResultsSection } from "@/components/wonseo/RecentResultsSection";
-import { LEVEL_EMPHASIS_STYLE, STATUS_BADGE_STYLE, STATUS_OPTIONS } from "@/lib/wonseo-constants";
+import { LEVEL_EMPHASIS_STYLE } from "@/lib/wonseo-constants";
+import { WonseoResultBadge } from "@/components/wonseo/WonseoResultBadge";
+import { waitlistTrail, type CardResult } from "@/lib/wonseo-result";
 import { normalizeDateInput } from "@/lib/time";
 import type { ScheduleEvent, WonseoCard, WonseoImage } from "@/lib/database.types";
 
@@ -134,7 +136,6 @@ export const WonseoCardView = forwardRef<
   HTMLDivElement,
   {
     card: WonseoCard;
-    showStatus: boolean;
     /** 목록 상단의 전체 on/off 버튼으로 제어되는, 최근 입결 표시 여부. "submitted" 모드에서는 안 쓴다. */
     showRecentResults: boolean;
     onEdit: () => void;
@@ -159,11 +160,12 @@ export const WonseoCardView = forwardRef<
      * 화면 전용으로, 학교/학과/전형만 보이고 그 자리에 수험번호·일정 편집기를 보여준다. */
     bodyMode?: "full" | "submitted";
     onSubmittedFieldsCommit?: (fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] }) => void;
+    /** "submitted" 모드의 발표 결과 배지가 바뀌면 저장한다. 없으면 배지를 읽기 전용으로 보여준다. */
+    onResultChange?: (result: CardResult) => void;
   }
 >(function WonseoCardView(
   {
     card,
-    showStatus,
     showRecentResults,
     onEdit,
     onDelete,
@@ -179,6 +181,7 @@ export const WonseoCardView = forwardRef<
     onRankChange,
     bodyMode = "full",
     onSubmittedFieldsCommit,
+    onResultChange,
   },
   ref,
 ) {
@@ -202,9 +205,8 @@ export const WonseoCardView = forwardRef<
     setScheduleEvents(card.schedule_events ?? []);
   }, [card.id, card.application_number, card.schedule_events]);
 
-  const statusLabel = STATUS_OPTIONS.find((o) => o.value === card.status)?.label ?? card.status;
-
   const emphasis = LEVEL_EMPHASIS_STYLE[card.level];
+  const trail = waitlistTrail(card);
 
   const methodValue =
     card.selection_mode === "single"
@@ -247,7 +249,11 @@ export const WonseoCardView = forwardRef<
       className={`bg-white rounded-[12px] border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden flex ${className ?? ""}`}
     >
       <div className={`w-1.5 shrink-0 ${emphasis.bar}`} />
-      <div ref={measureRef} className="flex-1 self-start p-4 space-y-3 min-w-0">
+      <div
+        ref={measureRef}
+        // 접수한 원서 화면에선 발표 결과 줄을 카드 바닥에 붙이려고 세로로 늘인다(이 화면은 동일높이 측정을 안 쓴다).
+        className={`flex-1 p-4 space-y-3 min-w-0 ${bodyMode === "submitted" ? "flex flex-col" : "self-start"}`}
+      >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {dragHandle}
@@ -270,13 +276,6 @@ export const WonseoCardView = forwardRef<
           >
             {card.level}
           </span>
-          {showStatus && (
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full border ${STATUS_BADGE_STYLE[card.status]}`}
-            >
-              {statusLabel}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {extraActions}
@@ -333,6 +332,7 @@ export const WonseoCardView = forwardRef<
       </div>
 
       {bodyMode === "submitted" ? (
+        <>
         <div className="text-[13px] space-y-3 border-t border-slate-100 pt-3">
           <div className="flex items-center gap-2">
             <span className="text-slate-500 shrink-0">수험번호</span>
@@ -389,6 +389,12 @@ export const WonseoCardView = forwardRef<
             </div>
           </div>
         </div>
+        <div className="mt-auto flex items-center gap-2 border-t border-slate-100 pt-3 text-[13px] min-w-0">
+          <span className="text-slate-500 shrink-0">발표 결과</span>
+          <WonseoResultBadge card={card} onChange={onResultChange} />
+          {trail && <span className="text-xs font-semibold text-slate-500 truncate">{trail}</span>}
+        </div>
+        </>
       ) : (
         <>
           <div className="text-[13px] space-y-1 border-t border-slate-100 pt-3">

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Layers } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
-import { useStatusReveal } from "@/lib/hooks/useStatusReveal";
 import { useUngroupedRanked } from "@/lib/hooks/useUngroupedRanked";
 import { useWonseoCards } from "@/lib/hooks/useWonseoCards";
 import { WonseoCardModal } from "@/components/wonseo/WonseoCardModal";
@@ -22,7 +21,6 @@ import type { WonseoCard } from "@/lib/database.types";
 export function WonseoTab({ studentId }: { studentId: string }) {
   const showToast = useToast();
   const confirm = useConfirm();
-  const { enabled: statusVisible } = useStatusReveal();
   const { ungroupedRanked, setUngroupedRanked } = useUngroupedRanked(studentId);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WonseoCard | null>(null);
@@ -48,6 +46,7 @@ export function WonseoTab({ studentId }: { studentId: string }) {
     reorderCards,
     reorderSubmittedCards,
     saveSubmittedFields,
+    saveResult,
     saveRank,
     toggleUngroupedRanked,
   } = useWonseoCards({
@@ -93,13 +92,13 @@ export function WonseoTab({ studentId }: { studentId: string }) {
         <SubmittedCardList
           cards={cards}
           gridClassName={gridClassName}
-          showStatus={statusVisible}
           onEdit={openEdit}
           onDelete={(card) => void deleteCard(card)}
           onToggleSubmitted={(card) => void toggleSubmitted(card)}
           onRankChange={(card, text) => void saveRank(card, text)}
           onReorder={(e, submitted) => void reorderSubmittedCards(e, submitted)}
           onSubmittedFieldsCommit={(card, fields) => void saveSubmittedFields(card, fields)}
+          onResultChange={(card, result) => void saveResult(card, result)}
         />
       ) : cards.length > 0 ? (
         <WonseoCardBoard
@@ -107,7 +106,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
           groups={groups}
           rankLabels={rankLabels}
           gridClassName={gridClassName}
-          showStatus={statusVisible}
           showRecentResults={showRecentResults}
           onEdit={openEdit}
           onDelete={(card) => void deleteCard(card)}
@@ -134,7 +132,6 @@ export function WonseoTab({ studentId }: { studentId: string }) {
         onClose={() => setModalOpen(false)}
         studentId={studentId}
         editingCard={editingCard}
-        canEditStatus={false}
         nextSortOrder={cards.length}
         onSaved={reloadCards}
       />

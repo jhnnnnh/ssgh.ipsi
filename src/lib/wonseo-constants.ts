@@ -1,4 +1,4 @@
-import type { ApplicationStatus, SupportLevel } from "@/lib/database.types";
+import type { SupportLevel } from "@/lib/database.types";
 
 export const LEVEL_OPTIONS: SupportLevel[] = ["상향", "소신", "적정", "하향"];
 
@@ -40,21 +40,3 @@ export const LEVEL_TABLE_CELL_STYLE: Record<SupportLevel, string> = {
 
 /** 전형 유형 빠른 선택 버튼 (그 외 값은 "직접입력"으로 취급) */
 export const QUICK_CATEGORY_OPTIONS = ["학생부교과", "학생부종합", "논술", "실기"] as const;
-
-export const STATUS_OPTIONS: { value: ApplicationStatus; label: string }[] = [
-  { value: "지원예정", label: "지원예정" },
-  { value: "원서접수", label: "원서접수 완료" },
-  { value: "1차합격", label: "1차 합격" },
-  { value: "최종합격", label: "🎉 최종 합격" },
-  { value: "예비번호", label: "예비 번호" },
-  { value: "불합격", label: "불합격" },
-];
-
-export const STATUS_BADGE_STYLE: Record<ApplicationStatus, string> = {
-  지원예정: "bg-slate-100 text-slate-600 border-slate-200",
-  원서접수: "bg-blue-50 text-blue-600 border-blue-200",
-  "1차합격": "bg-amber-50 text-amber-700 border-amber-200",
-  최종합격: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  예비번호: "bg-purple-50 text-purple-700 border-purple-200",
-  불합격: "bg-rose-50 text-rose-600 border-rose-200",
-};

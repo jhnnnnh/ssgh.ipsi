@@ -16,6 +16,7 @@ import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } fro
 import { ChevronDown, Eye, EyeOff, Plus, SlidersHorizontal, Star } from "lucide-react";
 import { SortableWonseoCard } from "@/components/wonseo/SortableWonseoCard";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
+import { resultBadge, type CardResult, type ResultTone } from "@/lib/wonseo-result";
 import { computeAutoRankLabels } from "@/lib/wonseo-rank";
 import { cn } from "@/lib/cn";
 import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
@@ -243,21 +244,44 @@ export function WonseoEmptyState({
   );
 }
 
+const SUMMARY_GROUPS: { label: string; tones: ResultTone[] }[] = [
+  { label: "합격", tones: ["pass"] },
+  { label: "예비", tones: ["waitlist"] },
+  { label: "불합격", tones: ["fail"] },
+  { label: "발표 전", tones: ["pending", "stage"] },
+];
+
+/** 접수한 원서 목록 위의 결과 요약 한 줄(예: 접수 6곳 | 합격 1 · 예비 2 · …). */
+function SubmittedResultSummary({ cards }: { cards: WonseoCard[] }) {
+  const tones = cards.map((card) => resultBadge(card).tone);
+  return (
+    <p className="text-xs font-bold text-slate-500 mb-3">
+      접수 {cards.length}곳
+      <span className="text-slate-300 mx-1.5">|</span>
+      {SUMMARY_GROUPS.map((group, i) => (
+        <span key={group.label}>
+          {i > 0 && <span className="text-slate-300 mx-1.5">·</span>}
+          {group.label} <span className="text-slate-900">{tones.filter((tone) => group.tones.includes(tone)).length}</span>
+        </span>
+      ))}
+    </p>
+  );
+}
+
 /** "접수한 원서" 보기: 접수 표시한 카드만 자체 순서(submitted_sort_order)로 보여주고 드래그로 순서를 바꾼다. */
 export function SubmittedCardList({
   cards,
   gridClassName,
-  showStatus,
   onEdit,
   onDelete,
   onToggleSubmitted,
   onRankChange,
   onReorder,
   onSubmittedFieldsCommit,
+  onResultChange,
 }: {
   cards: WonseoCard[];
   gridClassName: string;
-  showStatus: boolean;
   onEdit: (card: WonseoCard) => void;
   onDelete: (card: WonseoCard) => void;
   onToggleSubmitted: (card: WonseoCard) => void;
@@ -267,6 +291,7 @@ export function SubmittedCardList({
     card: WonseoCard,
     fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] },
   ) => void;
+  onResultChange: (card: WonseoCard, result: CardResult) => void;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
@@ -301,6 +326,7 @@ export function SubmittedCardList({
         onReorder(e, submittedCards);
       }}
     >
+      <SubmittedResultSummary cards={submittedCards} />
       <SortableContext items={submittedCards.map((c) => c.id)} strategy={rectSortingStrategy}>
         <div className={gridClassName}>
           {submittedCards.map((card, index) => (
@@ -312,7 +338,6 @@ export function SubmittedCardList({
               card={card}
               rankLabel={rankLabels[index]}
               onRankChange={(text) => onRankChange(card, text)}
-              showStatus={showStatus}
               showRecentResults={false}
               onEdit={() => onEdit(card)}
               onDelete={() => onDelete(card)}
@@ -320,6 +345,7 @@ export function SubmittedCardList({
               onToggleSubmitted={() => onToggleSubmitted(card)}
               bodyMode="submitted"
               onSubmittedFieldsCommit={(fields) => onSubmittedFieldsCommit(card, fields)}
+              onResultChange={(result) => onResultChange(card, result)}
             />
           ))}
         </div>
@@ -330,7 +356,6 @@ export function SubmittedCardList({
             <WonseoCardView
               card={activeCard}
               rankLabel={rankLabels[activeIndex]}
-              showStatus={showStatus}
               showRecentResults={false}
               onEdit={() => {}}
               onDelete={() => {}}

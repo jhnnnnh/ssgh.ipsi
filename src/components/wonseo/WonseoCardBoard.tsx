@@ -52,7 +52,6 @@ type Props = {
   groups: WonseoCardGroup[];
   rankLabels: Map<string, string>;
   gridClassName: string;
-  showStatus: boolean;
   showRecentResults: boolean;
   onEdit: (card: WonseoCard) => void;
   onDelete: (card: WonseoCard) => void;
@@ -78,7 +77,6 @@ export function WonseoCardBoard({
   groups,
   rankLabels,
   gridClassName,
-  showStatus,
   showRecentResults,
   onEdit,
   onDelete,
@@ -147,7 +145,6 @@ export function WonseoCardBoard({
         card={card}
         rankLabel={rankLabels.get(card.id)}
         onRankChange={(text) => onRankChange(card, text)}
-        showStatus={showStatus}
         showRecentResults={showRecentResults}
         onEdit={() => onEdit(card)}
         onDelete={() => onDelete(card)}
@@ -247,7 +244,6 @@ export function WonseoCardBoard({
               <WonseoCardView
                 card={activeCard}
                 rankLabel={rankLabels.get(activeCard.id)}
-                showStatus={showStatus}
                 showRecentResults={showRecentResults}
                 onEdit={() => {}}
                 onDelete={() => {}}

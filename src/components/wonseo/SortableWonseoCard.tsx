@@ -5,11 +5,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { WonseoCardView } from "@/components/wonseo/WonseoCardView";
 import type { ScheduleEvent, WonseoCard } from "@/lib/database.types";
+import type { CardResult } from "@/lib/wonseo-result";
 
 export function SortableWonseoCard({
   id,
   card,
-  showStatus,
   showRecentResults,
   onEdit,
   onDelete,
@@ -22,11 +22,11 @@ export function SortableWonseoCard({
   onRankChange,
   bodyMode,
   onSubmittedFieldsCommit,
+  onResultChange,
   extraActions,
 }: {
   id: string;
   card: WonseoCard;
-  showStatus: boolean;
   showRecentResults: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -39,6 +39,7 @@ export function SortableWonseoCard({
   onRankChange: (text: string) => void;
   bodyMode?: "full" | "submitted";
   onSubmittedFieldsCommit?: (fields: { applicationNumber: string; scheduleEvents: ScheduleEvent[] }) => void;
+  onResultChange?: (result: CardResult) => void;
   extraActions?: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isSorting } = useSortable({ id });
@@ -48,7 +49,6 @@ export function SortableWonseoCard({
       ref={setNodeRef}
       measureRef={setEqualHeightRef}
       card={card}
-      showStatus={showStatus}
       showRecentResults={showRecentResults}
       onEdit={onEdit}
       onDelete={onDelete}
@@ -58,6 +58,7 @@ export function SortableWonseoCard({
       onRankChange={onRankChange}
       bodyMode={bodyMode}
       onSubmittedFieldsCommit={onSubmittedFieldsCommit}
+      onResultChange={onResultChange}
       extraActions={extraActions}
       minHeight={minHeight}
       style={{

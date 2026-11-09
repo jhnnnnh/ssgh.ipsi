@@ -113,9 +113,18 @@ export type WonseoCard = {
   submitted_sort_order: number;
   /** 학생이 만든 그룹(wonseo_card_groups). null이면 미분류. */
   group_id: string | null;
+  /** 발표 결과 단계별 기록(src/lib/wonseo-result.ts). null은 아직 발표 전. */
+  stage1_result: StageResult | null;
+  first_result: FirstResult | null;
+  waitlist_number: number | null;
+  waitlist_progress: string | null;
+  waitlist_final: StageResult | null;
   created_at: string;
   updated_at: string;
 };
+
+export type StageResult = "합격" | "불합격";
+export type FirstResult = "합격" | "예비" | "불합격";
 
 /** 우리 학교 학생들의 지난 수시 합불 결과(엑셀 업로드). 개인 식별 정보(반·번호·이름)는 저장하지 않는다. */
 export type SchoolAdmissionResult = {

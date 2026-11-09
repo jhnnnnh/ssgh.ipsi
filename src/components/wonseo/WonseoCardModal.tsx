@@ -33,12 +33,10 @@ import {
   LEVEL_OPTIONS,
   LEVEL_TOGGLE_STYLE,
   QUICK_CATEGORY_OPTIONS,
-  STATUS_OPTIONS,
 } from "@/lib/wonseo-constants";
 import { cn } from "@/lib/cn";
 import type {
   ApplicationCategory,
-  ApplicationStatus,
   RecentResultYear,
   SelectionMode,
   SupportLevel,
@@ -49,7 +47,6 @@ import type {
 interface FormState {
   rank: string;
   level: SupportLevel;
-  status: ApplicationStatus;
   university: string;
   department: string;
   enrollment: string;
@@ -68,7 +65,6 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   rank: "",
   level: "적정",
-  status: "지원예정",
   university: "",
   department: "",
   enrollment: "",
@@ -93,7 +89,6 @@ function cardToForm(card: WonseoCard): FormState {
   return {
     rank: card.rank ?? "",
     level: card.level,
-    status: card.status,
     university: card.university ?? "",
     department: card.department ?? "",
     enrollment: card.enrollment != null ? String(card.enrollment) : "",
@@ -115,7 +110,6 @@ export function WonseoCardModal({
   onClose,
   studentId,
   editingCard,
-  canEditStatus,
   nextSortOrder,
   onSaved,
 }: {
@@ -123,7 +117,6 @@ export function WonseoCardModal({
   onClose: () => void;
   studentId: string;
   editingCard: WonseoCard | null;
-  canEditStatus: boolean;
   nextSortOrder?: number;
   onSaved: () => void;
 }) {
@@ -334,7 +327,6 @@ export function WonseoCardModal({
       student_id: studentId,
       rank: form.rank.trim() || null,
       level: form.level,
-      status: form.status,
       university: form.university.trim(),
       department: form.department.trim() || null,
       enrollment: form.enrollment.trim() ? Number(form.enrollment.trim()) : null,
@@ -449,28 +441,6 @@ export function WonseoCardModal({
           </div>
         </div>
       </div>
-
-      {canEditStatus && (
-        <div className="border-t border-b border-slate-100 py-2.5">
-          <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-            <span>진행 / 합격 상태</span>
-            <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              선생님 전용
-            </span>
-          </label>
-          <select
-            value={form.status}
-            onChange={(e) => set("status", e.target.value as ApplicationStatus)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <label className="block font-bold text-slate-700">학교 · 학과 정보</label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

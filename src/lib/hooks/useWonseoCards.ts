@@ -10,6 +10,7 @@ import {
   computeSectionRankLabels,
 } from "@/lib/wonseo-rank";
 import type { ScheduleEvent, WonseoCard, WonseoCardGroup } from "@/lib/database.types";
+import type { CardResult } from "@/lib/wonseo-result";
 
 /** 빈 구역에도 카드를 끌어다 놓을 수 있게 구역마다 두는 드롭 영역의 id 접두어. */
 export const SECTION_DROPPABLE_PREFIX = "section:";
@@ -338,6 +339,19 @@ export function useWonseoCards({
     [onError, reloadCards, supabase],
   );
 
+  /** 발표 결과는 버튼 한 번에 바로 바뀌어 보이도록 화면을 먼저 고치고 저장한다. */
+  const saveResult = useCallback(
+    async (card: WonseoCard, result: CardResult) => {
+      setCards((prev) => prev.map((item) => (item.id === card.id ? { ...item, ...result } : item)));
+      const { error } = await supabase.from("wonseo_cards").update(result).eq("id", card.id);
+      if (error) {
+        onError("결과 저장에 실패했습니다.");
+        await reloadCards();
+      }
+    },
+    [onError, reloadCards, supabase],
+  );
+
   const saveRank = useCallback(
     async (card: WonseoCard, text: string) => {
       const value = text.trim() || null;
@@ -380,6 +394,7 @@ export function useWonseoCards({
     reorderCards,
     reorderSubmittedCards,
     saveSubmittedFields,
+    saveResult,
     saveRank,
     toggleUngroupedRanked,
   };
