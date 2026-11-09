@@ -390,7 +390,6 @@ export const WonseoCardView = forwardRef<
           </div>
         </div>
         <div className="mt-auto flex items-center gap-2 border-t border-slate-100 pt-3 text-[13px] min-w-0">
-          <span className="text-slate-500 shrink-0">발표 결과</span>
           <WonseoResultBadge card={card} onChange={onResultChange} />
           {trail && <span className="text-xs font-semibold text-slate-500 truncate">{trail}</span>}
         </div>

@@ -173,17 +173,14 @@ export function WonseoResultBadge({
         }}
         className="fixed m-0 w-[336px] max-w-[calc(100vw-16px)] bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-[13px] text-slate-800 space-y-2"
       >
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-700 text-xs">발표 결과</span>
-          <button
+        <button
             type="button"
             onClick={() => popupRef.current?.hidePopover()}
             aria-label="닫기"
-            className="w-6 h-6 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center"
+            className="absolute top-2 right-2 w-6 h-6 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center"
           >
             <X className="w-3.5 h-3.5" />
           </button>
-        </div>
 
         <div className="space-y-1.5">
           {staged && (
@@ -250,20 +247,9 @@ export function WonseoResultBadge({
                     {v}
                   </button>
                 ))}
-                <Muted>충원 결과 선택</Muted>
               </>
             ) : final.value ? (
-              <>
-                <span
-                  className={cn(
-                    CHIP,
-                    RESULT_TONE_STYLE[final.value === "합격" ? "pass" : "fail"],
-                  )}
-                >
-                  {final.value}
-                </span>
-                <Muted>자동</Muted>
-              </>
+              <span className={cn(CHIP, RESULT_TONE_STYLE[final.value === "합격" ? "pass" : "fail"])}>{final.value}</span>
             ) : (
               <Muted>발표 대기</Muted>
             )}
